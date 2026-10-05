@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+*"
+  # Manual runs release the versionName of the selected branch or tag, creating the tag if needed.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: version
+        run: |
+          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          if [ -z "$version" ]; then
+            echo "::error::Could not read versionName from app/build.gradle.kts"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match versionName $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # The build reads its keys and signing config from local.properties, see app/build.gradle.kts.
+      # The secrets hold the values exactly as they are written in a local.properties file.
+      - name: Write local.properties
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          GOOGLE_BOOKS_API_KEY: ${{ secrets.GOOGLE_BOOKS_API_KEY }}
+        run: |
+          for name in RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Secret $name is not set, the release would be unsigned"
+              exit 1
+            fi
+          done
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          {
+            printf 'release.storeFile=%s\n' "$RUNNER_TEMP/release.jks"
+            printf 'release.storePassword=%s\n' "$RELEASE_STORE_PASSWORD"
+            printf 'release.keyAlias=%s\n' "$RELEASE_KEY_ALIAS"
+            printf 'release.keyPassword=%s\n' "$RELEASE_KEY_PASSWORD"
+            printf 'googleBooks.apiKey=%s\n' "$GOOGLE_BOOKS_API_KEY"
+          } > local.properties
+
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          apk="$RUNNER_TEMP/kozeki-$VERSION.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            gh release upload "$VERSION" "$apk" --clobber
+          else
+            gh release create "$VERSION" "$apk" --title "Kozeki $VERSION" --target "$GITHUB_SHA" --generate-notes
+          fi
