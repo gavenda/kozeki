@@ -4,6 +4,8 @@ import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
+import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudOff
@@ -34,7 +37,9 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterListOff
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RemoveShoppingCart
+import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material.icons.rounded.UploadFile
@@ -42,10 +47,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -68,14 +76,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Acquisition
@@ -85,6 +97,7 @@ import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.book.DeleteBookDialog
+import dev.gavenda.kozeki.ui.book.DeleteBooksDialog
 import dev.gavenda.kozeki.ui.book.PurchaseDialog
 import dev.gavenda.kozeki.ui.components.AdaptiveColumns
 import dev.gavenda.kozeki.ui.components.BookCover
@@ -136,11 +149,18 @@ fun LibraryScreen(
         onImportClick = { picker.launch(EpubMimeTypes) },
         onAddBook = onAddBook,
         onBookClick = { onOpenBook(it.id) },
-        onToggleFavorite = viewModel::toggleFavorite,
-        onSetState = viewModel::setState,
-        onMarkPurchased = viewModel::markPurchased,
-        onUnmarkPurchased = viewModel::unmarkPurchased,
-        onDelete = viewModel::delete,
+        selectionActions = remember(viewModel) {
+            SelectionActions(
+                onToggle = viewModel::toggleSelection,
+                onSelectAll = viewModel::selectAll,
+                onClear = viewModel::clearSelection,
+                onSetFavorite = viewModel::setFavorite,
+                onSetState = viewModel::setState,
+                onMarkPurchased = viewModel::markPurchased,
+                onUnmarkPurchased = viewModel::unmarkPurchased,
+                onDelete = viewModel::delete,
+            )
+        },
         onSettingsClick = onOpenSettings,
     )
 }
@@ -176,26 +196,24 @@ fun LibraryContent(
     onImportClick: () -> Unit,
     onAddBook: () -> Unit,
     onBookClick: (Book) -> Unit,
-    onToggleFavorite: (Book) -> Unit,
-    onSetState: (Book, ReadingState) -> Unit,
-    onMarkPurchased: (Book, Long?, String?, LocalDate, String?) -> Unit,
-    onUnmarkPurchased: (Book) -> Unit,
-    onDelete: (Book) -> Unit,
+    selectionActions: SelectionActions,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyGridState()
-    var purchasingId by rememberSaveable { mutableStateOf<String?>(null) }
-    var deletingId by rememberSaveable { mutableStateOf<String?>(null) }
-    val actions = BookItemActions(
-        onClick = onBookClick,
-        onToggleFavorite = onToggleFavorite,
-        onSetState = onSetState,
-        onEditPurchase = { purchasingId = it.id },
-        onUnmarkPurchased = onUnmarkPurchased,
-        onDelete = { deletingId = it.id },
-    )
+    val selection = state.selection
+    var editingPurchase by rememberSaveable { mutableStateOf(false) }
+    var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler(state.selecting) { selectionActions.onClear() }
+    // A dialog belongs to the selection it was opened for, not to whatever is picked next.
+    LaunchedEffect(state.selecting) {
+        if (!state.selecting) {
+            editingPurchase = false
+            confirmingDelete = false
+        }
+    }
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -216,12 +234,25 @@ fun LibraryContent(
         },
         floatingActionButton = {
             // The empty state has its own button; two of them side by side would be noise.
-            if (!state.isLibraryEmpty || state.importing) {
+            // While books are picked, the selection toolbar takes this corner.
+            if (!state.selecting && (!state.isLibraryEmpty || state.importing)) {
                 AddBooksMenu(importing = state.importing, onImportClick = onImportClick, onAddBook = onAddBook)
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
+        if (state.selecting) {
+            Box(Modifier.fillMaxSize().padding(innerPadding).zIndex(1f), contentAlignment = Alignment.BottomCenter) {
+                SelectionToolbar(
+                    selection = selection,
+                    allSelected = state.allSelected,
+                    actions = selectionActions,
+                    onEditPurchase = { editingPurchase = true },
+                    onDelete = { confirmingDelete = true },
+                    modifier = Modifier.padding(bottom = FloatingToolbarDefaults.ScreenOffset),
+                )
+            }
+        }
         when {
             state.loading -> Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 LoadingIndicator()
@@ -266,7 +297,14 @@ fun LibraryContent(
                                 SectionHeader(stringResource(R.string.library_favorites))
                             }
                             items(state.favorites, key = { it.id }) { book ->
-                                LibraryBookItem(book, actions, Modifier.animateItem())
+                                LibraryBookItem(
+                                book = book,
+                                selecting = state.selecting,
+                                selected = book.id in selection.ids,
+                                actions = selectionActions,
+                                onOpen = onBookClick,
+                                modifier = Modifier.animateItem(),
+                            )
                             }
                             if (state.others.isNotEmpty()) {
                                 item(key = "header-others", span = { GridItemSpan(maxLineSpan) }) {
@@ -275,7 +313,14 @@ fun LibraryContent(
                             }
                         }
                         items(state.others, key = { it.id }) { book ->
-                            LibraryBookItem(book, actions, Modifier.animateItem())
+                            LibraryBookItem(
+                                book = book,
+                                selecting = state.selecting,
+                                selected = book.id in selection.ids,
+                                actions = selectionActions,
+                                onOpen = onBookClick,
+                                modifier = Modifier.animateItem(),
+                            )
                         }
                     }
                 }
@@ -283,39 +328,43 @@ fun LibraryContent(
         }
     }
 
-    val visible = state.favorites + state.others
-    visible.firstOrNull { it.id == purchasingId }?.let { book ->
+    val single = selection.books.singleOrNull()
+    if (editingPurchase && single != null) {
         PurchaseDialog(
-            book = book,
+            book = single,
             lastCurrency = state.lastCurrency,
             locationHistory = state.purchaseLocations,
             onSave = { price, currency, date, location ->
-                purchasingId = null
-                onMarkPurchased(book, price, currency, date, location)
+                editingPurchase = false
+                selectionActions.onMarkPurchased(price, currency, date, location)
             },
-            onDismiss = { purchasingId = null },
+            onDismiss = { editingPurchase = false },
         )
     }
-    visible.firstOrNull { it.id == deletingId }?.let { book ->
-        DeleteBookDialog(
-            title = book.title,
-            onConfirm = {
-                deletingId = null
-                onDelete(book)
-            },
-            onDismiss = { deletingId = null },
-        )
+    if (confirmingDelete && state.selecting) {
+        val onConfirm = {
+            confirmingDelete = false
+            selectionActions.onDelete()
+        }
+        if (single != null) {
+            DeleteBookDialog(title = single.title, onConfirm = onConfirm, onDismiss = { confirmingDelete = false })
+        } else {
+            DeleteBooksDialog(count = selection.size, onConfirm = onConfirm, onDismiss = { confirmingDelete = false })
+        }
     }
 }
 
-/** What can be done to a book straight from the grid. */
-private class BookItemActions(
-    val onClick: (Book) -> Unit,
-    val onToggleFavorite: (Book) -> Unit,
-    val onSetState: (Book, ReadingState) -> Unit,
-    val onEditPurchase: (Book) -> Unit,
-    val onUnmarkPurchased: (Book) -> Unit,
-    val onDelete: (Book) -> Unit,
+/** Picking books in the grid, and what is then done to all of them at once. */
+class SelectionActions(
+    val onToggle: (Book) -> Unit = {},
+    val onSelectAll: () -> Unit = {},
+    val onClear: () -> Unit = {},
+    val onSetFavorite: (Boolean) -> Unit = {},
+    val onSetState: (ReadingState) -> Unit = {},
+    val onMarkPurchased: (priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) -> Unit =
+        { _, _, _, _ -> },
+    val onUnmarkPurchased: () -> Unit = {},
+    val onDelete: () -> Unit = {},
 )
 
 /** The two ways a book gets in: as an EPUB from the device, or looked up online without a file. */
@@ -411,22 +460,42 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LibraryBookItem(
     book: Book,
-    actions: BookItemActions,
+    selecting: Boolean,
+    selected: Boolean,
+    actions: SelectionActions,
+    onOpen: (Book) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
+    val container by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+    )
+    // A picked cover steps back from the edge, so the tint behind it frames it.
+    val inset by animateDpAsState(if (selected) 6.dp else 0.dp)
 
     Column(
         modifier = modifier
             .clip(MaterialTheme.shapes.medium)
+            .drawBehind { drawRect(container) }
             .combinedClickable(
-                onClick = { actions.onClick(book) },
-                onLongClick = { menuOpen = true },
-                onLongClickLabel = stringResource(R.string.book_more_actions),
-            ),
+                // While picking, a tap picks too; opening a book waits until the selection is over.
+                onClick = { if (selecting) actions.onToggle(book) else onOpen(book) },
+                onLongClick = { actions.onToggle(book) },
+                onLongClickLabel = stringResource(R.string.selection_select),
+            )
+            .semantics { if (selecting) this.selected = selected },
     ) {
-        Box {
+        Box(Modifier.padding(inset)) {
             BookCover(book, Modifier.fillMaxWidth())
+            if (selected) {
+                Surface(
+                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
+                }
+            }
             if (book.isFavorite) {
                 CoverBadge(Modifier.align(Alignment.TopEnd)) {
                     Icon(
@@ -448,7 +517,6 @@ private fun LibraryBookItem(
                     Icon(badgeIcon, contentDescription = stringResource(badgeLabel), modifier = Modifier.size(14.dp))
                 }
             }
-            BookMenu(book = book, expanded = menuOpen, onDismiss = { menuOpen = false }, actions = actions)
         }
         // Shorter waves than the default, so a narrow grid cell still shows a few of them.
         LinearWavyProgressIndicator(
@@ -498,88 +566,133 @@ private fun CoverBadge(modifier: Modifier = Modifier, content: @Composable () ->
     }
 }
 
+/** Floats over the grid while books are picked: how many, and what can be done to them together. */
 @Composable
-private fun BookMenu(
-    book: Book,
-    expanded: Boolean,
-    onDismiss: () -> Unit,
-    actions: BookItemActions,
+private fun SelectionToolbar(
+    selection: LibrarySelection,
+    allSelected: Boolean,
+    actions: SelectionActions,
+    onEditPurchase: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        if (book.canFavorite) {
-            DropdownMenuItem(
-                text = {
-                    Text(stringResource(if (book.isFavorite) R.string.favorite_remove else R.string.favorite_add))
-                },
-                leadingIcon = {
-                    Icon(
-                        if (book.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    onDismiss()
-                    actions.onToggleFavorite(book)
-                },
-            )
+    var stateMenuOpen by remember { mutableStateOf(false) }
+    var moreOpen by remember { mutableStateOf(false) }
+    val countLabel = pluralStringResource(R.plurals.selection_count, selection.size, selection.size)
+
+    HorizontalFloatingToolbar(
+        expanded = true,
+        modifier = modifier,
+        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
+    ) {
+        IconButton(onClick = actions.onClear) {
+            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.selection_clear))
         }
-        if (book.canFavorite) HorizontalDivider()
-        val recorded = book.acquisition == Acquisition.PURCHASED
-        DropdownMenuItem(
-            text = {
-                Text(stringResource(if (recorded) R.string.purchase_dialog_title else R.string.wishlist_mark_purchased))
-            },
-            leadingIcon = { Icon(Icons.Rounded.ShoppingBag, contentDescription = null) },
-            onClick = {
-                onDismiss()
-                actions.onEditPurchase(book)
-            },
+        Text(
+            text = selection.size.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .padding(start = 4.dp, end = 12.dp)
+                .semantics { contentDescription = countLabel },
         )
-        // Dropping the purchase leaves a wish, or a download when the book has its EPUB.
-        if (recorded) {
-            DropdownMenuItem(
-                text = {
-                    Text(
-                        stringResource(
-                            if (book.inLibrary) R.string.purchase_mark_not_purchased else R.string.wishlist_move_back,
-                        ),
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        if (book.inLibrary) Icons.Rounded.RemoveShoppingCart else Icons.Rounded.Bookmark,
-                        contentDescription = null,
-                    )
-                },
-                onClick = {
-                    onDismiss()
-                    actions.onUnmarkPurchased(book)
-                },
-            )
+        IconButton(onClick = actions.onSelectAll, enabled = !allSelected) {
+            Icon(Icons.Rounded.SelectAll, contentDescription = stringResource(R.string.selection_select_all))
         }
-        if (book.canChangeState) {
-            HorizontalDivider()
-            ReadingStateOrder.filter { it != book.state }.forEach { state ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.book_mark_as, stringResource(state.labelRes))) },
-                    leadingIcon = { Icon(state.icon, contentDescription = null) },
-                    onClick = {
-                        onDismiss()
-                        actions.onSetState(book, state)
-                    },
+        if (selection.favoritable.isNotEmpty()) {
+            val favorites = selection.allFavorite
+            IconButton(onClick = { actions.onSetFavorite(!favorites) }) {
+                Icon(
+                    if (favorites) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    contentDescription = stringResource(
+                        if (favorites) R.string.favorite_remove else R.string.favorite_add,
+                    ),
                 )
             }
         }
-        if (!book.inLibrary) {
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.action_delete)) },
-                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                onClick = {
-                    onDismiss()
-                    actions.onDelete(book)
-                },
-            )
+        if (selection.stateChangeable.isNotEmpty()) {
+            Box {
+                IconButton(onClick = { stateMenuOpen = true }) {
+                    Icon(
+                        Icons.Rounded.Bookmarks,
+                        contentDescription = stringResource(R.string.selection_change_state),
+                    )
+                }
+                DropdownMenu(expanded = stateMenuOpen, onDismissRequest = { stateMenuOpen = false }) {
+                    ReadingStateOrder.filter { it != selection.sharedState }.forEach { state ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.book_mark_as, stringResource(state.labelRes))) },
+                            leadingIcon = { Icon(state.icon, contentDescription = null) },
+                            onClick = {
+                                stateMenuOpen = false
+                                actions.onSetState(state)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        Box {
+            IconButton(onClick = { moreOpen = true }) {
+                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.book_more_actions))
+            }
+            DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                val single = selection.books.singleOrNull()
+                // One book gets the full details; several are simply marked as bought today.
+                if (single != null || selection.notPurchased.isNotEmpty()) {
+                    val recorded = single?.acquisition == Acquisition.PURCHASED
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (recorded) R.string.purchase_dialog_title else R.string.wishlist_mark_purchased,
+                                ),
+                            )
+                        },
+                        leadingIcon = { Icon(Icons.Rounded.ShoppingBag, contentDescription = null) },
+                        onClick = {
+                            moreOpen = false
+                            if (single != null) {
+                                onEditPurchase()
+                            } else {
+                                actions.onMarkPurchased(null, null, LocalDate.now(), null)
+                            }
+                        },
+                    )
+                }
+                // Dropping the purchase leaves a wish, or a download when the book has its EPUB.
+                if (selection.purchased.isNotEmpty()) {
+                    val toWishlist = selection.purchased.none { it.inLibrary }
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(
+                                    if (toWishlist) R.string.wishlist_move_back else R.string.purchase_mark_not_purchased,
+                                ),
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (toWishlist) Icons.Rounded.Bookmark else Icons.Rounded.RemoveShoppingCart,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            moreOpen = false
+                            actions.onUnmarkPurchased()
+                        },
+                    )
+                }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.action_delete)) },
+                    leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                    onClick = {
+                        moreOpen = false
+                        onDelete()
+                    },
+                )
+            }
         }
     }
 }
@@ -605,11 +718,35 @@ private fun LibraryContentPreview() {
             onImportClick = {},
             onAddBook = {},
             onBookClick = {},
-            onToggleFavorite = {},
-            onSetState = { _, _ -> },
-            onMarkPurchased = { _, _, _, _, _ -> },
-            onUnmarkPurchased = {},
-            onDelete = {},
+            selectionActions = SelectionActions(),
+            onSettingsClick = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun LibrarySelectionPreview() {
+    val books = PreviewData.books
+    AppTheme {
+        LibraryContent(
+            state = LibraryUiState(
+                loading = false,
+                filter = LibraryFilter.ALL,
+                favorites = books.filter { it.isFavorite },
+                others = books.filterNot { it.isFavorite },
+                counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) },
+                totalBooks = books.size,
+                selection = LibrarySelection(books.take(3)),
+            ),
+            search = SearchUiState(),
+            snackbarHostState = remember { SnackbarHostState() },
+            onSearchQueryChange = {},
+            onFilterSelected = {},
+            onImportClick = {},
+            onAddBook = {},
+            onBookClick = {},
+            selectionActions = SelectionActions(),
             onSettingsClick = {},
         )
     }
@@ -628,11 +765,7 @@ private fun LibraryEmptyPreview() {
             onImportClick = {},
             onAddBook = {},
             onBookClick = {},
-            onToggleFavorite = {},
-            onSetState = { _, _ -> },
-            onMarkPurchased = { _, _, _, _, _ -> },
-            onUnmarkPurchased = {},
-            onDelete = {},
+            selectionActions = SelectionActions(),
             onSettingsClick = {},
         )
     }

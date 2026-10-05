@@ -53,6 +53,14 @@
     <string name="library_add_import">Import EPUB</string>
     <string name="library_add_find">Find a book online</string>
     <string name="library_owned_no_epub">Owned, no EPUB yet</string>
+    <string name="selection_select">Select</string>
+    <plurals name="selection_count">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="selection_clear">Clear selection</string>
+    <string name="selection_select_all">Select all</string>
+    <string name="selection_change_state">Change reading state</string>
     <string name="library_filter_empty_title">Nothing here</string>
     <string name="library_filter_empty_message">No books match this filter. Pick another one above.</string>
 
@@ -111,6 +119,11 @@
     <string name="detail_isbn">ISBN</string>
     <string name="detail_categories">Categories</string>
     <string name="delete_book_title">Delete this book?</string>
+    <plurals name="delete_books_title">
+        <item quantity="one">Delete %1$d book?</item>
+        <item quantity="other">Delete %1$d books?</item>
+    </plurals>
+    <string name="delete_books_message">These books, their EPUBs, notes and reading history will be removed. This cannot be undone.</string>
     <string name="delete_book_message">“%1$s”, its EPUB, notes and reading history will be removed. This cannot be undone.</string>
 
     <!-- Rating -->
@@ -250,6 +263,15 @@
     <string name="add_book_added_purchased">Added “%1$s” to purchased</string>
     <string name="add_book_already_added">Added</string>
     <string name="action_view">View</string>
+
+    <string name="author_error_title">Author unavailable</string>
+    <string name="author_not_found">Hardcover has no page for this author any more.</string>
+    <string name="author_no_books_title">No books listed</string>
+    <string name="author_no_books_message">Hardcover lists no books written by this author.</string>
+    <string name="author_books">Books</string>
+    <string name="author_years">%1$d–%2$d</string>
+    <string name="author_born">Born %1$d</string>
+    <string name="author_photo">Photo of %1$s</string>
 
     <!-- Calendar -->
     <string name="calendar_title">Book calendar</string>

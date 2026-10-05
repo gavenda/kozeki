@@ -30,6 +30,10 @@ data class ReaderRoute(val bookId: String)
 @Serializable
 data object AddBookRoute
 
+/** An author's page on the metadata source, reached from a book found there. */
+@Serializable
+data class AuthorRoute(val authorId: String, val name: String)
+
 @Serializable
 data object SettingsRoute
 

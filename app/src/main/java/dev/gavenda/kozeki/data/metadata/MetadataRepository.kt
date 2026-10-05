@@ -54,6 +54,14 @@ class MetadataRepository(
         return books(key, LOOKUP_TTL) { provider.searchByTitleAndAuthor(title, author) }
     }
 
+    /** The author with [authorId] and one page of their books, the first being 1. */
+    suspend fun author(authorId: String, page: Int = 1): AuthorPage =
+        cached(
+            key = "author|$authorId|$page",
+            serializer = AuthorPage.serializer(),
+            lifetime = { if (it.author == null) EMPTY_TTL else AUTHOR_TTL },
+        ) { provider.author(authorId, page) }
+
     /** What the source's readers think of the book with [sourceId]. */
     suspend fun reviews(sourceId: String): BookReviews =
         cached("reviews|$sourceId", BookReviews.serializer(), { REVIEWS_TTL }) { provider.reviews(sourceId) }
@@ -125,10 +133,11 @@ class MetadataRepository(
         const val MIN_REQUEST_GAP_MS = 400L
 
         /** Bumped when what a search returns changes, so answers cached under the old rules are not served. */
-        const val SEARCH_VERSION = 2
+        const val SEARCH_VERSION = 3
         val SEARCH_TTL: Duration = Duration.ofDays(7)
         val LOOKUP_TTL: Duration = Duration.ofDays(30)
         val EMPTY_TTL: Duration = Duration.ofDays(1)
+        val AUTHOR_TTL: Duration = Duration.ofDays(7)
 
         /** Reviews keep arriving, so they are refreshed far sooner than a book's own details. */
         val REVIEWS_TTL: Duration = Duration.ofDays(1)

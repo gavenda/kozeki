@@ -30,10 +30,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dev.gavenda.kozeki.ui.addbook.AddBookScreen
+import dev.gavenda.kozeki.ui.author.AuthorScreen
 import dev.gavenda.kozeki.ui.book.BookDetailScreen
 import dev.gavenda.kozeki.ui.calendar.CalendarScreen
 import dev.gavenda.kozeki.ui.library.LibraryScreen
 import dev.gavenda.kozeki.ui.navigation.AddBookRoute
+import dev.gavenda.kozeki.ui.navigation.AuthorRoute
 import dev.gavenda.kozeki.ui.navigation.BookRoute
 import dev.gavenda.kozeki.ui.navigation.CalendarRoute
 import dev.gavenda.kozeki.ui.navigation.DayRoute
@@ -113,7 +115,18 @@ fun KozekiApp() {
                 AddBookScreen(
                     onBack = { entry.back() },
                     onOpenBook = { entry.open(BookRoute(it)) },
+                    onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                     onOpenSettings = { entry.open(SettingsRoute) },
+                )
+            }
+            composable<AuthorRoute> { entry ->
+                val route = entry.toRoute<AuthorRoute>()
+                AuthorScreen(
+                    authorId = route.authorId,
+                    name = route.name,
+                    onBack = { entry.back() },
+                    onOpenBook = { entry.open(BookRoute(it)) },
+                    onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
             }
             composable<SettingsRoute> { entry -> SettingsScreen(onBack = { entry.back() }) }

@@ -15,6 +15,7 @@ import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.work.MatchWorker
 import dev.gavenda.kozeki.ui.addbook.AddBookViewModel
+import dev.gavenda.kozeki.ui.author.AuthorViewModel
 import dev.gavenda.kozeki.ui.book.BookDetailViewModel
 import dev.gavenda.kozeki.ui.calendar.CalendarViewModel
 import dev.gavenda.kozeki.ui.library.LibraryViewModel
@@ -87,6 +88,8 @@ val appModule = module {
     viewModel { LibraryViewModel(get(), get(), scheduleMatching()) }
 
     viewModel { AddBookViewModel(get(), get()) }
+
+    viewModel { (authorId: String, name: String) -> AuthorViewModel(authorId, name, get(), get()) }
 
     viewModel { SearchViewModel(get()) }
 

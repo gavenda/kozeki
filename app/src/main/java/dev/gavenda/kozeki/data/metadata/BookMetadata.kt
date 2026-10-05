@@ -11,6 +11,8 @@ data class BookMetadata(
     val title: String,
     val subtitle: String? = null,
     val authors: List<String> = emptyList(),
+    /** Who among [authors] the source keeps a page for. */
+    val authorRefs: List<AuthorRef> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
     val publishedDate: String? = null,
@@ -22,6 +24,37 @@ data class BookMetadata(
     val coverUrl: String? = null,
     /** The book's page on the source. */
     val infoUrl: String? = null,
+) {
+    /** The author called [name], when the source can show more of them. */
+    fun authorRef(name: String): AuthorRef? = authorRefs.firstOrNull { it.name == name }
+}
+
+/** An author by the ID the source knows them under. */
+@Serializable
+data class AuthorRef(val id: String, val name: String)
+
+/** An author as described by a metadata source. */
+@Serializable
+data class Author(
+    val id: String,
+    val name: String,
+    val bio: String? = null,
+    val bornYear: Int? = null,
+    val deathYear: Int? = null,
+    val location: String? = null,
+    /** How many books the source credits them with, which can be more than it lists. */
+    val booksCount: Int = 0,
+    val imageUrl: String? = null,
+    /** The author's page on the source. */
+    val infoUrl: String? = null,
+)
+
+/** An author and one page of their books. */
+@Serializable
+data class AuthorPage(
+    /** Null when the source has no such author. */
+    val author: Author? = null,
+    val books: BookPage = BookPage(),
 )
 
 /** One page of a search, and whether the source has more to give after it. */
@@ -72,6 +105,9 @@ interface MetadataProvider {
 
     suspend fun searchByTitleAndAuthor(title: String, author: String?): List<BookMetadata> =
         search(listOfNotNull(title, author).joinToString(" ")).books
+
+    /** The author with [authorId] on this source and [page] of their books, the first page being 1. */
+    suspend fun author(authorId: String, page: Int = 1): AuthorPage
 
     /** Ratings and written reviews for the book with [sourceId] on this source. */
     suspend fun reviews(sourceId: String): BookReviews

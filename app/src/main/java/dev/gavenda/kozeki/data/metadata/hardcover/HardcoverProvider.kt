@@ -1,5 +1,8 @@
 package dev.gavenda.kozeki.data.metadata.hardcover
 
+import dev.gavenda.kozeki.data.metadata.Author
+import dev.gavenda.kozeki.data.metadata.AuthorPage
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookPage
 import dev.gavenda.kozeki.data.metadata.BookReview
@@ -30,8 +33,9 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Hardcover's GraphQL API. Books are found through its `search` action alone, for both free-text
- * and ISBN lookups, because the search index already carries every ISBN of a book. Reviews are the
- * `user_books` rows of other readers, which need wider scopes than search does.
+ * and ISBN lookups, because the search index already carries every ISBN of a book. An author's
+ * books are their `contributions`. Reviews are the `user_books` rows of other readers, which need
+ * wider scopes than search does.
  */
 class HardcoverProvider(
     private val client: OkHttpClient,
@@ -56,6 +60,81 @@ class HardcoverProvider(
 
     override suspend fun findByIsbn(isbn13: String): List<BookMetadata> =
         searchDocuments(isbn13, page = 1).documents.mapNotNull { toMetadata(it, isbn13) }.filter { it.isbn13 == isbn13 }
+
+    override suspend fun author(authorId: String, page: Int): AuthorPage {
+        // Hardcover's author IDs are integers; anything else cannot be one of its authors.
+        val id = authorId.toIntOrNull() ?: return AuthorPage()
+        val body = buildJsonObject {
+            put("query", AUTHOR_QUERY)
+            putJsonObject("variables") {
+                put("id", id)
+                put("limit", AUTHOR_PAGE_SIZE)
+                put("offset", (page - 1) * AUTHOR_PAGE_SIZE)
+            }
+        }.toString()
+
+        val author = execute(body)["authors_by_pk"].asObject() ?: return AuthorPage()
+        val name = author.string("name")?.singleLineOrNull() ?: return AuthorPage()
+        val rows = (author["contributions"] as? JsonArray).orEmpty().mapNotNull { it.asObject() }
+        return AuthorPage(
+            author = Author(
+                id = authorId,
+                name = name,
+                bio = author.string("bio")?.let(::plainText)?.takeIf { it.isNotEmpty() },
+                bornYear = author.int("born_year"),
+                deathYear = author.int("death_year"),
+                location = author.string("location")?.singleLineOrNull(),
+                booksCount = author.int("books_count") ?: 0,
+                imageUrl = author["image"].asObject()?.string("url")?.takeIf { it.startsWith("https://") },
+                infoUrl = author.string("slug")?.let { "https://hardcover.app/authors/$it" },
+            ),
+            books = BookPage(
+                // Their own books only, not the ones they translated, narrated or introduced.
+                books = rows.filter { isWriter(it.string("contribution")) }
+                    .mapNotNull { it["book"].asObject() }
+                    .filterNot(::isCollection)
+                    .mapNotNull(::bookToMetadata),
+                hasMore = rows.size >= AUTHOR_PAGE_SIZE,
+            ),
+        )
+    }
+
+    /** Whether a contribution in [role] is the writing of the book. The main author's has no role at all. */
+    private fun isWriter(role: String?): Boolean = role.isNullOrBlank() || role.trim().lowercase() in WriterRoles
+
+    /** A row of the `books` table, which names things differently from a search document. */
+    private fun bookToMetadata(book: JsonObject): BookMetadata? {
+        val id = book.string("id") ?: return null
+        val title = book.string("title")?.singleLineOrNull() ?: return null
+        val contributors = (book["contributions"] as? JsonArray).orEmpty()
+            .mapNotNull { it.asObject() }
+            .filter { isWriter(it.string("contribution")) }
+            .mapNotNull { it["author"].asObject()?.let(::toAuthorRef) }
+            .distinct()
+        val isbn13 = listOf("default_physical_edition", "default_ebook_edition")
+            .firstNotNullOfOrNull { edition -> book[edition].asObject()?.string("isbn_13")?.let(Isbn::toIsbn13) }
+        return BookMetadata(
+            source = MetadataSource.HARDCOVER,
+            sourceId = id,
+            title = title,
+            subtitle = book.string("subtitle")?.singleLineOrNull(),
+            authors = contributors.map { it.name },
+            authorRefs = contributors,
+            description = book.string("description")?.takeIf { it.isNotBlank() },
+            publishedDate = book.string("release_date") ?: book.int("release_year")?.toString(),
+            pageCount = book.int("pages")?.takeIf { it > 0 },
+            isbn10 = isbn13?.let(Isbn::toIsbn10),
+            isbn13 = isbn13,
+            coverUrl = book["image"].asObject()?.string("url")?.takeIf { it.startsWith("https://") },
+            infoUrl = book.string("slug")?.let { "https://hardcover.app/books/$it" },
+        )
+    }
+
+    private fun toAuthorRef(author: JsonObject): AuthorRef? {
+        val id = author.string("id") ?: return null
+        val name = author.string("name")?.singleLineOrNull() ?: return null
+        return AuthorRef(id, name)
+    }
 
     override suspend fun reviews(sourceId: String): BookReviews {
         // Hardcover's book IDs are integers; anything else cannot be one of its books.
@@ -198,6 +277,9 @@ class HardcoverProvider(
             title = title,
             subtitle = document.string("subtitle")?.singleLineOrNull(),
             authors = strings(document["author_names"]),
+            authorRefs = (document["contributions"] as? JsonArray).orEmpty()
+                .mapNotNull { it.asObject()?.get("author").asObject()?.let(::toAuthorRef) }
+                .distinct(),
             description = document.string("description")?.takeIf { it.isNotBlank() },
             publishedDate = document.string("release_date") ?: document.int("release_year")?.toString(),
             pageCount = document.int("pages")?.takeIf { it > 0 },
@@ -226,6 +308,24 @@ class HardcoverProvider(
 
         const val SEARCH_QUERY = "query Search(\$query: String!, \$page: Int!, \$perPage: Int!) { " +
             "search(query: \$query, query_type: \"Book\", per_page: \$perPage, page: \$page) { results } }"
+
+        const val AUTHOR_PAGE_SIZE = 20
+
+        // Duplicates merged into another book are left out, and the most read books come first.
+        private const val AUTHOR_BOOK_ROWS =
+            "contributions(where: { contributable_type: { _eq: \"Book\" }, " +
+                "book: { canonical_id: { _is_null: true } } }, " +
+                "order_by: [{ book: { users_count: desc } }, { id: asc }], limit: \$limit, offset: \$offset)"
+        private const val AUTHOR_BOOK_FIELDS =
+            "id title subtitle slug description release_date release_year pages compilation image { url } " +
+                "contributions { contribution author { id name } } " +
+                "default_physical_edition { isbn_13 } default_ebook_edition { isbn_13 }"
+
+        const val AUTHOR_QUERY = "query Author(\$id: Int!, \$limit: Int!, \$offset: Int!) { " +
+            "authors_by_pk(id: \$id) { name bio born_year death_year location books_count slug image { url } " +
+            "$AUTHOR_BOOK_ROWS { contribution book { $AUTHOR_BOOK_FIELDS } } } }"
+
+        val WriterRoles = setOf("author", "writer")
 
         const val REVIEWS_LIMIT = 20
 

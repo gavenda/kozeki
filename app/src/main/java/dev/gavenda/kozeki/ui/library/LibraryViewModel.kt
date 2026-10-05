@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
@@ -51,6 +52,26 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
     }
 }
 
+/** The books picked in the grid, and which of them each action applies to. */
+data class LibrarySelection(val books: List<Book> = emptyList()) {
+    val ids: Set<String> = books.mapTo(HashSet()) { it.id }
+    val size: Int get() = books.size
+    val isEmpty: Boolean get() = books.isEmpty()
+
+    /** A book that is only wanted cannot be a favorite, so it sits that change out. */
+    val favoritable: List<Book> = books.filter { it.canFavorite }
+    val allFavorite: Boolean get() = favoritable.isNotEmpty() && favoritable.all { it.isFavorite }
+
+    /** Likewise for the reading state: a wanted book stays Planned. */
+    val stateChangeable: List<Book> = books.filter { it.canChangeState }
+
+    /** The state every one of those is in, when they agree. */
+    val sharedState: ReadingState? get() = stateChangeable.map { it.state }.distinct().singleOrNull()
+
+    val purchased: List<Book> = books.filter { it.acquisition == Acquisition.PURCHASED }
+    val notPurchased: List<Book> = books.filter { it.acquisition != Acquisition.PURCHASED }
+}
+
 data class LibraryUiState(
     val loading: Boolean = true,
     val filter: LibraryFilter = LibraryFilter.READING,
@@ -61,7 +82,11 @@ data class LibraryUiState(
     val importing: Boolean = false,
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
+    val selection: LibrarySelection = LibrarySelection(),
 ) {
+    val selecting: Boolean get() = !selection.isEmpty
+    val allSelected: Boolean get() = selection.size == favorites.size + others.size
+
     val isLibraryEmpty: Boolean get() = !loading && totalBooks == 0
     val isFilterEmpty: Boolean get() = !loading && favorites.isEmpty() && others.isEmpty()
 }
@@ -79,6 +104,7 @@ class LibraryViewModel(
     // Null until the user picks one, so the first view can avoid opening on an empty filter.
     private val chosenFilter = MutableStateFlow<LibraryFilter?>(null)
     private val importing = MutableStateFlow(false)
+    private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
     val events: Flow<LibraryEvent> = eventChannel.receiveAsFlow()
@@ -88,14 +114,11 @@ class LibraryViewModel(
         withFile + without
     }
 
+    private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
+
     val uiState: StateFlow<LibraryUiState> =
-        combine(
-            books,
-            chosenFilter,
-            importing,
-            settings.lastCurrency,
-            library.observePurchaseLocations(),
-        ) { books, chosen, busy, currency, locations ->
+        combine(books, chosenFilter, importing, selectedIds, purchaseDefaults) { books, chosen, busy, selected, defaults ->
+            val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
             val filter = chosen ?: when {
                 counts.getValue(LibraryFilter.READING) > 0 -> LibraryFilter.READING
@@ -112,11 +135,27 @@ class LibraryViewModel(
                 importing = busy,
                 lastCurrency = currency,
                 purchaseLocations = locations,
+                // Only what is on screen: a book that left the filter is no longer picked.
+                selection = LibrarySelection((favorites + others).filter { it.id in selected }),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     fun selectFilter(filter: LibraryFilter) {
         chosenFilter.value = filter
+        clearSelection()
+    }
+
+    fun toggleSelection(book: Book) {
+        selectedIds.update { if (book.id in it) it - book.id else it + book.id }
+    }
+
+    fun selectAll() {
+        val state = uiState.value
+        selectedIds.value = (state.favorites + state.others).mapTo(HashSet()) { it.id }
+    }
+
+    fun clearSelection() {
+        selectedIds.value = emptySet()
     }
 
     fun import(uris: List<Uri>) {
@@ -144,28 +183,43 @@ class LibraryViewModel(
         }
     }
 
-    fun toggleFavorite(book: Book) {
-        viewModelScope.launch { library.setFavorite(book.id, !book.isFavorite) }
+    /** Runs [action] on the picked books and ends the selection, as the action is what it was for. */
+    private fun withSelection(action: suspend (LibrarySelection) -> Unit) {
+        val selection = uiState.value.selection
+        clearSelection()
+        viewModelScope.launch { action(selection) }
     }
 
-    fun setState(book: Book, state: ReadingState) {
-        viewModelScope.launch { library.setState(book.id, state) }
+    fun setFavorite(favorite: Boolean) = withSelection { selection ->
+        selection.favoritable.forEach { library.setFavorite(it.id, favorite) }
     }
 
-    fun markPurchased(book: Book, priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) {
-        viewModelScope.launch {
-            library.setPurchase(book.id, Acquisition.PURCHASED, priceMinor, currency, purchasedOn, location)
+    fun setState(state: ReadingState) = withSelection { selection ->
+        selection.stateChangeable.forEach { library.setState(it.id, state) }
+    }
+
+    /**
+     * A single book takes the details as given, which also edits a purchase already on record.
+     * With several picked, only those without a purchase get one, so no recorded price is lost.
+     */
+    fun markPurchased(priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) =
+        withSelection { selection ->
+            val books = selection.books.singleOrNull()?.let(::listOf) ?: selection.notPurchased
+            books.forEach {
+                library.setPurchase(it.id, Acquisition.PURCHASED, priceMinor, currency, purchasedOn, location)
+            }
             if (priceMinor != null && currency != null) settings.setLastCurrency(currency)
+        }
+
+    /** Back to the wishlist, or to a plain download when the book has its EPUB. */
+    fun unmarkPurchased() = withSelection { selection ->
+        selection.purchased.forEach { book ->
+            val unbought = if (book.inLibrary) Acquisition.DOWNLOADED else Acquisition.WISHLIST
+            library.setPurchase(book.id, unbought, null, null, null, null)
         }
     }
 
-    /** Back to the wishlist, or to a plain download when the book has its EPUB. */
-    fun unmarkPurchased(book: Book) {
-        val unbought = if (book.inLibrary) Acquisition.DOWNLOADED else Acquisition.WISHLIST
-        viewModelScope.launch { library.setPurchase(book.id, unbought, null, null, null, null) }
-    }
-
-    fun delete(book: Book) {
-        viewModelScope.launch { library.deleteBook(book.id) }
+    fun delete() = withSelection { selection ->
+        selection.books.forEach { library.deleteBook(it.id) }
     }
 }

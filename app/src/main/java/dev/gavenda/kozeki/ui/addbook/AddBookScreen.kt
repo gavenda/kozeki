@@ -1,9 +1,7 @@
 package dev.gavenda.kozeki.ui.addbook
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,10 +9,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
@@ -22,8 +18,6 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -36,7 +30,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -52,13 +45,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -66,6 +58,7 @@ import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
+import dev.gavenda.kozeki.ui.components.MetadataResultDetails
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
@@ -76,6 +69,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun AddBookScreen(
     onBack: () -> Unit,
     onOpenBook: (String) -> Unit,
+    onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSettings: () -> Unit,
     viewModel: AddBookViewModel = koinViewModel(),
 ) {
@@ -114,6 +108,7 @@ fun AddBookScreen(
         onLoadMore = viewModel::loadMore,
         onSelect = viewModel::select,
         onAdd = viewModel::add,
+        onOpenAuthor = onOpenAuthor,
         onOpenSettings = onOpenSettings,
     )
 }
@@ -128,6 +123,7 @@ fun AddBookContent(
     onLoadMore: () -> Unit,
     onSelect: (BookMetadata?) -> Unit,
     onAdd: (BookMetadata, Acquisition) -> Unit,
+    onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -254,65 +250,13 @@ fun AddBookContent(
 
     state.selected?.let { result ->
         ModalBottomSheet(onDismissRequest = { onSelect(null) }, sheetState = rememberExpandedSheetState()) {
-            ResultDetails(result, onAdd)
+            MetadataResultDetails(result, onAdd, onOpenAuthor)
         }
     }
 }
 
 /** Errors the user fixes in Settings rather than by retrying. */
 private val SetupErrors = setOf(LookupError.SIGNED_OUT, LookupError.UNAUTHORIZED)
-
-@Composable
-private fun ResultDetails(result: BookMetadata, onAdd: (BookMetadata, Acquisition) -> Unit) {
-    Column(
-        modifier = Modifier
-            .verticalScroll(rememberScrollState())
-            .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = listOfNotNull(result.title, result.subtitle).joinToString(": "),
-            style = MaterialTheme.typography.titleLargeEmphasized,
-        )
-        if (result.authors.isNotEmpty()) {
-            Text(
-                text = result.authors.joinToString(", "),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        val details = listOfNotNull(
-            result.publisher,
-            result.publishedDate,
-            result.pageCount?.let { pluralStringResource(R.plurals.pages_count, it, it) },
-            result.isbn13,
-        )
-        if (details.isNotEmpty()) {
-            Text(
-                text = details.joinToString(" · "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        result.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 8) }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { onAdd(result, Acquisition.WISHLIST) },
-                shapes = ButtonDefaults.shapes(),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(stringResource(R.string.add_book_to_wishlist))
-            }
-            FilledTonalButton(
-                onClick = { onAdd(result, Acquisition.PURCHASED) },
-                shapes = ButtonDefaults.shapes(),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(stringResource(R.string.add_book_as_purchased))
-            }
-        }
-    }
-}
 
 private val PreviewResults = listOf(
     BookMetadata(
@@ -351,6 +295,7 @@ private fun AddBookResultsPreview() {
             onLoadMore = {},
             onSelect = {},
             onAdd = { _, _ -> },
+            onOpenAuthor = {},
             onOpenSettings = {},
         )
     }
@@ -369,15 +314,8 @@ private fun AddBookSignedOutPreview() {
             onLoadMore = {},
             onSelect = {},
             onAdd = { _, _ -> },
+            onOpenAuthor = {},
             onOpenSettings = {},
         )
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun ResultDetailsPreview() {
-    AppTheme {
-        Surface { ResultDetails(PreviewResults.first(), onAdd = { _, _ -> }) }
     }
 }
