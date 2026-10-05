@@ -32,11 +32,11 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
     ALL(R.string.filter_all, null),
     READING(R.string.state_reading, setOf(ReadingState.READING)),
     PLANNED(R.string.filter_planning, setOf(ReadingState.PLANNED)),
-    PAUSED(R.string.state_paused, setOf(ReadingState.PAUSED)),
-    DROPPED(R.string.state_dropped, setOf(ReadingState.DROPPED)),
     COMPLETED(R.string.state_completed, setOf(ReadingState.COMPLETED)),
     WISHLIST(R.string.wishlist_tab, null),
     PURCHASED(R.string.purchased_tab, null),
+    PAUSED(R.string.state_paused, setOf(ReadingState.PAUSED)),
+    DROPPED(R.string.state_dropped, setOf(ReadingState.DROPPED)),
     ;
 
     fun matches(book: Book): Boolean {

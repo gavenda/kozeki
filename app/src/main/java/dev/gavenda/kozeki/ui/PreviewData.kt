@@ -9,6 +9,8 @@ import dev.gavenda.kozeki.data.model.CompletedBook
 import dev.gavenda.kozeki.data.model.DailyStats
 import dev.gavenda.kozeki.data.model.DayReading
 import dev.gavenda.kozeki.data.model.MatchStatus
+import dev.gavenda.kozeki.data.metadata.BookReview
+import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.PeriodStats
@@ -44,8 +46,8 @@ object PreviewData {
             state = ReadingState.READING,
             acquisition = Acquisition.PURCHASED,
             isFavorite = true,
-            source = MetadataSource.GOOGLE_BOOKS,
-            sourceUrl = "https://books.google.com/books?id=example",
+            source = MetadataSource.HARDCOVER,
+            sourceUrl = "https://hardcover.app/books/example",
             matchStatus = MatchStatus.MATCHED,
             inLibrary = true,
             hasFile = true,
@@ -111,7 +113,7 @@ object PreviewData {
             pageCount = 387,
             state = ReadingState.PLANNED,
             acquisition = Acquisition.WISHLIST,
-            source = MetadataSource.GOOGLE_BOOKS,
+            source = MetadataSource.HARDCOVER,
             matchStatus = MatchStatus.MATCHED,
         ),
         Book(
@@ -145,6 +147,34 @@ object PreviewData {
     val notes: List<Note> = listOf(
         Note("n1", "1", "Shifgrethor: prestige, face, the unspoken rules of who may advise whom.", "The Question of Sex", Now),
         Note("n2", "1", "The ice crossing chapters are the heart of the book.", null, Now - DAY),
+    )
+
+    val reviews = BookReviews(
+        averageRating = 4.2f,
+        ratingsCount = 1834,
+        reviewsCount = 212,
+        reviews = listOf(
+            BookReview(
+                id = "v1",
+                reviewer = "Shevek",
+                rating = 5f,
+                text = "Slow to begin and then impossible to put down. The journey across the ice is some of " +
+                    "the best writing about trust between two people I have read anywhere.",
+                reviewedOn = Today.minusDays(40).toEpochDay(),
+                likes = 31,
+            ),
+            BookReview(
+                id = "v2",
+                reviewer = "Takver",
+                rating = 3.5f,
+                text = "The ending changes how the whole first half reads.",
+                hasSpoilers = true,
+                reviewedOn = Today.minusDays(300).toEpochDay(),
+                likes = 4,
+            ),
+            BookReview(id = "v3", text = "More anthropology than plot, which is exactly what I wanted."),
+            BookReview(id = "v4", reviewer = "Bedap", rating = 4f, text = "A book to reread every few years."),
+        ),
     )
 
     val readThroughs: List<ReadThrough> = listOf(

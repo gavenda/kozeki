@@ -7,9 +7,9 @@ import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
-import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.settings.ThemeMode
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.channels.Channel
@@ -22,13 +22,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
-    val source: MetadataSource = MetadataSource.GOOGLE_BOOKS,
-    val googleBooksConfigured: Boolean = false,
-    val googleRequestsToday: Int = 0,
     val hardcover: HardcoverAccount = HardcoverAccount.SignedOut,
     val signIn: HardcoverSignIn.Status = HardcoverSignIn.Status.IDLE,
     /** Shown so a mismatch with what is registered on Hardcover is easy to spot. */
     val hardcoverRedirectUri: String = "",
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dynamicColor: Boolean = true,
     val dailyGoalMinutes: Int = SettingsRepository.DEFAULT_DAILY_GOAL_MINUTES,
     val year: Int = 0,
@@ -48,8 +46,6 @@ class SettingsViewModel(
     private val stats: StatsRepository,
     private val hardcoverAuth: HardcoverAuth,
     private val hardcoverSignIn: HardcoverSignIn,
-    private val scheduleMatching: () -> Unit,
-    googleBooksConfigured: Boolean,
     versionName: String,
     clock: Clock,
 ) : ViewModel() {
@@ -59,36 +55,22 @@ class SettingsViewModel(
     private val eventChannel = Channel<SettingsEvent>(Channel.BUFFERED)
     val events: Flow<SettingsEvent> = eventChannel.receiveAsFlow()
 
-    private data class Sources(
-        val source: MetadataSource,
-        val requestsToday: Int,
-        val hardcover: HardcoverAccount,
-        val signIn: HardcoverSignIn.Status,
-    )
+    private val account = combine(hardcoverAuth.account, hardcoverSignIn.status, ::Pair)
 
-    private val sources = combine(
-        settings.metadataSource,
-        settings.googleBooksRequests,
-        hardcoverAuth.account,
-        hardcoverSignIn.status,
-    ) { source, requests, account, signIn ->
-        Sources(source, if (requests.day == today.toEpochDay()) requests.count else 0, account, signIn)
-    }
+    private val appearance = combine(settings.themeMode, settings.dynamicColor, ::Pair)
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        sources,
-        settings.dynamicColor,
+        account,
+        appearance,
         settings.dailyGoalMinutes,
         stats.observeYearlyGoal(today.year),
         metadata.observeCacheSize(),
-    ) { sources, dynamicColor, dailyGoal, yearlyGoal, cached ->
+    ) { (hardcover, signIn), (themeMode, dynamicColor), dailyGoal, yearlyGoal, cached ->
         SettingsUiState(
-            source = sources.source,
-            googleBooksConfigured = googleBooksConfigured,
-            googleRequestsToday = sources.requestsToday,
-            hardcover = sources.hardcover,
-            signIn = sources.signIn,
+            hardcover = hardcover,
+            signIn = signIn,
             hardcoverRedirectUri = hardcoverAuth.redirectUri,
+            themeMode = themeMode,
             dynamicColor = dynamicColor,
             dailyGoalMinutes = dailyGoal,
             year = today.year,
@@ -100,20 +82,11 @@ class SettingsViewModel(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         SettingsUiState(
-            googleBooksConfigured = googleBooksConfigured,
             hardcoverRedirectUri = hardcoverAuth.redirectUri,
             year = today.year,
             versionName = versionName,
         ),
     )
-
-    fun selectSource(source: MetadataSource) {
-        viewModelScope.launch {
-            settings.setMetadataSource(source)
-            // Books still waiting for a lookup may be answerable by the newly selected source.
-            scheduleMatching()
-        }
-    }
 
     fun signIn() {
         viewModelScope.launch { eventChannel.send(SettingsEvent.OpenBrowser(hardcoverSignIn.begin())) }
@@ -126,6 +99,10 @@ class SettingsViewModel(
 
     fun signOut() {
         viewModelScope.launch { hardcoverAuth.signOut() }
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { settings.setThemeMode(mode) }
     }
 
     fun setDynamicColor(enabled: Boolean) {

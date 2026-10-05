@@ -86,22 +86,6 @@ fun MetadataResultItem(
     }
 }
 
-/** Google's terms ask for this attribution wherever its book results are shown. */
-@Composable
-fun SourceAttribution(source: MetadataSource, modifier: Modifier = Modifier) {
-    Text(
-        text = stringResource(
-            when (source) {
-                MetadataSource.GOOGLE_BOOKS -> R.string.attribution_google
-                MetadataSource.HARDCOVER -> R.string.attribution_hardcover
-            },
-        ),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier,
-    )
-}
-
 @PreviewLightDark
 @Composable
 private fun MetadataResultItemPreview() {
@@ -110,7 +94,7 @@ private fun MetadataResultItemPreview() {
             Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 MetadataResultItem(
                     result = BookMetadata(
-                        source = MetadataSource.GOOGLE_BOOKS,
+                        source = MetadataSource.HARDCOVER,
                         sourceId = "abc",
                         title = "The Dispossessed",
                         subtitle = "An Ambiguous Utopia",
@@ -121,7 +105,6 @@ private fun MetadataResultItemPreview() {
                     ),
                     onClick = {},
                 )
-                SourceAttribution(MetadataSource.GOOGLE_BOOKS, Modifier.padding(horizontal = 16.dp))
             }
         }
     }

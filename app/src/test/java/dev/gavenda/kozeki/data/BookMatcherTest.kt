@@ -19,7 +19,7 @@ class BookMatcherTest {
         coverUrl: String? = null,
         description: String? = null,
     ) = BookMetadata(
-        source = MetadataSource.GOOGLE_BOOKS,
+        source = MetadataSource.HARDCOVER,
         sourceId = id,
         title = title,
         subtitle = subtitle,

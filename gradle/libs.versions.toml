@@ -8,14 +8,10 @@ lifecycle = "2.11.0"
 navigation = "2.10.2"
 browser = "1.10.0"
 composeBom = "2026.09.00"
-# Material 3 Expressive only exists in the 1.5.0 alphas. Keep this on the alpha that the
-# MaterialKolor theme builder pairs with the release below; newer alphas rename or remove
-# Expressive APIs.
 #noinspection GradleDependency
 compose-material3 = "1.5.0-alpha29"
 material3Adaptive = "1.3.0"
 materialIconsExtended = "1.7.8"
-# 6.0.0 is only published as a pre-release so far.
 materialKolor = "6.0.0-beta01"
 room = "2.8.5"
 datastore = "1.2.1"

@@ -20,7 +20,6 @@ enum class Acquisition {
 
 /** The online catalogues book metadata can be fetched from. */
 enum class MetadataSource {
-    GOOGLE_BOOKS,
     HARDCOVER,
 }
 

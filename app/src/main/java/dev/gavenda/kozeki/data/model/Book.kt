@@ -29,6 +29,8 @@ data class Book(
     val purchasedOn: LocalDate? = null,
     val purchaseLocation: String? = null,
     val source: MetadataSource? = null,
+    /** The book's ID on [source]. */
+    val sourceId: String? = null,
     val sourceUrl: String? = null,
     val matchStatus: MatchStatus = MatchStatus.NONE,
     /** An EPUB was imported for this book. */

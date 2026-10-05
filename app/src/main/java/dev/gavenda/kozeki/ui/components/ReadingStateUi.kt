@@ -49,8 +49,8 @@ val ReadingState.icon: ImageVector
 val ReadingStateOrder: List<ReadingState> = listOf(
     ReadingState.PLANNED,
     ReadingState.READING,
-    ReadingState.PAUSED,
     ReadingState.COMPLETED,
+    ReadingState.PAUSED,
     ReadingState.DROPPED,
 )
 

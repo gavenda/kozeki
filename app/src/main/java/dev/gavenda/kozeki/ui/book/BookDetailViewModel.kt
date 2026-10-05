@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.metadata.BookMetadata
+import dev.gavenda.kozeki.data.metadata.BookSearch
+import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -11,7 +13,6 @@ import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.MatchStatus
-import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
@@ -26,7 +27,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -38,8 +42,18 @@ data class MatchUiState(
     val loading: Boolean = false,
     val query: String = "",
     val results: List<BookMetadata> = emptyList(),
+    /** Whether the source may have results beyond the ones in [results]. */
+    val canLoadMore: Boolean = false,
+    val loadingMore: Boolean = false,
     val error: LookupError? = null,
-    val source: MetadataSource = MetadataSource.GOOGLE_BOOKS,
+)
+
+/** What other readers wrote about the book, for a book that is linked to the metadata source. */
+data class ReviewsUiState(
+    val loading: Boolean = false,
+    /** Null until the source has answered. */
+    val reviews: BookReviews? = null,
+    val error: LookupError? = null,
 )
 
 data class BookDetailUiState(
@@ -49,6 +63,8 @@ data class BookDetailUiState(
     val readThroughs: List<ReadThrough> = emptyList(),
     val readingTimeMs: Long = 0L,
     val match: MatchUiState = MatchUiState(),
+    /** Null while the book is not linked to the source, which leaves nothing to ask reviews for. */
+    val reviews: ReviewsUiState? = null,
     val importing: Boolean = false,
     /** Currency code last used for a price, to pre-fill the next one. */
     val lastCurrency: String? = null,
@@ -78,8 +94,17 @@ class BookDetailViewModel(
     )
 
     private val match = MutableStateFlow(MatchUiState())
+    private val reviews = MutableStateFlow<ReviewsUiState?>(null)
     private val importing = MutableStateFlow(false)
     private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+
+    /** The search the match sheet's results are the start of, when there may be more of it. */
+    private var matchPager: BookSearch? = null
+    private var reviewsJob: Job? = null
+
+    /** The ID on the source of the book the reviews on screen belong to. */
+    private var reviewedSourceId: String? = null
 
     private val eventChannel = Channel<BookDetailEvent>(Channel.BUFFERED)
     val events: Flow<BookDetailEvent> = eventChannel.receiveAsFlow()
@@ -95,11 +120,11 @@ class BookDetailViewModel(
     val uiState: StateFlow<BookDetailUiState> =
         combine(
             bookData,
-            match,
+            combine(match, reviews, ::Pair),
             importing,
             settings.lastCurrency,
             library.observePurchaseLocations(),
-        ) { data, matchState, busy, currency, locations ->
+        ) { data, (matchState, reviewsState), busy, currency, locations ->
             BookDetailUiState(
                 loading = false,
                 book = data.book,
@@ -107,11 +132,23 @@ class BookDetailViewModel(
                 readThroughs = data.readThroughs,
                 readingTimeMs = data.readingTimeMs,
                 match = matchState,
+                reviews = reviewsState,
                 importing = busy,
                 lastCurrency = currency,
                 purchaseLocations = locations,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookDetailUiState())
+
+    init {
+        // Reviews follow the link to the source: matching, re-matching or unlinking the book
+        // changes which reviews, if any, belong on the screen.
+        viewModelScope.launch {
+            library.observeBook(bookId).map { it?.sourceId }.distinctUntilChanged().collectLatest { sourceId ->
+                reviewedSourceId = sourceId
+                loadReviews()
+            }
+        }
+    }
 
     fun setState(state: ReadingState) = launch { library.setState(bookId, state) }
 
@@ -162,16 +199,37 @@ class BookDetailViewModel(
         eventChannel.send(BookDetailEvent.ImportFinished(result))
     }
 
+    // ---- Reviews ---------------------------------------------------------------------------
+
+    /** Asks again after a failure, for instance once the user has signed in or is back online. */
+    fun retryReviews() = loadReviews()
+
+    private fun loadReviews() {
+        reviewsJob?.cancel()
+        val sourceId = reviewedSourceId
+        if (sourceId == null) {
+            reviews.value = null
+            return
+        }
+        reviewsJob = viewModelScope.launch {
+            reviews.value = ReviewsUiState(loading = true)
+            reviews.value = try {
+                ReviewsUiState(reviews = metadata.reviews(sourceId))
+            } catch (e: MetadataException) {
+                ReviewsUiState(error = LookupError.from(e))
+            }
+        }
+    }
+
     // ---- Matching --------------------------------------------------------------------------
 
     /** Opens the match sheet pre-filled with the candidates for this book's title and author. */
     fun openMatch() {
         val book = uiState.value.book ?: return
         val query = listOfNotNull(book.title, book.authors.firstOrNull()).joinToString(" ")
-        searchJob?.cancel()
+        cancelMatchSearch()
         searchJob = viewModelScope.launch {
-            val source = metadata.selectedSource()
-            match.value = MatchUiState(open = true, loading = true, query = query, source = source)
+            match.value = MatchUiState(open = true, loading = true, query = query)
             lookup { matchService.candidates(book).map { it.metadata } }
         }
     }
@@ -181,20 +239,48 @@ class BookDetailViewModel(
     fun searchMatch() {
         val query = match.value.query.trim()
         if (query.isEmpty()) return
-        searchJob?.cancel()
+        cancelMatchSearch()
         searchJob = viewModelScope.launch {
             match.update { it.copy(loading = true, error = null) }
-            lookup { metadata.search(query, match.value.source) }
+            val search = BookSearch(metadata, query)
+            lookup { search.next() }
+            matchPager = search
+            match.update { it.copy(canLoadMore = it.error == null && search.hasMore) }
+        }
+    }
+
+    /** Fetches the results after the ones in the sheet, for when the list is scrolled to its end. */
+    fun loadMoreMatches() {
+        val search = matchPager ?: return
+        if (!search.hasMore || loadMoreJob?.isActive == true) return
+        loadMoreJob = viewModelScope.launch {
+            match.update { it.copy(loadingMore = true) }
+            try {
+                val more = search.next()
+                match.update { it.copy(results = it.results + more, canLoadMore = search.hasMore) }
+            } catch (_: MetadataException) {
+                // What is in the sheet stays; scrolling back to the end asks again.
+            } finally {
+                match.update { it.copy(loadingMore = false) }
+            }
         }
     }
 
     private suspend fun lookup(fetch: suspend () -> List<BookMetadata>) {
         try {
             val results = fetch()
-            match.update { it.copy(loading = false, results = results, error = null) }
+            match.update { it.copy(loading = false, results = results, canLoadMore = false, error = null) }
         } catch (e: MetadataException) {
-            match.update { it.copy(loading = false, results = emptyList(), error = LookupError.from(e)) }
+            match.update {
+                it.copy(loading = false, results = emptyList(), canLoadMore = false, error = LookupError.from(e))
+            }
         }
+    }
+
+    private fun cancelMatchSearch() {
+        searchJob?.cancel()
+        loadMoreJob?.cancel()
+        matchPager = null
     }
 
     fun applyMatch(candidate: BookMetadata) = launch {
@@ -203,7 +289,7 @@ class BookDetailViewModel(
     }
 
     fun closeMatch() {
-        searchJob?.cancel()
+        cancelMatchSearch()
         match.update { it.copy(open = false, loading = false) }
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,17 +26,20 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
@@ -59,10 +64,10 @@ import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
-import dev.gavenda.kozeki.ui.book.nameRes
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
-import dev.gavenda.kozeki.ui.components.SourceAttribution
+import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
@@ -106,6 +111,7 @@ fun AddBookScreen(
         onBack = onBack,
         onQueryChange = viewModel::onQueryChange,
         onSearch = viewModel::search,
+        onLoadMore = viewModel::loadMore,
         onSelect = viewModel::select,
         onAdd = viewModel::add,
         onOpenSettings = onOpenSettings,
@@ -119,6 +125,7 @@ fun AddBookContent(
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onLoadMore: () -> Unit,
     onSelect: (BookMetadata?) -> Unit,
     onAdd: (BookMetadata, Acquisition) -> Unit,
     onOpenSettings: () -> Unit,
@@ -152,17 +159,31 @@ fun AddBookContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 720.dp)) {
-                OutlinedTextField(
+                // Dressed as the search bar of the library, though it is a plain field: it does not
+                // open into results.
+                val searchBarColors = SearchBarDefaults.colors()
+                TextField(
                     value = state.query,
                     onValueChange = onQueryChange,
-                    label = { Text(stringResource(R.string.search_hint)) },
-                    supportingText = {
-                        Text(stringResource(R.string.add_book_searching_in, stringResource(state.source.nameRes)))
-                    },
+                    placeholder = { Text(stringResource(R.string.search_hint)) },
                     singleLine = true,
-                    shape = MaterialTheme.shapes.extraLarge,
-                    trailingIcon = {
-                        IconButton(onClick = submit, enabled = state.query.trim().length >= 3) {
+                    shape = SearchBarDefaults.inputFieldShape,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = searchBarColors.containerColor,
+                        unfocusedContainerColor = searchBarColors.containerColor,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent,
+                    ),
+                    leadingIcon = {
+                        IconButton(
+                            onClick = submit,
+                            enabled = state.query.trim().length >= 3,
+                            // The library's icon never dims, so neither does this one.
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                disabledContentColor = MaterialTheme.colorScheme.onSurface,
+                            ),
+                        ) {
                             Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.action_search))
                         }
                     },
@@ -170,7 +191,7 @@ fun AddBookContent(
                     keyboardActions = KeyboardActions(onSearch = { submit() }),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                         .focusRequester(focusRequester),
                 )
 
@@ -203,25 +224,27 @@ fun AddBookContent(
                         message = stringResource(R.string.add_book_no_results_message),
                     )
 
-                    else -> LazyColumn {
-                        items(results, key = { it.sourceId }) { result ->
-                            MetadataResultItem(
-                                result = result,
-                                onClick = { onSelect(result) },
-                                trailingContent = if (result.sourceId in state.added) {
-                                    {
-                                        Icon(
-                                            Icons.Rounded.Check,
-                                            contentDescription = stringResource(R.string.add_book_already_added),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                            )
-                        }
-                        item {
-                            SourceAttribution(state.source, Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+                    else -> {
+                        val listState = rememberLazyListState()
+                        LoadMoreEffect(listState, results.size, state.canLoadMore, onLoadMore)
+                        LazyColumn(state = listState) {
+                            items(results, key = { it.sourceId }) { result ->
+                                MetadataResultItem(
+                                    result = result,
+                                    onClick = { onSelect(result) },
+                                    trailingContent = if (result.sourceId in state.added) {
+                                        {
+                                            Icon(
+                                                Icons.Rounded.Check,
+                                                contentDescription = stringResource(R.string.add_book_already_added),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
+                            loadingMoreItem(state.loadingMore)
                         }
                     }
                 }
@@ -237,7 +260,7 @@ fun AddBookContent(
 }
 
 /** Errors the user fixes in Settings rather than by retrying. */
-private val SetupErrors = setOf(LookupError.NOT_CONFIGURED, LookupError.SIGNED_OUT, LookupError.UNAUTHORIZED)
+private val SetupErrors = setOf(LookupError.SIGNED_OUT, LookupError.UNAUTHORIZED)
 
 @Composable
 private fun ResultDetails(result: BookMetadata, onAdd: (BookMetadata, Acquisition) -> Unit) {
@@ -293,7 +316,7 @@ private fun ResultDetails(result: BookMetadata, onAdd: (BookMetadata, Acquisitio
 
 private val PreviewResults = listOf(
     BookMetadata(
-        source = MetadataSource.GOOGLE_BOOKS,
+        source = MetadataSource.HARDCOVER,
         sourceId = "a",
         title = "The Dispossessed",
         subtitle = "An Ambiguous Utopia",
@@ -306,7 +329,7 @@ private val PreviewResults = listOf(
         isbn13 = "9780061054884",
     ),
     BookMetadata(
-        source = MetadataSource.GOOGLE_BOOKS,
+        source = MetadataSource.HARDCOVER,
         sourceId = "b",
         title = "The Lathe of Heaven",
         authors = listOf("Ursula K. Le Guin"),
@@ -325,6 +348,7 @@ private fun AddBookResultsPreview() {
             onBack = {},
             onQueryChange = {},
             onSearch = {},
+            onLoadMore = {},
             onSelect = {},
             onAdd = { _, _ -> },
             onOpenSettings = {},
@@ -334,14 +358,15 @@ private fun AddBookResultsPreview() {
 
 @ScreenPreviews
 @Composable
-private fun AddBookNotConfiguredPreview() {
+private fun AddBookSignedOutPreview() {
     AppTheme {
         AddBookContent(
-            state = AddBookUiState(error = LookupError.NOT_CONFIGURED),
+            state = AddBookUiState(error = LookupError.SIGNED_OUT),
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onQueryChange = {},
             onSearch = {},
+            onLoadMore = {},
             onSelect = {},
             onAdd = { _, _ -> },
             onOpenSettings = {},

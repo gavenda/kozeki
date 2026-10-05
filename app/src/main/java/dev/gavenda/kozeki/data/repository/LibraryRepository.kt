@@ -683,6 +683,7 @@ class LibraryRepository(
         purchasedOn = purchasedOn?.let(LocalDate::ofEpochDay),
         purchaseLocation = purchaseLocation,
         source = source,
+        sourceId = sourceId,
         sourceUrl = sourceUrl,
         matchStatus = matchStatus,
         inLibrary = fileHash != null,

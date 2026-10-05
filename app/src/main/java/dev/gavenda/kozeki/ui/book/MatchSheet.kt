@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -29,8 +30,9 @@ import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.MetadataSource
+import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
-import dev.gavenda.kozeki.ui.components.SourceAttribution
+import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
@@ -40,6 +42,7 @@ fun MatchSheet(
     state: MatchUiState,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onLoadMore: () -> Unit,
     onPick: (BookMetadata) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -47,7 +50,7 @@ fun MatchSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberExpandedSheetState(),
     ) {
-        MatchSheetContent(state, onQueryChange, onSearch, onPick)
+        MatchSheetContent(state, onQueryChange, onSearch, onLoadMore, onPick)
     }
 }
 
@@ -56,6 +59,7 @@ private fun MatchSheetContent(
     state: MatchUiState,
     onQueryChange: (String) -> Unit,
     onSearch: () -> Unit,
+    onLoadMore: () -> Unit,
     onPick: (BookMetadata) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -89,12 +93,14 @@ private fun MatchSheetContent(
 
             state.results.isEmpty() -> SheetMessage(stringResource(R.string.search_no_results))
 
-            else -> LazyColumn {
-                items(state.results, key = { it.sourceId }) { result ->
-                    MetadataResultItem(result = result, onClick = { onPick(result) })
-                }
-                item {
-                    SourceAttribution(state.source, Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+            else -> {
+                val listState = rememberLazyListState()
+                LoadMoreEffect(listState, state.results.size, state.canLoadMore, onLoadMore)
+                LazyColumn(state = listState) {
+                    items(state.results, key = { it.sourceId }) { result ->
+                        MetadataResultItem(result = result, onClick = { onPick(result) })
+                    }
+                    loadingMoreItem(state.loadingMore)
                 }
             }
         }
@@ -122,7 +128,7 @@ private fun MatchSheetContentPreview() {
                     query = "The Dispossessed Le Guin",
                     results = listOf(
                         BookMetadata(
-                            source = MetadataSource.GOOGLE_BOOKS,
+                            source = MetadataSource.HARDCOVER,
                             sourceId = "a",
                             title = "The Dispossessed",
                             authors = listOf("Ursula K. Le Guin"),
@@ -131,7 +137,7 @@ private fun MatchSheetContentPreview() {
                             pageCount = 387,
                         ),
                         BookMetadata(
-                            source = MetadataSource.GOOGLE_BOOKS,
+                            source = MetadataSource.HARDCOVER,
                             sourceId = "b",
                             title = "The Dispossessed",
                             subtitle = "A Novel",
@@ -142,6 +148,7 @@ private fun MatchSheetContentPreview() {
                 ),
                 onQueryChange = {},
                 onSearch = {},
+                onLoadMore = {},
                 onPick = {},
             )
         }

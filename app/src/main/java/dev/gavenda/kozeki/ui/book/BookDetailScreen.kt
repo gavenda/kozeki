@@ -72,6 +72,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.metadata.BookMetadata
+import dev.gavenda.kozeki.data.metadata.BookReview
+import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MatchStatus
@@ -80,6 +82,7 @@ import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.BookCover
@@ -95,6 +98,7 @@ import dev.gavenda.kozeki.ui.formatPrice
 import dev.gavenda.kozeki.ui.library.EpubMimeTypes
 import dev.gavenda.kozeki.ui.library.importMessage
 import dev.gavenda.kozeki.ui.theme.AppTheme
+import java.text.NumberFormat
 import java.time.LocalDate
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -119,8 +123,10 @@ class BookDetailActions(
     val onUnlink: () -> Unit = {},
     val onMatchQueryChange: (String) -> Unit = {},
     val onSearchMatch: () -> Unit = {},
+    val onLoadMoreMatches: () -> Unit = {},
     val onApplyMatch: (BookMetadata) -> Unit = {},
     val onCloseMatch: () -> Unit = {},
+    val onRetryReviews: () -> Unit = {},
 )
 
 @Composable
@@ -166,8 +172,10 @@ fun BookDetailScreen(
             onUnlink = viewModel::unlink,
             onMatchQueryChange = viewModel::onMatchQueryChange,
             onSearchMatch = viewModel::searchMatch,
+            onLoadMoreMatches = viewModel::loadMoreMatches,
             onApplyMatch = viewModel::applyMatch,
             onCloseMatch = viewModel::closeMatch,
+            onRetryReviews = viewModel::retryReviews,
         )
     }
 
@@ -188,6 +196,7 @@ fun BookDetailContent(
     var editingPhysicalProgress by rememberSaveable { mutableStateOf(false) }
     // "" means a new note is being written; null means no note dialog.
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showingAllReviews by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -310,6 +319,37 @@ fun BookDetailContent(
                 if (state.readThroughs.isNotEmpty()) {
                     item(key = "history") { HistorySection(state.readThroughs) }
                 }
+                state.reviews?.let { reviewsState ->
+                    val reviews = reviewsState.reviews
+                    item(key = "reviews-header") { ReviewsHeader(reviews) }
+                    when {
+                        reviews == null -> item(key = "reviews-status") {
+                            ReviewsStatus(reviewsState, actions.onRetryReviews)
+                        }
+
+                        reviews.reviews.isEmpty() -> item(key = "reviews-empty") {
+                            MutedText(stringResource(R.string.reviews_empty))
+                        }
+
+                        else -> {
+                            val shown = if (showingAllReviews) reviews.reviews else reviews.reviews.take(REVIEWS_PREVIEW)
+                            items(shown, key = { "review-${it.id}" }) { ReviewCard(it) }
+                            if (shown.size < reviews.reviews.size) {
+                                item(key = "reviews-more") {
+                                    TextButton(onClick = { showingAllReviews = true }) {
+                                        Text(
+                                            pluralStringResource(
+                                                R.plurals.reviews_show_all,
+                                                reviews.reviews.size,
+                                                reviews.reviews.size,
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -369,6 +409,7 @@ fun BookDetailContent(
                 state = state.match,
                 onQueryChange = actions.onMatchQueryChange,
                 onSearch = actions.onSearchMatch,
+                onLoadMore = actions.onLoadMoreMatches,
                 onPick = actions.onApplyMatch,
                 onDismiss = actions.onCloseMatch,
             )
@@ -686,7 +727,6 @@ private fun AboutSection(book: Book) {
 
 internal val MetadataSource.nameRes: Int
     get() = when (this) {
-        MetadataSource.GOOGLE_BOOKS -> R.string.source_google_books
         MetadataSource.HARDCOVER -> R.string.source_hardcover
     }
 
@@ -781,6 +821,112 @@ private fun HistorySection(readThroughs: List<ReadThrough>) {
     }
 }
 
+/** How many reviews are shown before the user asks for the rest. */
+private const val REVIEWS_PREVIEW = 3
+
+/** The section title with, once known, what the source's readers rate the book overall. */
+@Composable
+private fun ReviewsHeader(reviews: BookReviews?) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        SectionTitle(stringResource(R.string.reviews_title))
+        if (reviews == null) return@Column
+        reviews.averageRating?.let { average ->
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.reviews_average, average),
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                )
+                RatingBar(rating = average, starSize = 18.dp)
+            }
+        }
+        if (reviews.ratingsCount > 0 || reviews.reviewsCount > 0) {
+            val counts = NumberFormat.getIntegerInstance()
+            MutedText(
+                listOf(
+                    pluralStringResource(
+                        R.plurals.reviews_ratings_count,
+                        reviews.ratingsCount,
+                        counts.format(reviews.ratingsCount),
+                    ),
+                    pluralStringResource(
+                        R.plurals.reviews_reviews_count,
+                        reviews.reviewsCount,
+                        counts.format(reviews.reviewsCount),
+                    ),
+                ).joinToString(" · "),
+            )
+        }
+    }
+}
+
+/** Stands in for the reviews while they load, or says why there are none to show. */
+@Composable
+private fun ReviewsStatus(state: ReviewsUiState, onRetry: () -> Unit) {
+    val error = state.error
+    if (error == null) {
+        Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+            LoadingIndicator()
+        }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        MutedText(stringResource(error.message))
+        TextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(stringResource(R.string.action_retry))
+        }
+    }
+}
+
+@Composable
+private fun ReviewCard(review: BookReview) {
+    // A review that gives the story away stays folded until the user asks for it.
+    var revealed by rememberSaveable(review.id) { mutableStateOf(!review.hasSpoilers) }
+    var expanded by rememberSaveable(review.id) { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = review.reviewer ?: stringResource(R.string.reviews_anonymous),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                review.rating?.let { RatingBar(rating = it, starSize = 16.dp) }
+            }
+            if (revealed) {
+                Text(
+                    text = review.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = if (expanded) Int.MAX_VALUE else 6,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .animateContentSize()
+                        .clickable(
+                            onClickLabel = stringResource(
+                                if (expanded) R.string.action_show_less else R.string.action_show_more,
+                            ),
+                        ) { expanded = !expanded },
+                )
+            } else {
+                MutedText(stringResource(R.string.reviews_spoilers))
+                TextButton(onClick = { revealed = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(stringResource(R.string.reviews_spoilers_show))
+                }
+            }
+            val footer = listOfNotNull(
+                review.reviewedOn?.let { formatDate(LocalDate.ofEpochDay(it)) },
+                review.likes.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.reviews_likes, it, it) },
+            ).joinToString(" · ")
+            if (footer.isNotEmpty()) MutedText(footer)
+        }
+    }
+}
+
 @Composable
 private fun SectionTitle(text: String, trailing: (@Composable () -> Unit)? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -805,6 +951,7 @@ private fun BookDetailReadingPreview() {
                 notes = PreviewData.notes,
                 readThroughs = PreviewData.readThroughs,
                 readingTimeMs = 5 * 3_600_000L + 20 * 60_000L,
+                reviews = ReviewsUiState(reviews = PreviewData.reviews),
             ),
             snackbarHostState = remember { SnackbarHostState() },
             actions = BookDetailActions(),
@@ -829,7 +976,11 @@ private fun BookDetailPhysicalPreview() {
 private fun BookDetailWishlistPreview() {
     AppTheme {
         BookDetailContent(
-            state = BookDetailUiState(loading = false, book = PreviewData.books[4]),
+            state = BookDetailUiState(
+                loading = false,
+                book = PreviewData.books[4],
+                reviews = ReviewsUiState(error = LookupError.MISSING_PERMISSION),
+            ),
             snackbarHostState = remember { SnackbarHostState() },
             actions = BookDetailActions(),
         )

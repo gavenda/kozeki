@@ -16,19 +16,21 @@ val localProperties = Properties().apply {
 fun localProperty(name: String, default: String = ""): String =
     localProperties.getProperty(name)?.trim().orEmpty().ifEmpty { default }
 
-// Public metadata only, so an API key is enough. Set googleBooks.apiKey in local.properties.
-val googleBooksApiKey = localProperty("googleBooks.apiKey")
-
 // Hardcover OAuth public client: the client ID is not a secret, PKCE protects the flow.
 val hardcoverClientId = localProperty("hardcover.clientId", "d5a3c778-a5b8-4fb1-819c-deb5e30ac364")
 
 // Must match a redirect URI registered on the Hardcover developer app exactly.
 val hardcoverRedirectUri = URI(localProperty("hardcover.redirectUri", "kozeki://oauth/hardcover"))
 
-// Catalogue search is all the app needs. read:me:content (username and picture) and read:me:email
-// only add the account shown in Settings.
+// read:catalog covers search. Reviews by other readers need read:social, and the user_books query
+// they are read through is only open to tokens with a read:library scope. read:users adds who
+// wrote each review. read:me:content (username and picture) and read:me:email only add the
+// account shown in Settings.
 // Scopes the developer app does not allow are dropped by Hardcover at consent time.
-val hardcoverScopes = localProperty("hardcover.scopes", "read:catalog read:me:content read:me:email")
+val hardcoverScopes = localProperty(
+    "hardcover.scopes",
+    "read:catalog read:social read:library:public read:users read:me:content read:me:email",
+)
 
 android {
     namespace = "dev.gavenda.kozeki"
@@ -40,12 +42,11 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"$googleBooksApiKey\"")
         buildConfigField("String", "HARDCOVER_CLIENT_ID", "\"$hardcoverClientId\"")
         buildConfigField("String", "HARDCOVER_REDIRECT_URI", "\"$hardcoverRedirectUri\"")
         buildConfigField("String", "HARDCOVER_SCOPES", "\"$hardcoverScopes\"")

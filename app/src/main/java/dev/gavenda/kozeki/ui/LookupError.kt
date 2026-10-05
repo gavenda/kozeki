@@ -9,9 +9,11 @@ import dev.gavenda.kozeki.data.metadata.MetadataProvider
 enum class LookupError(@param:StringRes val message: Int) {
     OFFLINE(R.string.lookup_error_offline),
     RATE_LIMITED(R.string.lookup_error_rate_limited),
-    NOT_CONFIGURED(R.string.lookup_error_not_configured),
     SIGNED_OUT(R.string.lookup_error_signed_out),
     UNAUTHORIZED(R.string.lookup_error_unauthorized),
+
+    /** Signed in, but before the app asked for what this lookup needs. */
+    MISSING_PERMISSION(R.string.lookup_error_missing_permission),
     OTHER(R.string.lookup_error_other),
     ;
 
@@ -20,12 +22,12 @@ enum class LookupError(@param:StringRes val message: Int) {
             is MetadataException.Network -> OFFLINE
             is MetadataException.RateLimited -> RATE_LIMITED
             is MetadataException.Unauthorized -> UNAUTHORIZED
+            is MetadataException.MissingScope -> MISSING_PERMISSION
             is MetadataException.Unavailable -> from(error.reason)
             else -> OTHER
         }
 
         fun from(reason: MetadataProvider.Unavailable): LookupError = when (reason) {
-            MetadataProvider.Unavailable.NOT_CONFIGURED -> NOT_CONFIGURED
             MetadataProvider.Unavailable.SIGNED_OUT -> SIGNED_OUT
         }
     }

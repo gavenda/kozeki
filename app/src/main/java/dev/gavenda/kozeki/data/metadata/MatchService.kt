@@ -4,7 +4,7 @@ import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 
-/** Maps imported EPUBs to records in the selected metadata source. */
+/** Maps imported EPUBs to records in the metadata source. */
 class MatchService(
     private val library: LibraryRepository,
     private val metadata: MetadataRepository,
@@ -14,7 +14,7 @@ class MatchService(
         NEEDS_REVIEW,
         NOT_FOUND,
 
-        /** The source has no key or nobody is signed in. Trying again by itself will not help. */
+        /** Nobody is signed in to the source. Trying again by itself will not help. */
         UNAVAILABLE,
 
         /** Offline or rate-limited. Worth trying again later. */
@@ -27,11 +27,10 @@ class MatchService(
      */
     suspend fun match(bookId: String): Outcome {
         val book = library.getBook(bookId) ?: return Outcome.NOT_FOUND
-        val source = metadata.selectedSource()
-        if (metadata.unavailableReason(source) != null) return Outcome.UNAVAILABLE
+        if (metadata.unavailableReason() != null) return Outcome.UNAVAILABLE
 
         return try {
-            val byIsbn = book.isbn13?.let { metadata.findByIsbn(it, source).firstOrNull() }
+            val byIsbn = book.isbn13?.let { metadata.findByIsbn(it).firstOrNull() }
             if (byIsbn != null) {
                 library.applyMetadata(bookId, byIsbn)
                 return Outcome.MATCHED
@@ -66,11 +65,9 @@ class MatchService(
 
     /** Possible matches for [book], best first. Served from the cache once fetched. */
     suspend fun candidates(book: Book): List<BookMatcher.Scored> {
-        val source = metadata.selectedSource()
         val results = metadata.searchByTitleAndAuthor(
             title = BookMatcher.mainTitle(book.title).trim(),
             author = book.authors.firstOrNull(),
-            source = source,
         )
         return BookMatcher.rank(book.title, book.authors, results)
     }

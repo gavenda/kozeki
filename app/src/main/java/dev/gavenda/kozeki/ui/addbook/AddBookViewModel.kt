@@ -3,16 +3,16 @@ package dev.gavenda.kozeki.ui.addbook
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.metadata.BookMetadata
+import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Isbn
-import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
-import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,11 +22,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AddBookUiState(
-    val source: MetadataSource = MetadataSource.GOOGLE_BOOKS,
     val query: String = "",
     val loading: Boolean = false,
     /** Null until a search has been run, to tell "nothing yet" from "nothing found". */
     val results: List<BookMetadata>? = null,
+    /** Whether the source may have results beyond the ones in [results]. */
+    val canLoadMore: Boolean = false,
+    val loadingMore: Boolean = false,
     val error: LookupError? = null,
     /** The result whose details are open. */
     val selected: BookMetadata? = null,
@@ -41,7 +43,6 @@ sealed interface AddBookEvent {
 class AddBookViewModel(
     private val metadata: MetadataRepository,
     private val library: LibraryRepository,
-    settings: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddBookUiState())
@@ -51,40 +52,87 @@ class AddBookViewModel(
     val events: Flow<AddBookEvent> = eventChannel.receiveAsFlow()
 
     private var searchJob: Job? = null
+    private var loadMoreJob: Job? = null
+
+    /** The search the results on screen are the start of, when there may be more of it. */
+    private var pager: BookSearch? = null
+
+    /** The query the last search was started for. */
+    private var searched: String? = null
 
     init {
         viewModelScope.launch {
-            settings.metadataSource.collect { source ->
-                val unavailable = metadata.unavailableReason(source)
+            val unavailable = metadata.unavailableReason()
+            _uiState.update { it.copy(error = unavailable?.let(LookupError::from)) }
+        }
+    }
+
+    fun onQueryChange(query: String) {
+        _uiState.update { it.copy(query = query) }
+        search(SEARCH_DEBOUNCE_MS)
+    }
+
+    /** Searches at once, for when the user submits instead of waiting for the search to follow. */
+    fun search() = search(debounceMs = 0)
+
+    /**
+     * Searches for the query once it has stood still for [debounceMs]. Every request counts
+     * against the source's quota, so a word being typed is not searched letter by letter.
+     */
+    private fun search(debounceMs: Long) {
+        val query = _uiState.value.query.trim()
+        if (query.length < MIN_QUERY_LENGTH) {
+            // Too short to search, and the results on screen were for something longer.
+            if (debounceMs > 0) {
+                cancelSearch()
+                _uiState.update { it.copy(loading = false, results = null, canLoadMore = false) }
+            }
+            return
+        }
+        // Typing that leaves the query as it was, a trailing space for one, is not a new search.
+        if (debounceMs > 0 && query == searched) return
+        cancelSearch()
+        searchJob = viewModelScope.launch {
+            delay(debounceMs)
+            searched = query
+            _uiState.update { it.copy(loading = true, error = null) }
+            try {
+                // A bare ISBN gets an exact lookup instead of a text search.
+                val isbn = Isbn.toIsbn13(query)
+                val search = if (isbn == null) BookSearch(metadata, query) else null
+                val results = search?.next() ?: metadata.findByIsbn(isbn!!)
+                pager = search
+                _uiState.update { it.copy(loading = false, results = results, canLoadMore = search?.hasMore == true) }
+            } catch (e: MetadataException) {
                 _uiState.update {
-                    it.copy(source = source, error = unavailable?.let(LookupError::from), results = null)
+                    it.copy(loading = false, results = null, canLoadMore = false, error = LookupError.from(e))
                 }
             }
         }
     }
 
-    fun onQueryChange(query: String) = _uiState.update { it.copy(query = query) }
-
-    /**
-     * Runs the search. It only fires when the user submits, never per keystroke: every request
-     * counts against the source's quota.
-     */
-    fun search() {
-        val query = _uiState.value.query.trim()
-        if (query.length < 3) return
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            val source = _uiState.value.source
-            _uiState.update { it.copy(loading = true, error = null) }
+    /** Fetches the results after the ones on screen, for when the list is scrolled to its end. */
+    fun loadMore() {
+        val search = pager ?: return
+        if (!search.hasMore || loadMoreJob?.isActive == true) return
+        loadMoreJob = viewModelScope.launch {
+            _uiState.update { it.copy(loadingMore = true) }
             try {
-                // A bare ISBN gets an exact lookup instead of a text search.
-                val isbn = Isbn.toIsbn13(query)
-                val results = if (isbn != null) metadata.findByIsbn(isbn, source) else metadata.search(query, source)
-                _uiState.update { it.copy(loading = false, results = results) }
-            } catch (e: MetadataException) {
-                _uiState.update { it.copy(loading = false, results = null, error = LookupError.from(e)) }
+                val more = search.next()
+                _uiState.update { it.copy(results = it.results.orEmpty() + more, canLoadMore = search.hasMore) }
+            } catch (_: MetadataException) {
+                // What is on screen stays; scrolling back to the end asks again.
+            } finally {
+                _uiState.update { it.copy(loadingMore = false) }
             }
         }
+    }
+
+    private fun cancelSearch() {
+        searchJob?.cancel()
+        loadMoreJob?.cancel()
+        searched = null
+        pager = null
     }
 
     fun select(result: BookMetadata?) = _uiState.update { it.copy(selected = result) }
@@ -95,5 +143,10 @@ class AddBookViewModel(
             _uiState.update { it.copy(selected = null, added = it.added + result.sourceId) }
             eventChannel.send(AddBookEvent.Added(bookId, result.title, acquisition))
         }
+    }
+
+    private companion object {
+        const val MIN_QUERY_LENGTH = 3
+        const val SEARCH_DEBOUNCE_MS = 500L
     }
 }
