@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BrightnessAuto
@@ -358,6 +359,9 @@ private fun HardcoverSetting(
     if (confirmSignOut && account is HardcoverAccount.SignedIn) {
         AlertDialog(
             onDismissRequest = { confirmSignOut = false },
+            // With an icon the dialog centres its headline, as Material 3 lays out a dialog that has one.
+            icon = { Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null) },
+            iconContentColor = MaterialTheme.colorScheme.error,
             title = { Text(stringResource(R.string.settings_hardcover_sign_out_title)) },
             text = { Text(stringResource(R.string.settings_hardcover_sign_out_message)) },
             confirmButton = {

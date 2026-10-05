@@ -36,7 +36,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -54,6 +56,7 @@ import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
+import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.EmptyState
@@ -61,8 +64,10 @@ import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultDetails
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
+import dev.gavenda.kozeki.ui.components.SourcePicker
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
+import dev.gavenda.kozeki.ui.components.sourceAttributionItem
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -105,6 +110,7 @@ fun AddBookScreen(
         snackbarHostState = snackbarHostState,
         onBack = onBack,
         onQueryChange = viewModel::onQueryChange,
+        onSourceChange = viewModel::setSource,
         onSearch = viewModel::search,
         onLoadMore = viewModel::loadMore,
         onSelect = viewModel::select,
@@ -120,6 +126,7 @@ fun AddBookContent(
     snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onQueryChange: (String) -> Unit,
+    onSourceChange: (MetadataSource) -> Unit,
     onSearch: () -> Unit,
     onLoadMore: () -> Unit,
     onSelect: (BookMetadata?) -> Unit,
@@ -159,9 +166,15 @@ fun AddBookContent(
                 // Dressed as the search bar of the library, though it is a plain field: it does not
                 // open into results.
                 val searchBarColors = SearchBarDefaults.colors()
+                // The field keeps its own text: the state reaches it a moment after each keystroke,
+                // and a field fed text older than what was typed puts the cursor back.
+                var query by remember { mutableStateOf(state.query) }
                 TextField(
-                    value = state.query,
-                    onValueChange = onQueryChange,
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        onQueryChange(it)
+                    },
                     placeholder = { Text(stringResource(R.string.search_hint)) },
                     singleLine = true,
                     shape = SearchBarDefaults.inputFieldShape,
@@ -174,7 +187,7 @@ fun AddBookContent(
                     leadingIcon = {
                         IconButton(
                             onClick = submit,
-                            enabled = state.query.trim().length >= 3,
+                            enabled = query.trim().length >= 3,
                             // The library's icon never dims, so neither does this one.
                             colors = IconButtonDefaults.iconButtonColors(
                                 contentColor = MaterialTheme.colorScheme.onSurface,
@@ -190,6 +203,14 @@ fun AddBookContent(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                         .focusRequester(focusRequester),
+                )
+
+                SourcePicker(
+                    source = state.source,
+                    onSourceChange = onSourceChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 )
 
                 val results = state.results
@@ -225,6 +246,7 @@ fun AddBookContent(
                         val listState = rememberLazyListState()
                         LoadMoreEffect(listState, results.size, state.canLoadMore, onLoadMore)
                         LazyColumn(state = listState) {
+                            sourceAttributionItem(state.source)
                             items(results, key = { it.sourceId }) { result ->
                                 MetadataResultItem(
                                     result = result,
@@ -280,10 +302,25 @@ private val PreviewResults = listOf(
 private fun AddBookResultsPreview() {
     AppTheme {
         AddBookContent(
-            state = AddBookUiState(query = "le guin", results = PreviewResults, owned = mapOf("b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED))),
+            state = AddBookUiState(
+                query = "le guin",
+                results = PreviewResults,
+                owned = mapOf(
+                    "a" to Book(
+                        id = "a",
+                        title = "The Dispossessed",
+                        acquisition = Acquisition.DOWNLOADED,
+                        inLibrary = true,
+                        state = ReadingState.READING,
+                        progression = 0.42,
+                    ),
+                    "b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED),
+                ),
+            ),
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onQueryChange = {},
+            onSourceChange = {},
             onSearch = {},
             onLoadMore = {},
             onSelect = {},
@@ -303,6 +340,31 @@ private fun AddBookSignedOutPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onQueryChange = {},
+            onSourceChange = {},
+            onSearch = {},
+            onLoadMore = {},
+            onSelect = {},
+            onAdd = { _, _ -> },
+            onOpenAuthor = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun AddBookGoogleBooksPreview() {
+    AppTheme {
+        AddBookContent(
+            state = AddBookUiState(
+                query = "le guin",
+                source = MetadataSource.GOOGLE_BOOKS,
+                results = PreviewResults.map { it.copy(source = MetadataSource.GOOGLE_BOOKS) },
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            onBack = {},
+            onQueryChange = {},
+            onSourceChange = {},
             onSearch = {},
             onLoadMore = {},
             onSelect = {},

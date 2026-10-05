@@ -21,6 +21,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -32,8 +36,10 @@ import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
+import dev.gavenda.kozeki.ui.components.SourcePicker
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
+import dev.gavenda.kozeki.ui.components.sourceAttributionItem
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
 /** Lets the user confirm or search for the record a book should be linked to. */
@@ -41,6 +47,7 @@ import dev.gavenda.kozeki.ui.theme.AppTheme
 fun MatchSheet(
     state: MatchUiState,
     onQueryChange: (String) -> Unit,
+    onSourceChange: (MetadataSource) -> Unit,
     onSearch: () -> Unit,
     onLoadMore: () -> Unit,
     onPick: (BookMetadata) -> Unit,
@@ -50,7 +57,7 @@ fun MatchSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberExpandedSheetState(),
     ) {
-        MatchSheetContent(state, onQueryChange, onSearch, onLoadMore, onPick)
+        MatchSheetContent(state, onQueryChange, onSourceChange, onSearch, onLoadMore, onPick)
     }
 }
 
@@ -58,6 +65,7 @@ fun MatchSheet(
 private fun MatchSheetContent(
     state: MatchUiState,
     onQueryChange: (String) -> Unit,
+    onSourceChange: (MetadataSource) -> Unit,
     onSearch: () -> Unit,
     onLoadMore: () -> Unit,
     onPick: (BookMetadata) -> Unit,
@@ -68,9 +76,15 @@ private fun MatchSheetContent(
             style = MaterialTheme.typography.titleLargeEmphasized,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
+        // The field keeps its own text: the state reaches it a moment after each keystroke, and a
+        // field fed text older than what was typed puts the cursor back.
+        var query by remember { mutableStateOf(state.query) }
         OutlinedTextField(
-            value = state.query,
-            onValueChange = onQueryChange,
+            value = query,
+            onValueChange = {
+                query = it
+                onQueryChange(it)
+            },
             label = { Text(stringResource(R.string.search_hint)) },
             singleLine = true,
             trailingIcon = {
@@ -80,6 +94,13 @@ private fun MatchSheetContent(
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+        )
+        SourcePicker(
+            source = state.source,
+            onSourceChange = onSourceChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
@@ -97,6 +118,7 @@ private fun MatchSheetContent(
                 val listState = rememberLazyListState()
                 LoadMoreEffect(listState, state.results.size, state.canLoadMore, onLoadMore)
                 LazyColumn(state = listState) {
+                    sourceAttributionItem(state.source)
                     items(state.results, key = { it.sourceId }) { result ->
                         MetadataResultItem(result = result, onClick = { onPick(result) })
                     }
@@ -147,6 +169,7 @@ private fun MatchSheetContentPreview() {
                     ),
                 ),
                 onQueryChange = {},
+                onSourceChange = {},
                 onSearch = {},
                 onLoadMore = {},
                 onPick = {},

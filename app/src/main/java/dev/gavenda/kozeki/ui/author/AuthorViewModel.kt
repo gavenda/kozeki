@@ -10,6 +10,7 @@ import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.OwnedBooks
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.addbook.AddBookEvent
@@ -65,6 +66,9 @@ class AuthorViewModel(
     private val eventChannel = Channel<AddBookEvent>(Channel.BUFFERED)
     val events: Flow<AddBookEvent> = eventChannel.receiveAsFlow()
 
+    /** The one source with pages for authors, so the only one an author's ID can have come from. */
+    private val source = MetadataSource.HARDCOVER
+
     private var loadJob: Job? = null
     private var loadMoreJob: Job? = null
 
@@ -81,13 +85,13 @@ class AuthorViewModel(
         loadJob = viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null, notFound = false) }
             try {
-                val author = metadata.author(authorId).author
+                val author = metadata.author(source, authorId).author
                 if (author == null) {
                     _uiState.update { it.copy(loading = false, notFound = true) }
                     return@launch
                 }
                 // The first page is asked for twice, and answered from the cache the second time.
-                val books = BookSearch { page -> metadata.author(authorId, page).books }
+                val books = BookSearch { page -> metadata.author(source, authorId, page).books }
                 val first = books.next()
                 pager = books
                 _uiState.update {

@@ -1,6 +1,7 @@
 package dev.gavenda.kozeki.data.settings
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -8,6 +9,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -68,6 +70,21 @@ class SettingsRepository(context: Context) {
     /** Name of the order the library was last put in, or null while the user has not picked one. */
     val librarySort: Flow<String?> = store.data.map { it[Keys.LibrarySort] }.distinctUntilChanged()
 
+    // Opened here, ahead of its first use, so that reading it later does not wait for the disk.
+    private val searchPreferences = context.applicationContext.getSharedPreferences("search", Context.MODE_PRIVATE)
+
+    /**
+     * The catalogue the online search was last pointed at: Hardcover until the user picks another.
+     * A shared preference rather than a part of the store, so the search screen can read it at
+     * once and open with the right source already picked.
+     */
+    var searchSource: MetadataSource
+        get() {
+            val name = searchPreferences.getString(SEARCH_SOURCE, null)
+            return MetadataSource.entries.find { it.name == name } ?: MetadataSource.HARDCOVER
+        }
+        set(value) = searchPreferences.edit { putString(SEARCH_SOURCE, value.name) }
+
     suspend fun setDailyGoalMinutes(minutes: Int) {
         store.edit { it[Keys.DailyGoalMinutes] = minutes.coerceIn(1, 24 * 60) }
     }
@@ -103,5 +120,6 @@ class SettingsRepository(context: Context) {
 
     companion object {
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
+        private const val SEARCH_SOURCE = "source"
     }
 }

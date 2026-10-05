@@ -3,6 +3,7 @@ package dev.gavenda.kozeki.data.files
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.graphics.scale
@@ -92,6 +93,28 @@ class BookStorage(context: Context) {
         val name = coverName(bookId)
         coverFile(name).writeBytes(bytes)
         name
+    }
+
+    /**
+     * Saves the picture behind [uri], one the user picked, as the cover of [bookId]. Returns null
+     * when it cannot be read as an image.
+     */
+    suspend fun saveCover(bookId: String, uri: Uri): String? = withContext(Dispatchers.IO) {
+        val bitmap = runCatching {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, uri)) { decoder, info, _ ->
+                // Photos are far larger than a cover is ever shown, so they are shrunk while decoding.
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val longest = maxOf(info.size.width, info.size.height)
+                if (longest > MAX_COVER_EDGE) {
+                    val scale = MAX_COVER_EDGE.toFloat() / longest
+                    decoder.setTargetSize(
+                        (info.size.width * scale).toInt().coerceAtLeast(1),
+                        (info.size.height * scale).toInt().coerceAtLeast(1),
+                    )
+                }
+            }
+        }.getOrNull() ?: return@withContext null
+        saveCover(bookId, bitmap)
     }
 
     suspend fun deleteCover(name: String?): Unit = withContext(Dispatchers.IO) {

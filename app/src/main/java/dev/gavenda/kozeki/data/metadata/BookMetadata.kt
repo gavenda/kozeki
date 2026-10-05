@@ -108,6 +108,9 @@ interface MetadataProvider {
     suspend fun searchByTitleAndAuthor(title: String, author: String?): List<BookMetadata> =
         search(listOfNotNull(title, author).joinToString(" ")).books
 
+    /** The book with [sourceId] on this source, or null when it has no such book. */
+    suspend fun book(sourceId: String): BookMetadata?
+
     /** The author with [authorId] on this source and [page] of their books, the first page being 1. */
     suspend fun author(authorId: String, page: Int = 1): AuthorPage
 
@@ -117,6 +120,9 @@ interface MetadataProvider {
     enum class Unavailable {
         /** The source needs an account and nobody is signed in. */
         SIGNED_OUT,
+
+        /** The source needs an API key and the app was built without one. */
+        NOT_CONFIGURED,
     }
 }
 
@@ -127,6 +133,9 @@ sealed class MetadataException(message: String, cause: Throwable? = null) : Exce
 
     /** The token was rejected. */
     class Unauthorized(message: String) : MetadataException(message)
+
+    /** The API key the app was built with was refused. Nothing the user does in the app changes that. */
+    class KeyRejected(message: String) : MetadataException(message)
 
     /**
      * The token is fine but was not granted what the request needs, typically because the user

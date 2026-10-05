@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.data.model
 
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import java.io.File
 import java.time.LocalDate
 
@@ -9,6 +10,8 @@ data class Book(
     val title: String,
     val subtitle: String? = null,
     val authors: List<String> = emptyList(),
+    /** Who among [authors] the metadata source keeps a page for. */
+    val authorRefs: List<AuthorRef> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
     val publishedDate: String? = null,
@@ -20,6 +23,8 @@ data class Book(
     /** Absolute path of the cover kept on the device. */
     val coverPath: String? = null,
     val coverUrl: String? = null,
+    /** The cover is a picture the user chose themselves. */
+    val hasCustomCover: Boolean = false,
     val state: ReadingState = ReadingState.PLANNED,
     val acquisition: Acquisition = Acquisition.WISHLIST,
     val isFavorite: Boolean = false,
@@ -87,6 +92,20 @@ data class Book(
     /** A book that is merely wanted is always Planned; the other states are for books the user has. */
     val canChangeState: Boolean get() = acquisition != Acquisition.WISHLIST
 }
+
+/** A book as the user types it in, for one that is added without a metadata source. */
+data class BookDraft(
+    val title: String,
+    val subtitle: String? = null,
+    val authors: List<String> = emptyList(),
+    val description: String? = null,
+    val publisher: String? = null,
+    /** As on the book: "2019-05-21", or the "2019" or "2019-05" a source gave it. */
+    val publishedDate: String? = null,
+    val pageCount: Int? = null,
+    /** In either length, with or without hyphens. One that is not a valid ISBN is left out. */
+    val isbn: String? = null,
+)
 
 data class Note(
     val id: String,

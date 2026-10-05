@@ -1,9 +1,11 @@
 package dev.gavenda.kozeki.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -28,6 +30,8 @@ data class BookEntity(
     val title: String,
     val subtitle: String? = null,
     val authors: List<String> = emptyList(),
+    /** Who among [authors] the metadata source keeps a page for, by its ID for them. */
+    @ColumnInfo(defaultValue = "[]") val authorRefs: List<AuthorRef> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
     /** As given by the source: "2019", "2019-05" or "2019-05-21". */
@@ -41,6 +45,8 @@ data class BookEntity(
     /** File name inside the covers directory. */
     val coverFile: String? = null,
     val coverUrl: String? = null,
+    /** [coverFile] is a picture the user chose, which no cover from an EPUB or a source replaces. */
+    @ColumnInfo(defaultValue = "0") val customCover: Boolean = false,
 
     val state: ReadingState = ReadingState.PLANNED,
     val acquisition: Acquisition = Acquisition.WISHLIST,

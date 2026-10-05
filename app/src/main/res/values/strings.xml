@@ -9,9 +9,11 @@
     <!-- Common actions -->
     <string name="action_back">Back</string>
     <string name="action_cancel">Cancel</string>
-    <string name="action_delete">Delete</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_close">Close</string>
     <string name="action_edit">Edit</string>
     <string name="action_ok">OK</string>
+    <string name="action_remove">Remove</string>
     <string name="action_retry">Try again</string>
     <string name="action_save">Save</string>
     <string name="action_search">Search</string>
@@ -45,18 +47,19 @@
     <string name="filter_planning">Planning</string>
     <string name="filter_all">All</string>
     <string name="sort_books">Sort books</string>
+    <string name="filter_books">Filter books</string>
     <string name="sort_recent">Recently read</string>
     <string name="sort_title">Title</string>
     <string name="sort_date_added">Date added</string>
     <string name="sort_rating">My rating</string>
     <string name="library_favorites">Favorites</string>
     <string name="library_other_books">Other books</string>
-    <string name="library_paused_at">Paused · %1$s</string>
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_empty_message">Import an EPUB to start reading, or find a book online to keep on your wishlist. Kozeki keeps track of your chapter and progress as you go.</string>
     <string name="library_add">Add books</string>
     <string name="library_add_import">Import EPUB</string>
     <string name="library_add_find">Find a book online</string>
+    <string name="library_add_manual">Add manually</string>
     <string name="library_owned_no_epub">Owned, no EPUB yet</string>
     <string name="selection_select">Select</string>
     <plurals name="selection_count">
@@ -114,6 +117,7 @@
     <string name="physical_page">Current page</string>
     <string name="physical_page_count">Total pages</string>
     <string name="physical_stop">Stop tracking</string>
+    <string name="physical_save">Save page</string>
     <string name="book_about">Synopsis</string>
     <string name="book_no_details">No details yet. Link this book to a metadata source to fill them in.</string>
     <string name="book_view_on_source">View on %1$s</string>
@@ -123,13 +127,22 @@
     <string name="detail_language">Language</string>
     <string name="detail_isbn">ISBN</string>
     <string name="detail_categories">Categories</string>
-    <string name="delete_book_title">Delete this book?</string>
     <plurals name="delete_books_title">
-        <item quantity="one">Delete %1$d book?</item>
-        <item quantity="other">Delete %1$d books?</item>
+        <item quantity="one">Remove this book?</item>
+        <item quantity="other">Remove %1$d books?</item>
     </plurals>
-    <string name="delete_books_message">These books, their EPUBs, notes and reading history will be removed. This cannot be undone.</string>
-    <string name="delete_book_message">“%1$s”, its EPUB, notes and reading history will be removed. This cannot be undone.</string>
+    <plurals name="delete_books_keep">
+        <item quantity="one">No, keep it</item>
+        <item quantity="other">No, keep them</item>
+    </plurals>
+    <plurals name="delete_books_confirm">
+        <item quantity="one">Yes, remove it</item>
+        <item quantity="other">Yes, remove them</item>
+    </plurals>
+    <plurals name="delete_books_message">
+        <item quantity="one">This book, its notes and reading history will be removed. This cannot be undone.</item>
+        <item quantity="other">These books, their notes and reading history will be removed. This cannot be undone.</item>
+    </plurals>
 
     <!-- Rating -->
     <string name="rating_none">Not rated</string>
@@ -145,6 +158,7 @@
     <string name="wishlist_tab">Wishlist</string>
     <string name="purchased_tab">Purchased</string>
     <string name="purchase_dialog_title">Purchase details</string>
+    <string name="purchase_save">Save purchase</string>
     <string name="purchase_price">Price</string>
     <string name="purchase_currency">Currency</string>
     <string name="purchase_date">Bought on</string>
@@ -158,6 +172,8 @@
     <string name="note_add">Add note</string>
     <string name="note_edit">Edit note</string>
     <string name="note_hint">Note</string>
+    <string name="note_save">Save note</string>
+    <string name="note_remove">Remove note</string>
 
     <!-- Reading history -->
     <string name="history_title">Reading history</string>
@@ -171,6 +187,8 @@
 
     <!-- Metadata sources and matching -->
     <string name="source_hardcover">Hardcover</string>
+    <string name="source_google_books">Google Books</string>
+    <string name="attribution_google">Powered by Google</string>
     <string name="match_find">Find metadata match</string>
     <string name="match_unlink">Unlink from source</string>
     <string name="match_sheet_title">Choose the matching book</string>
@@ -188,6 +206,8 @@
     <string name="lookup_error_rate_limited">The metadata source\'s request limit has been reached. Try again later.</string>
     <string name="lookup_error_signed_out">Sign in to this metadata source in Settings first.</string>
     <string name="lookup_error_unauthorized">The metadata source rejected the request. Sign in again in Settings.</string>
+    <string name="lookup_error_not_configured">Google Books needs an API key, and this build of Kozeki was made without one.</string>
+    <string name="lookup_error_key_rejected">Google Books refused the API key this build of Kozeki was made with.</string>
     <string name="lookup_error_missing_permission">Kozeki has not been given access to this yet. Sign out of Hardcover in Settings and sign in again to allow it.</string>
     <string name="lookup_error_other">The lookup failed. Try again later.</string>
 
@@ -263,11 +283,29 @@
     <string name="add_book_prompt_message">Search by title, author or ISBN. Results are kept on this device, so repeating a search costs nothing.</string>
     <string name="add_book_no_results_message">Try fewer or different words, or the ISBN.</string>
     <string name="add_book_error_title">Search unavailable</string>
-    <string name="add_book_to_wishlist">Add to wishlist</string>
+    <string name="add_book_to_wishlist">I want this</string>
     <string name="add_book_as_purchased">I own this</string>
     <string name="add_book_added_wishlist">Added “%1$s” to your wishlist</string>
     <string name="add_book_added_purchased">Added “%1$s” to purchased</string>
     <string name="action_view">View</string>
+    <string name="manual_book_title">Add manually</string>
+    <string name="book_form_edit_title">Edit details</string>
+    <string name="book_form_discard_changes">Discard changes?</string>
+    <string name="book_form_discard_changes_message">The details you changed are not saved. The book stays as it was.</string>
+    <string name="book_form_discard_book_message">The details you changed are not saved. The book is not added to your library.</string>
+    <string name="book_form_discard">Discard</string>
+    <string name="book_form_keep_editing">Keep editing</string>
+    <string name="manual_book_field_title">Title</string>
+    <string name="manual_book_field_authors">Authors</string>
+    <string name="manual_book_authors_hint">Separate several with commas</string>
+    <string name="manual_book_field_subtitle">Subtitle</string>
+    <string name="manual_book_field_description">Description</string>
+    <string name="manual_book_isbn_invalid">Not a valid ISBN</string>
+    <string name="manual_book_cover">Cover</string>
+    <string name="manual_book_cover_add">Add cover</string>
+    <string name="cover_choose">Choose cover photo</string>
+    <string name="cover_remove">Remove cover photo</string>
+    <string name="cover_failed">That picture could not be used as a cover</string>
 
     <string name="author_error_title">Author unavailable</string>
     <string name="author_not_found">Hardcover has no page for this author any more.</string>

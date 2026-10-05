@@ -9,6 +9,7 @@ import dev.gavenda.kozeki.data.model.CompletedBook
 import dev.gavenda.kozeki.data.model.DailyStats
 import dev.gavenda.kozeki.data.model.DayReading
 import dev.gavenda.kozeki.data.model.MatchStatus
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -35,6 +36,7 @@ object PreviewData {
             id = "1",
             title = "The Left Hand of Darkness",
             authors = listOf("Ursula K. Le Guin"),
+            authorRefs = listOf(AuthorRef("1", "Ursula K. Le Guin")),
             description = "A lone human emissary is sent to Winter, an alien world whose inhabitants " +
                 "can choose and change their gender, to bring it into a growing intergalactic civilization.",
             publisher = "Ace Books",
@@ -99,6 +101,7 @@ object PreviewData {
             id = "4",
             title = "Gideon the Ninth",
             authors = listOf("Tamsyn Muir"),
+            authorRefs = listOf(AuthorRef("2", "Tamsyn Muir")),
             state = ReadingState.PLANNED,
             acquisition = Acquisition.DOWNLOADED,
             matchStatus = MatchStatus.NEEDS_REVIEW,

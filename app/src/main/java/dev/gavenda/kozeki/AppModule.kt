@@ -1,11 +1,14 @@
 package dev.gavenda.kozeki
 
+import android.content.Context
+import android.content.pm.PackageManager
 import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.epub.Readium
 import dev.gavenda.kozeki.data.files.BookStorage
 import dev.gavenda.kozeki.data.metadata.CoverDownloader
 import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
+import dev.gavenda.kozeki.data.metadata.googlebooks.GoogleBooksProvider
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverProvider
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
@@ -15,6 +18,7 @@ import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.work.MatchWorker
 import dev.gavenda.kozeki.ui.addbook.AddBookViewModel
+import dev.gavenda.kozeki.ui.addbook.BookFormViewModel
 import dev.gavenda.kozeki.ui.author.AuthorViewModel
 import dev.gavenda.kozeki.ui.book.BookDetailViewModel
 import dev.gavenda.kozeki.ui.calendar.CalendarViewModel
@@ -23,6 +27,7 @@ import dev.gavenda.kozeki.ui.reader.ReaderViewModel
 import dev.gavenda.kozeki.ui.search.SearchViewModel
 import dev.gavenda.kozeki.ui.settings.SettingsViewModel
 import dev.gavenda.kozeki.ui.statistics.StatisticsViewModel
+import java.security.MessageDigest
 import java.time.Clock
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
@@ -81,13 +86,27 @@ val appModule = module {
     // Signing in may be what books imported earlier were waiting for.
     single { HardcoverSignIn(get(), get(), scheduleMatching()) }
 
-    single { MetadataRepository(HardcoverProvider(get(), get()), get<KozekiDatabase>().metadataCacheDao(), get()) }
+    single {
+        val context = androidContext()
+        val providers = listOf(
+            HardcoverProvider(get(), get()),
+            GoogleBooksProvider(
+                client = get(),
+                apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY,
+                androidPackage = context.packageName,
+                androidCertSha1 = signingCertificateSha1(context),
+            ),
+        )
+        MetadataRepository(providers, get<KozekiDatabase>().metadataCacheDao(), get())
+    }
 
     single { MatchService(get(), get()) }
 
     viewModel { LibraryViewModel(get(), get(), scheduleMatching()) }
 
-    viewModel { AddBookViewModel(get(), get()) }
+    viewModel { AddBookViewModel(get(), get(), get()) }
+
+    viewModel { params -> BookFormViewModel(bookId = params.getOrNull(), library = get()) }
 
     viewModel { (authorId: String, name: String) -> AuthorViewModel(authorId, name, get(), get()) }
 
@@ -121,3 +140,13 @@ private fun Scope.scheduleMatching(): () -> Unit {
     val context = androidContext()
     return { MatchWorker.enqueue(context) }
 }
+
+/** SHA-1 of the certificate this build is signed with, as Google wants it: upper-case hex, no colons. */
+private fun signingCertificateSha1(context: Context): String? = runCatching {
+    val info = context.packageManager.getPackageInfo(
+        context.packageName,
+        PackageManager.PackageInfoFlags.of(PackageManager.GET_SIGNING_CERTIFICATES.toLong()),
+    )
+    val signer = info.signingInfo?.apkContentsSigners?.firstOrNull() ?: return null
+    MessageDigest.getInstance("SHA-1").digest(signer.toByteArray()).joinToString("") { "%02X".format(it) }
+}.getOrNull()

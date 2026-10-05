@@ -19,8 +19,16 @@ enum class Acquisition {
 }
 
 /** The online catalogues book metadata can be fetched from. */
-enum class MetadataSource {
-    HARDCOVER,
+enum class MetadataSource(
+    /** Whether the source carries what its readers wrote about a book. */
+    val hasReviews: Boolean,
+    /** Whether the source keeps a page for each author, which is what gives them an ID. */
+    val hasAuthorPages: Boolean,
+) {
+    HARDCOVER(hasReviews = true, hasAuthorPages = true),
+
+    /** A catalogue and nothing more: no written reviews, and authors are names alone. */
+    GOOGLE_BOOKS(hasReviews = false, hasAuthorPages = false),
 }
 
 /** State of the link between a local book and a record in a [MetadataSource]. */

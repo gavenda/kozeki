@@ -16,6 +16,9 @@ val localProperties = Properties().apply {
 fun localProperty(name: String, default: String = ""): String =
     localProperties.getProperty(name)?.trim().orEmpty().ifEmpty { default }
 
+// Public metadata only, so an API key is enough. Set googleBooks.apiKey in local.properties.
+val googleBooksApiKey = localProperty("googleBooks.apiKey")
+
 // Hardcover OAuth public client: the client ID is not a secret, PKCE protects the flow.
 val hardcoverClientId = localProperty("hardcover.clientId", "d5a3c778-a5b8-4fb1-819c-deb5e30ac364")
 
@@ -42,11 +45,12 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"$googleBooksApiKey\"")
         buildConfigField("String", "HARDCOVER_CLIENT_ID", "\"$hardcoverClientId\"")
         buildConfigField("String", "HARDCOVER_REDIRECT_URI", "\"$hardcoverRedirectUri\"")
         buildConfigField("String", "HARDCOVER_SCOPES", "\"$hardcoverScopes\"")

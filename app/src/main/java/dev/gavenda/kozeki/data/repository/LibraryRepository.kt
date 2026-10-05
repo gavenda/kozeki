@@ -12,11 +12,13 @@ import dev.gavenda.kozeki.data.epub.EpubInfo
 import dev.gavenda.kozeki.data.epub.Readium
 import dev.gavenda.kozeki.data.epub.extractInfo
 import dev.gavenda.kozeki.data.files.BookStorage
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMatcher
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.CoverDownloader
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.BookDraft
 import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MatchStatus
@@ -26,6 +28,7 @@ import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingProgress
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.SessionDraft
+import dev.gavenda.kozeki.data.model.singleLine
 import dev.gavenda.kozeki.data.model.singleLines
 import java.time.Clock
 import java.time.Instant
@@ -143,7 +146,8 @@ class LibraryRepository(
 
             if (wanted != null) {
                 storage.adopt(staged, wanted.id)
-                val cover = info.cover?.let { storage.saveCover(wanted.id, it) }
+                // A cover the user chose stays; the EPUB's own is still there if they remove it.
+                val cover = info.cover?.takeIf { !wanted.customCover }?.let { storage.saveCover(wanted.id, it) }
                 if (cover != null) storage.deleteCover(wanted.coverFile)
                 books.upsert(
                     wanted.copy(
@@ -229,6 +233,7 @@ class LibraryRepository(
                 title = metadata.title,
                 subtitle = metadata.subtitle,
                 authors = metadata.authors,
+                authorRefs = metadata.authorRefs,
                 description = metadata.description,
                 publisher = metadata.publisher,
                 publishedDate = metadata.publishedDate,
@@ -253,6 +258,94 @@ class LibraryRepository(
     }
 
     /**
+     * Adds a book the user typed in themselves. It is linked to no source and no lookup is queued
+     * for it, since going without one is the point. [cover] is a picture they picked for it.
+     */
+    suspend fun addManually(draft: BookDraft, acquisition: Acquisition, cover: Uri? = null): String {
+        val bookId = UUID.randomUUID().toString()
+        val isbn13 = draft.isbn?.let(Isbn::toIsbn13)
+        val coverFile = cover?.let { storage.saveCover(bookId, it) }
+        books.upsert(
+            BookEntity(
+                id = bookId,
+                title = draft.title.singleLine(),
+                subtitle = draft.subtitle.tidied(),
+                authors = draft.authors.singleLines(),
+                description = draft.description.tidied(),
+                publisher = draft.publisher.tidied(),
+                publishedDate = draft.publishedDate.tidied(),
+                pageCount = draft.pageCount?.takeIf { it > 0 },
+                isbn10 = isbn13?.let(Isbn::toIsbn10),
+                isbn13 = isbn13,
+                coverFile = coverFile,
+                customCover = coverFile != null,
+                state = ReadingState.PLANNED,
+                acquisition = acquisition,
+                purchasedOn = if (acquisition == Acquisition.PURCHASED) today().toEpochDay() else null,
+                matchStatus = MatchStatus.NONE,
+                sync = SyncStamp.created(clock.millis()),
+            ),
+        )
+        return bookId
+    }
+
+    /**
+     * Replaces what describes [bookId] with what the user typed. The link to its source stays, as
+     * do the pages of the authors who are still named.
+     */
+    suspend fun updateDetails(bookId: String, draft: BookDraft) = edit(bookId) { book ->
+        val authors = draft.authors.singleLines()
+        val isbn13 = draft.isbn?.let(Isbn::toIsbn13)
+        book.copy(
+            title = draft.title.singleLine().ifEmpty { book.title },
+            subtitle = draft.subtitle.tidied(),
+            authors = authors,
+            authorRefs = book.authorRefs.filter { it.name in authors },
+            description = draft.description.tidied(),
+            publisher = draft.publisher.tidied(),
+            publishedDate = draft.publishedDate.tidied(),
+            pageCount = draft.pageCount?.takeIf { it > 0 },
+            isbn10 = isbn13?.let(Isbn::toIsbn10),
+            isbn13 = isbn13,
+        )
+    }
+
+    /**
+     * Makes the picture behind [uri] the cover of [bookId], in place of whatever cover it had.
+     *
+     * @return false when the picture could not be read, which leaves the book as it was.
+     */
+    suspend fun setCustomCover(bookId: String, uri: Uri): Boolean {
+        val name = storage.saveCover(bookId, uri) ?: return false
+        var replaced: String? = name
+        db.withTransaction {
+            val book = books.get(bookId) ?: return@withTransaction
+            replaced = book.coverFile
+            books.upsert(book.copy(coverFile = name, customCover = true, sync = book.sync.touched(clock.millis())))
+        }
+        storage.deleteCover(replaced)
+        return true
+    }
+
+    /** Drops the cover the user chose and goes back to the one from the EPUB, or else from the source. */
+    suspend fun removeCustomCover(bookId: String) {
+        val book = books.get(bookId)?.takeIf { it.customCover } ?: return
+        edit(bookId) { it.copy(coverFile = null, customCover = false) }
+        storage.deleteCover(book.coverFile)
+        val fromEpub = if (storage.hasEpub(bookId)) {
+            runCatching { readium.open(storage.epubFile(bookId)).use { it.extractInfo().cover } }.getOrNull()
+        } else {
+            null
+        }
+        if (fromEpub != null) {
+            val name = storage.saveCover(bookId, fromEpub)
+            edit(bookId) { it.copy(coverFile = name) }
+        } else {
+            downloadMissingCover(bookId)
+        }
+    }
+
+    /**
      * Links [bookId] to [metadata] and takes over its descriptive fields. A cover that came out of
      * the EPUB is kept, since sources often only have small thumbnails.
      */
@@ -264,6 +357,7 @@ class LibraryRepository(
                     title = metadata.title,
                     subtitle = metadata.subtitle ?: book.subtitle,
                     authors = metadata.authors.ifEmpty { book.authors },
+                    authorRefs = metadata.authorRefs,
                     description = metadata.description ?: book.description,
                     publisher = metadata.publisher ?: book.publisher,
                     publishedDate = metadata.publishedDate ?: book.publishedDate,
@@ -289,10 +383,23 @@ class LibraryRepository(
 
     /** Breaks the link to the metadata source; the fields already copied stay. */
     suspend fun unlink(bookId: String) = edit(bookId) {
-        it.copy(source = null, sourceId = null, sourceUrl = null, matchStatus = MatchStatus.NONE)
+        it.copy(
+            // Their IDs mean nothing away from the source.
+            authorRefs = emptyList(),
+            source = null,
+            sourceId = null,
+            sourceUrl = null,
+            matchStatus = MatchStatus.NONE,
+        )
     }
 
     suspend fun pendingMatches(): List<Book> = books.pendingMatches().map { it.toBook() }
+
+    /** Linked books whose authors cannot be opened yet, having been linked before their IDs were kept. */
+    suspend fun withoutAuthorRefs(): List<Book> =
+        books.withoutAuthorRefs().filter { it.authors.isNotEmpty() }.map { it.toBook() }
+
+    suspend fun setAuthorRefs(bookId: String, refs: List<AuthorRef>) = edit(bookId) { it.copy(authorRefs = refs) }
 
     suspend fun downloadMissingCover(bookId: String) {
         val book = books.get(bookId) ?: return
@@ -300,7 +407,8 @@ class LibraryRepository(
         if (book.coverFile != null && storage.coverFile(book.coverFile).isFile) return
         val bytes = covers.download(url) ?: return
         val name = storage.saveCover(bookId, bytes)
-        edit(bookId) { it.copy(coverFile = name) }
+        // Reached with a custom cover only when its file is gone, as on another device.
+        edit(bookId) { it.copy(coverFile = name, customCover = false) }
     }
 
     /** Retries covers that could not be fetched when their book was added, for example while offline. */
@@ -328,8 +436,12 @@ class LibraryRepository(
             readThroughs.moveToBook(other.id, bookId, now)
             sessions.moveToBook(other.id, bookId, now)
             notes.moveToBook(other.id, bookId, now)
+            // A cover the user chose for the entry that goes away comes along too.
+            val takeCover = other.customCover && !book.customCover && other.coverFile != null
             books.upsert(
                 book.copy(
+                    coverFile = if (takeCover) other.coverFile else book.coverFile,
+                    customCover = book.customCover || takeCover,
                     state = if (book.state == ReadingState.PLANNED) other.state else book.state,
                     isFavorite = book.isFavorite || other.isFavorite,
                     rating = book.rating ?: other.rating,
@@ -344,7 +456,7 @@ class LibraryRepository(
                 ),
             )
             books.upsert(other.copy(sync = other.sync.deleted(now)))
-            orphanedCover = other.coverFile
+            orphanedCover = if (takeCover) book.coverFile else other.coverFile
         }
         storage.deleteCover(orphanedCover)
     }
@@ -648,6 +760,8 @@ class LibraryRepository(
         }
     }
 
+    private fun String?.tidied(): String? = this?.trim()?.ifEmpty { null }
+
     private fun today(): LocalDate = LocalDate.now(clock.withZone(ZoneId.systemDefault()))
 
     private fun progressionOf(locatorJson: String?): Double? = runCatching {
@@ -664,6 +778,7 @@ class LibraryRepository(
         subtitle = subtitle,
         // Rows saved before names were tidied on the way in.
         authors = authors.singleLines(),
+        authorRefs = authorRefs,
         description = description,
         publisher = publisher,
         publishedDate = publishedDate,
@@ -674,6 +789,7 @@ class LibraryRepository(
         categories = categories,
         coverPath = coverFile?.let(storage::coverFile)?.takeIf { it.isFile }?.absolutePath,
         coverUrl = coverUrl,
+        hasCustomCover = customCover,
         state = state,
         acquisition = acquisition,
         isFavorite = isFavorite,

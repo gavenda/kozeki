@@ -10,7 +10,9 @@ import dev.gavenda.kozeki.data.metadata.OwnedBooks
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Isbn
+import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
+import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -30,6 +32,8 @@ import kotlinx.coroutines.launch
 
 data class AddBookUiState(
     val query: String = "",
+    /** The catalogue being searched. */
+    val source: MetadataSource = MetadataSource.HARDCOVER,
     val loading: Boolean = false,
     /** Null until a search has been run, to tell "nothing yet" from "nothing found". */
     val results: List<BookMetadata>? = null,
@@ -50,22 +54,25 @@ sealed interface AddBookEvent {
 class AddBookViewModel(
     private val metadata: MetadataRepository,
     private val library: LibraryRepository,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(AddBookUiState())
+    // Opens on the source searched last time.
+    private val _uiState = MutableStateFlow(AddBookUiState(source = settings.searchSource))
 
     val uiState: StateFlow<AddBookUiState> =
         combine(_uiState, library.observeAll().map(::OwnedBooks)) { state, owned ->
             state.copy(owned = owned.among(state.results.orEmpty()))
         }
             .flowOn(Dispatchers.Default)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AddBookUiState())
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _uiState.value)
 
     private val eventChannel = Channel<AddBookEvent>(Channel.BUFFERED)
     val events: Flow<AddBookEvent> = eventChannel.receiveAsFlow()
 
     private var searchJob: Job? = null
     private var loadMoreJob: Job? = null
+    private var availabilityJob: Job? = null
 
     /** The search the results on screen are the start of, when there may be more of it. */
     private var pager: BookSearch? = null
@@ -74,8 +81,26 @@ class AddBookViewModel(
     private var searched: String? = null
 
     init {
-        viewModelScope.launch {
-            val unavailable = metadata.unavailableReason()
+        checkAvailability()
+    }
+
+    /** Points the search at [source], repeats it there, and remembers the choice for next time. */
+    fun setSource(source: MetadataSource) {
+        if (source == _uiState.value.source) return
+        cancelSearch()
+        // What is on screen came from the other source, its failures included.
+        _uiState.update {
+            it.copy(source = source, loading = false, results = null, canLoadMore = false, error = null)
+        }
+        settings.searchSource = source
+        if (_uiState.value.query.trim().length >= MIN_QUERY_LENGTH) search() else checkAvailability()
+    }
+
+    /** Says at once when the source cannot be searched, instead of after the first attempt. */
+    private fun checkAvailability() {
+        availabilityJob?.cancel()
+        availabilityJob = viewModelScope.launch {
+            val unavailable = metadata.unavailableReason(_uiState.value.source)
             _uiState.update { it.copy(error = unavailable?.let(LookupError::from)) }
         }
     }
@@ -108,12 +133,13 @@ class AddBookViewModel(
         searchJob = viewModelScope.launch {
             delay(debounceMs)
             searched = query
+            val source = _uiState.value.source
             _uiState.update { it.copy(loading = true, error = null) }
             try {
                 // A bare ISBN gets an exact lookup instead of a text search.
                 val isbn = Isbn.toIsbn13(query)
-                val search = if (isbn == null) BookSearch(metadata, query) else null
-                val results = search?.next() ?: metadata.findByIsbn(isbn!!)
+                val search = if (isbn == null) BookSearch(metadata, source, query) else null
+                val results = search?.next() ?: metadata.findByIsbn(source, isbn!!)
                 pager = search
                 _uiState.update { it.copy(loading = false, results = results, canLoadMore = search?.hasMore == true) }
             } catch (e: MetadataException) {
@@ -144,6 +170,7 @@ class AddBookViewModel(
     private fun cancelSearch() {
         searchJob?.cancel()
         loadMoreJob?.cancel()
+        availabilityJob?.cancel()
         searched = null
         pager = null
     }

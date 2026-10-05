@@ -15,73 +15,90 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
 /**
- * The only way the app talks to the metadata source. Every lookup goes through a persistent cache
- * first, because the source is rate-limited and because repeating a lookup while offline should
- * still work.
+ * The only way the app talks to the metadata sources. Every lookup names the source it is for and
+ * goes through a persistent cache first, because the sources are rate-limited and because
+ * repeating a lookup while offline should still work.
  */
 class MetadataRepository(
-    private val provider: MetadataProvider,
+    providers: List<MetadataProvider>,
     private val cache: MetadataCacheDao,
     private val clock: Clock,
 ) {
+    private val providers = providers.associateBy { it.source }
     private val json = Json { ignoreUnknownKeys = true }
     private val bookList = ListSerializer(BookMetadata.serializer())
 
-    // One request at a time, spaced out, so a burst of imports cannot burn the quota.
-    private val gate = Mutex()
-    private var lastRequestAt = 0L
+    // One request at a time to each source, spaced out, so a burst of imports cannot burn its quota.
+    private val gates = MetadataSource.entries.associateWith { Gate() }
 
-    val source: MetadataSource get() = provider.source
+    private class Gate {
+        val mutex = Mutex()
+        var lastRequestAt = 0L
+    }
 
-    suspend fun unavailableReason(): MetadataProvider.Unavailable? = provider.unavailableReason()
+    suspend fun unavailableReason(source: MetadataSource): MetadataProvider.Unavailable? =
+        provider(source).unavailableReason()
 
-    /** One page of a search, the first being 1. [BookSearch] reads them in turn. */
-    suspend fun search(query: String, page: Int = 1): BookPage {
+    /** One page of a search of [source], the first being 1. [BookSearch] reads them in turn. */
+    suspend fun search(source: MetadataSource, query: String, page: Int = 1): BookPage {
         val normalized = BookMatcher.normalize(query)
         if (normalized.length < MIN_QUERY_LENGTH) return BookPage()
         return cached(
+            source = source,
             key = "search|$SEARCH_VERSION|$normalized|$page",
             serializer = BookPage.serializer(),
             lifetime = { if (it.books.isEmpty() && !it.hasMore) EMPTY_TTL else SEARCH_TTL },
-        ) { provider.search(query.trim(), page) }
+        ) { provider(source).search(query.trim(), page) }
     }
 
-    suspend fun findByIsbn(isbn13: String): List<BookMetadata> =
-        books("isbn|$SEARCH_VERSION|$isbn13", LOOKUP_TTL) { provider.findByIsbn(isbn13) }
+    suspend fun findByIsbn(source: MetadataSource, isbn13: String): List<BookMetadata> =
+        books(source, "isbn|$SEARCH_VERSION|$isbn13", LOOKUP_TTL) { provider(source).findByIsbn(isbn13) }
 
-    suspend fun searchByTitleAndAuthor(title: String, author: String?): List<BookMetadata> {
+    suspend fun searchByTitleAndAuthor(source: MetadataSource, title: String, author: String?): List<BookMetadata> {
         val key = "title|$SEARCH_VERSION|${BookMatcher.normalize(title)}|${author?.let(BookMatcher::normalize).orEmpty()}"
-        return books(key, LOOKUP_TTL) { provider.searchByTitleAndAuthor(title, author) }
+        return books(source, key, LOOKUP_TTL) { provider(source).searchByTitleAndAuthor(title, author) }
     }
 
-    /** The author with [authorId] and one page of their books, the first being 1. */
-    suspend fun author(authorId: String, page: Int = 1): AuthorPage =
+    /** The book with [sourceId] as [source] describes it now, or null when it has no such book. */
+    suspend fun book(source: MetadataSource, sourceId: String): BookMetadata? =
+        books(source, "book|$SEARCH_VERSION|$sourceId", LOOKUP_TTL) { listOfNotNull(provider(source).book(sourceId)) }
+            .firstOrNull()
+
+    /** The author [source] knows as [authorId] and one page of their books, the first being 1. */
+    suspend fun author(source: MetadataSource, authorId: String, page: Int = 1): AuthorPage =
         cached(
+            source = source,
             key = "author|$SEARCH_VERSION|$authorId|$page",
             serializer = AuthorPage.serializer(),
             lifetime = { if (it.author == null) EMPTY_TTL else AUTHOR_TTL },
-        ) { provider.author(authorId, page) }
+        ) { provider(source).author(authorId, page) }
 
-    /** What the source's readers think of the book with [sourceId]. */
-    suspend fun reviews(sourceId: String): BookReviews =
-        cached("reviews|$sourceId", BookReviews.serializer(), { REVIEWS_TTL }) { provider.reviews(sourceId) }
+    /** What the readers of [source] think of the book with [sourceId]. */
+    suspend fun reviews(source: MetadataSource, sourceId: String): BookReviews =
+        cached(source, "reviews|$sourceId", BookReviews.serializer(), { REVIEWS_TTL }) {
+            provider(source).reviews(sourceId)
+        }
 
     /** How many lookups are held in the cache. */
     fun observeCacheSize(): Flow<Int> = cache.observeCount()
 
     suspend fun clearCache() = cache.clear()
 
+    private fun provider(source: MetadataSource): MetadataProvider = providers.getValue(source)
+
     private suspend fun books(
+        source: MetadataSource,
         key: String,
         ttl: Duration,
         fetch: suspend () -> List<BookMetadata>,
     ): List<BookMetadata> =
         // An empty answer is cached too, but briefly: the book may be added to the source later.
-        cached(key, bookList, { if (it.isEmpty()) EMPTY_TTL else ttl }, fetch)
+        cached(source, key, bookList, { if (it.isEmpty()) EMPTY_TTL else ttl }, fetch)
             // Entries cached before names were tidied on the way in.
             .map { it.copy(authors = it.authors.singleLines()) }
 
     private suspend fun <T> cached(
+        source: MetadataSource,
         key: String,
         serializer: KSerializer<T>,
         lifetime: (T) -> Duration,
@@ -90,11 +107,12 @@ class MetadataRepository(
         val fullKey = "${source.name}|$key"
         read(fullKey, serializer)?.let { return it }
 
-        return gate.withLock {
+        val gate = gates.getValue(source)
+        return gate.mutex.withLock {
             // Another caller may have filled the entry while this one waited for the gate.
             read(fullKey, serializer)?.let { return@withLock it }
 
-            val wait = lastRequestAt + MIN_REQUEST_GAP_MS - clock.millis()
+            val wait = gate.lastRequestAt + MIN_REQUEST_GAP_MS - clock.millis()
             if (wait > 0) delay(wait)
 
             val result = try {
@@ -104,7 +122,7 @@ class MetadataRepository(
                 read(fullKey, serializer, allowExpired = true)?.let { return@withLock it }
                 throw e
             } finally {
-                lastRequestAt = clock.millis()
+                gate.lastRequestAt = clock.millis()
             }
 
             val now = clock.millis()

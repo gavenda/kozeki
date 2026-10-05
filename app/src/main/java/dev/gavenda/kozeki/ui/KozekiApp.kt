@@ -30,6 +30,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dev.gavenda.kozeki.ui.addbook.AddBookScreen
+import dev.gavenda.kozeki.ui.addbook.BookFormScreen
 import dev.gavenda.kozeki.ui.author.AuthorScreen
 import dev.gavenda.kozeki.ui.book.BookDetailScreen
 import dev.gavenda.kozeki.ui.calendar.CalendarScreen
@@ -40,6 +41,7 @@ import dev.gavenda.kozeki.ui.navigation.BookRoute
 import dev.gavenda.kozeki.ui.navigation.CalendarRoute
 import dev.gavenda.kozeki.ui.navigation.DayRoute
 import dev.gavenda.kozeki.ui.navigation.LibraryRoute
+import dev.gavenda.kozeki.ui.navigation.BookFormRoute
 import dev.gavenda.kozeki.ui.navigation.ReaderRoute
 import dev.gavenda.kozeki.ui.navigation.SettingsRoute
 import dev.gavenda.kozeki.ui.navigation.StatisticsRoute
@@ -87,7 +89,9 @@ fun KozekiApp() {
             composable<LibraryRoute> { entry ->
                 LibraryScreen(
                     onOpenBook = { entry.open(BookRoute(it)) },
+                    onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                     onAddBook = { entry.open(AddBookRoute) },
+                    onAddManually = { entry.open(BookFormRoute()) },
                     onOpenSettings = { entry.open(SettingsRoute) },
                 )
             }
@@ -119,6 +123,14 @@ fun KozekiApp() {
                     onOpenSettings = { entry.open(SettingsRoute) },
                 )
             }
+            composable<BookFormRoute> { entry ->
+                BookFormScreen(
+                    bookId = entry.toRoute<BookFormRoute>().bookId,
+                    onBack = { entry.back() },
+                    // The book's page takes the form's place, so Back from it does not return to a spent form.
+                    onAdded = { navController.navigate(BookRoute(it)) { popUpTo<BookFormRoute> { inclusive = true } } },
+                )
+            }
             composable<AuthorRoute> { entry ->
                 val route = entry.toRoute<AuthorRoute>()
                 AuthorScreen(
@@ -135,6 +147,8 @@ fun KozekiApp() {
                     bookId = entry.toRoute<BookRoute>().bookId,
                     onBack = { entry.back() },
                     onRead = { entry.open(ReaderRoute(it)) },
+                    onEdit = { entry.open(BookFormRoute(it)) },
+                    onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
             }
             composable<ReaderRoute> { entry ->

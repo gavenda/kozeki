@@ -1,5 +1,7 @@
 package dev.gavenda.kozeki.data.metadata
 
+import dev.gavenda.kozeki.data.model.MetadataSource
+
 /**
  * A list of books read one page at a time. Pages can repeat a book and can hold nothing worth showing, so
  * this hands out only books it has not handed out before, and reads past a page that had none.
@@ -8,8 +10,9 @@ package dev.gavenda.kozeki.data.metadata
  */
 class BookSearch(private val readPage: suspend (page: Int) -> BookPage) {
 
-    /** The results of a search for [query]. */
-    constructor(metadata: MetadataRepository, query: String) : this({ page -> metadata.search(query, page) })
+    /** The results of a search of [source] for [query]. */
+    constructor(metadata: MetadataRepository, source: MetadataSource, query: String) :
+        this({ page -> metadata.search(source, query, page) })
 
     private var page = 0
     private val seen = mutableSetOf<String>()

@@ -2,15 +2,22 @@ package dev.gavenda.kozeki.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PauseCircle
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -18,12 +25,18 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.ui.formatPercent
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
 @get:StringRes
@@ -43,6 +56,16 @@ val ReadingState.icon: ImageVector
         ReadingState.COMPLETED -> Icons.Rounded.CheckCircle
         ReadingState.DROPPED -> Icons.Rounded.Cancel
         ReadingState.PAUSED -> Icons.Rounded.PauseCircle
+    }
+
+/** The [icon] as a bare glyph, without the disc around it, light enough to lie over a cover. */
+val ReadingState.outlinedIcon: ImageVector
+    get() = when (this) {
+        ReadingState.PLANNED -> Icons.Outlined.BookmarkBorder
+        ReadingState.READING -> Icons.AutoMirrored.Outlined.MenuBook
+        ReadingState.COMPLETED -> Icons.Rounded.Check
+        ReadingState.DROPPED -> Icons.Rounded.Close
+        ReadingState.PAUSED -> Icons.Rounded.Pause
     }
 
 /** The order states are offered in: the path a book usually takes, then the ways it can stall. */
@@ -83,5 +106,37 @@ private fun ReadingStateBadgePreview() {
                 ReadingStateOrder.forEach { ReadingStateBadge(it) }
             }
         }
+    }
+}
+
+/** How far into a book the reader is: a ring that fills as they go, around the figure itself. */
+@Composable
+fun ReadingProgressRing(progression: Double, modifier: Modifier = Modifier) {
+    val percent = formatPercent(progression)
+    val density = LocalDensity.current
+    val stroke = with(density) { Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round) }
+    Box(
+        // The ring and the figure say the same thing, so it is read out once.
+        modifier = modifier.clearAndSetSemantics { contentDescription = percent },
+        contentAlignment = Alignment.Center,
+    ) {
+        // Scaled down from the 48dp default, waves and all, to fit the corner of a cover.
+        CircularWavyProgressIndicator(
+            progress = { progression.toFloat() },
+            modifier = Modifier.size(32.dp),
+            stroke = stroke,
+            trackStroke = stroke,
+            gapSize = 3.dp,
+            wavelength = 10.dp,
+        )
+        Text(
+            text = percent,
+            // Sized in dp: the ring around it does not grow with the font scale.
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = with(density) { 9.dp.toSp() },
+                lineHeight = with(density) { 10.dp.toSp() },
+            ),
+            maxLines = 1,
+        )
     }
 }

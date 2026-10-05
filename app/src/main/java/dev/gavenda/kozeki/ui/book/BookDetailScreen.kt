@@ -80,6 +80,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
@@ -92,14 +93,17 @@ import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.LookupError
+import dev.gavenda.kozeki.ui.addbook.CoverPhotoRequest
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
 import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.icon
 import dev.gavenda.kozeki.ui.components.labelRes
+import dev.gavenda.kozeki.ui.components.nameRes
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatPercent
@@ -117,7 +121,11 @@ import org.koin.core.parameter.parametersOf
 class BookDetailActions(
     val onBack: () -> Unit = {},
     val onRead: () -> Unit = {},
+    val onEdit: () -> Unit = {},
+    val onOpenAuthor: (AuthorRef) -> Unit = {},
     val onImportEpub: () -> Unit = {},
+    val onChooseCover: () -> Unit = {},
+    val onRemoveCover: () -> Unit = {},
     val onSetState: (ReadingState) -> Unit = {},
     val onReadAgain: () -> Unit = {},
     val onSetFavorite: (Boolean) -> Unit = {},
@@ -131,6 +139,7 @@ class BookDetailActions(
     val onRetryMatch: () -> Unit = {},
     val onUnlink: () -> Unit = {},
     val onMatchQueryChange: (String) -> Unit = {},
+    val onMatchSourceChange: (MetadataSource) -> Unit = {},
     val onSearchMatch: () -> Unit = {},
     val onLoadMoreMatches: () -> Unit = {},
     val onApplyMatch: (BookMetadata) -> Unit = {},
@@ -143,6 +152,8 @@ fun BookDetailScreen(
     bookId: String,
     onBack: () -> Unit,
     onRead: (String) -> Unit,
+    onEdit: (String) -> Unit,
+    onOpenAuthor: (AuthorRef) -> Unit,
     viewModel: BookDetailViewModel = koinViewModel(key = bookId) { parametersOf(bookId) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -151,6 +162,9 @@ fun BookDetailScreen(
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.attachEpub(uri)
     }
+    val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.setCover(uri)
+    }
 
     LaunchedEffect(viewModel, resources) {
         viewModel.events.collect { event ->
@@ -158,6 +172,7 @@ fun BookDetailScreen(
                 BookDetailEvent.Deleted -> onBack()
                 is BookDetailEvent.ImportFinished ->
                     snackbarHostState.showSnackbar(importMessage(resources, listOf(event.result)))
+                BookDetailEvent.CoverFailed -> snackbarHostState.showSnackbar(resources.getString(R.string.cover_failed))
             }
         }
     }
@@ -166,7 +181,11 @@ fun BookDetailScreen(
         BookDetailActions(
             onBack = onBack,
             onRead = { onRead(bookId) },
+            onEdit = { onEdit(bookId) },
+            onOpenAuthor = onOpenAuthor,
             onImportEpub = { picker.launch(EpubMimeTypes) },
+            onChooseCover = { coverPicker.launch(CoverPhotoRequest) },
+            onRemoveCover = viewModel::removeCover,
             onSetState = viewModel::setState,
             onReadAgain = viewModel::readAgain,
             onSetFavorite = viewModel::setFavorite,
@@ -180,6 +199,7 @@ fun BookDetailScreen(
             onRetryMatch = viewModel::retryAutomaticMatch,
             onUnlink = viewModel::unlink,
             onMatchQueryChange = viewModel::onMatchQueryChange,
+            onMatchSourceChange = viewModel::setMatchSource,
             onSearchMatch = viewModel::searchMatch,
             onLoadMoreMatches = viewModel::loadMoreMatches,
             onApplyMatch = viewModel::applyMatch,
@@ -259,6 +279,13 @@ fun BookDetailContent(
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.book_form_edit_title)) },
+                                    onClick = {
+                                        menuOpen = false
+                                        actions.onEdit()
+                                    },
+                                )
+                                DropdownMenuItem(
                                     text = { Text(stringResource(R.string.match_find)) },
                                     onClick = {
                                         menuOpen = false
@@ -275,7 +302,23 @@ fun BookDetailContent(
                                     )
                                 }
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.action_delete)) },
+                                    text = { Text(stringResource(R.string.cover_choose)) },
+                                    onClick = {
+                                        menuOpen = false
+                                        actions.onChooseCover()
+                                    },
+                                )
+                                if (book.hasCustomCover) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.cover_remove)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            actions.onRemoveCover()
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.action_remove)) },
                                     onClick = {
                                         menuOpen = false
                                         confirmingDelete = true
@@ -308,7 +351,7 @@ fun BookDetailContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                item(key = "header") { Header(book, actions.onSetRating, onTitleHeight = { titleHeight = it }) }
+                item(key = "header") { Header(book, actions.onSetRating, actions.onOpenAuthor, onTitleHeight = { titleHeight = it }) }
                 item(key = "primary") { PrimaryAction(book, state.importing, actions) }
                 if (book.canChangeState) {
                     item(key = "state") { StateSelector(book.state, actions.onSetState) }
@@ -384,8 +427,8 @@ fun BookDetailContent(
 
     if (book != null) {
         if (confirmingDelete) {
-            DeleteBookDialog(
-                title = book.title,
+            DeleteBooksDialog(
+                books = listOf(book),
                 onConfirm = {
                     confirmingDelete = false
                     actions.onDelete()
@@ -394,7 +437,7 @@ fun BookDetailContent(
             )
         }
         if (editingPurchase) {
-            PurchaseDialog(
+            PurchaseSheet(
                 book = book,
                 lastCurrency = state.lastCurrency,
                 locationHistory = state.purchaseLocations,
@@ -406,7 +449,7 @@ fun BookDetailContent(
             )
         }
         if (editingPhysicalProgress) {
-            PhysicalProgressDialog(
+            PhysicalProgressSheet(
                 book = book,
                 onSave = { page, pageCount ->
                     editingPhysicalProgress = false
@@ -417,7 +460,7 @@ fun BookDetailContent(
         }
         editingNoteId?.let { noteId ->
             val note = state.notes.firstOrNull { it.id == noteId }
-            NoteDialog(
+            NoteSheet(
                 note = note,
                 onSave = { text ->
                     actions.onSaveNote(note?.id, text)
@@ -436,6 +479,7 @@ fun BookDetailContent(
             MatchSheet(
                 state = state.match,
                 onQueryChange = actions.onMatchQueryChange,
+                onSourceChange = actions.onMatchSourceChange,
                 onSearch = actions.onSearchMatch,
                 onLoadMore = actions.onLoadMoreMatches,
                 onPick = actions.onApplyMatch,
@@ -446,7 +490,12 @@ fun BookDetailContent(
 }
 
 @Composable
-private fun Header(book: Book, onSetRating: (Float?) -> Unit, onTitleHeight: (Int) -> Unit) {
+private fun Header(
+    book: Book,
+    onSetRating: (Float?) -> Unit,
+    onOpenAuthor: (AuthorRef) -> Unit,
+    onTitleHeight: (Int) -> Unit,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         BookCover(book, Modifier.width(128.dp), shape = MaterialTheme.shapes.large)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -459,10 +508,13 @@ private fun Header(book: Book, onSetRating: (Float?) -> Unit, onTitleHeight: (In
                 Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (book.authors.isNotEmpty()) {
-                Text(
-                    text = book.authorLine,
+                AuthorLinks(
+                    authors = book.authors,
+                    refs = book.authorRefs,
+                    onOpenAuthor = onOpenAuthor,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = Int.MAX_VALUE,
                 )
             }
             Spacer(Modifier.height(4.dp))
@@ -756,11 +808,6 @@ private fun AboutSection(book: Book) {
         }
     }
 }
-
-internal val MetadataSource.nameRes: Int
-    get() = when (this) {
-        MetadataSource.HARDCOVER -> R.string.source_hardcover
-    }
 
 @Composable
 private fun OwnershipSection(

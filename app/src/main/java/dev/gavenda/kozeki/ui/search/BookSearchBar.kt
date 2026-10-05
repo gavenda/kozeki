@@ -2,6 +2,7 @@ package dev.gavenda.kozeki.ui.search
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -63,9 +64,12 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.ReadingProgressRing
+import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -245,8 +249,21 @@ private fun SearchResultItem(book: Book, onClick: () -> Unit, modifier: Modifier
         leadingContent = {
             BookCover(book, Modifier.width(48.dp), MaterialTheme.shapes.small, showTitleOnPlaceholder = false)
         },
-        supportingContent = if (book.authors.isNotEmpty()) {
-            { Text(book.authorLine, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+        supportingContent = {
+            Column {
+                if (book.authors.isNotEmpty()) {
+                    Text(book.authorLine, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Text(
+                    text = stringResource(book.state.labelRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        trailingContent = if (book.state == ReadingState.READING) {
+            { ReadingProgressRing(book.overallProgression) }
         } else {
             null
         },

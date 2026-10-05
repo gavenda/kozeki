@@ -42,6 +42,10 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE deletedAt IS NULL AND matchStatus = 'PENDING'")
     suspend fun pendingMatches(): List<BookEntity>
 
+    /** Books linked to the source before their authors' IDs were kept. */
+    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND sourceId IS NOT NULL AND authorRefs = '[]'")
+    suspend fun withoutAuthorRefs(): List<BookEntity>
+
     /** Every place a book was bought, most recent purchase first, as suggestions for the next one. */
     @Query(
         "SELECT purchaseLocation FROM books WHERE deletedAt IS NULL AND purchaseLocation IS NOT NULL " +

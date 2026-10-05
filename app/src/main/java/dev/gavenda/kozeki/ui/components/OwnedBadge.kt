@@ -23,14 +23,20 @@ import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
 /**
  * Marks a result of a metadata source as [book], one the user already has, and says where it is
- * kept: on the wishlist, among the purchases still without an EPUB, or in the library.
+ * kept: on the wishlist, among the purchases still without an EPUB, or in the library. One being
+ * read shows how far along it is instead, as it does in the library.
  */
 @Composable
 fun OwnedBadge(book: Book, modifier: Modifier = Modifier) {
+    if (book.state == ReadingState.READING) {
+        ReadingProgressRing(book.overallProgression, modifier)
+        return
+    }
     // The same icons the library grid puts on a cover.
     val (icon, label) = when {
         book.acquisition == Acquisition.WISHLIST -> Icons.Rounded.Bookmark to R.string.wishlist_tab
@@ -59,6 +65,16 @@ private fun OwnedBadgePreview() {
                 OwnedBadge(Book(id = "a", title = "Wanted"))
                 OwnedBadge(Book(id = "b", title = "Bought", acquisition = Acquisition.PURCHASED))
                 OwnedBadge(Book(id = "c", title = "Imported", acquisition = Acquisition.DOWNLOADED, inLibrary = true))
+                OwnedBadge(
+                    Book(
+                        id = "d",
+                        title = "Reading",
+                        acquisition = Acquisition.DOWNLOADED,
+                        inLibrary = true,
+                        state = ReadingState.READING,
+                        progression = 0.42,
+                    ),
+                )
             }
         }
     }

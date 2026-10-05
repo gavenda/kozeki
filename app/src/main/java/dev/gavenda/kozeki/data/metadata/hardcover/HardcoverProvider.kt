@@ -61,6 +61,16 @@ class HardcoverProvider(
     override suspend fun findByIsbn(isbn13: String): List<BookMetadata> =
         searchDocuments(isbn13, page = 1).documents.mapNotNull { toMetadata(it, isbn13) }.filter { it.isbn13 == isbn13 }
 
+    override suspend fun book(sourceId: String): BookMetadata? {
+        // Hardcover's book IDs are integers; anything else cannot be one of its books.
+        val id = sourceId.toIntOrNull() ?: return null
+        val body = buildJsonObject {
+            put("query", BOOK_QUERY)
+            putJsonObject("variables") { put("id", id) }
+        }.toString()
+        return execute(body)["books_by_pk"].asObject()?.let(::bookToMetadata)
+    }
+
     override suspend fun author(authorId: String, page: Int): AuthorPage {
         // Hardcover's author IDs are integers; anything else cannot be one of its authors.
         val id = authorId.toIntOrNull() ?: return AuthorPage()
@@ -326,6 +336,8 @@ class HardcoverProvider(
         const val AUTHOR_QUERY = "query Author(\$id: Int!, \$limit: Int!, \$offset: Int!) { " +
             "authors_by_pk(id: \$id) { name bio born_year death_year location books_count slug image { url } " +
             "$AUTHOR_BOOK_ROWS { contribution book { $AUTHOR_BOOK_FIELDS } } } }"
+
+        const val BOOK_QUERY = "query Book(\$id: Int!) { books_by_pk(id: \$id) { $AUTHOR_BOOK_FIELDS } }"
 
         val WriterRoles = setOf("author", "writer")
 

@@ -2,9 +2,6 @@ package dev.gavenda.kozeki.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,28 +18,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withAnnotation
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -105,7 +89,7 @@ fun MetadataResultItem(
                     if (onOpenAuthor == null) {
                         Text(result.authors.joinToString(", "), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     } else {
-                        AuthorLinks(result, onOpenAuthor)
+                        AuthorLinks(result.authors, result.authorRefs, onOpenAuthor)
                     }
                 }
                 val details = listOfNotNull(result.publishedDate?.take(4), result.publisher).joinToString(" · ")
@@ -143,69 +127,6 @@ private fun AverageRating(rating: Float, modifier: Modifier = Modifier) {
         Text(stringResource(R.string.reviews_average, rating), style = MaterialTheme.typography.bodySmall, maxLines = 1)
     }
 }
-
-/**
- * The authors of [result] on one line. Tapping one the source keeps a page for calls [onOpenAuthor];
- * a tap anywhere else on the line is left to the row.
- *
- * The taps are worked out from where they land in a single Text, so that the names shorten as one
- * line when there is no room for all of them.
- */
-@Composable
-private fun AuthorLinks(result: BookMetadata, onOpenAuthor: (AuthorRef) -> Unit, modifier: Modifier = Modifier) {
-    val linkColor = MaterialTheme.colorScheme.primary
-    val authors = remember(result, linkColor) {
-        buildAnnotatedString {
-            result.authors.forEachIndexed { index, name ->
-                if (index > 0) append(", ")
-                val ref = result.authorRef(name)
-                if (ref == null) {
-                    append(name)
-                } else {
-                    withStyle(SpanStyle(color = linkColor)) {
-                        withAnnotation(AUTHOR_TAG, ref.id) { append(name) }
-                    }
-                }
-            }
-        }
-    }
-    val refs = result.authors.mapNotNull(result::authorRef)
-    val openAuthor by rememberUpdatedState(onOpenAuthor)
-    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val openLabel = stringResource(R.string.result_open_author)
-    Text(
-        text = authors,
-        modifier = modifier
-            .pointerInput(authors) {
-                awaitEachGesture {
-                    val down = awaitFirstDown()
-                    val measured = layout ?: return@awaitEachGesture
-                    // Past the end of the line there is no name, though the nearest offset is one.
-                    if (down.position.x > measured.getLineRight(0)) return@awaitEachGesture
-                    val offset = measured.getOffsetForPosition(down.position)
-                    val id = authors.getStringAnnotations(AUTHOR_TAG, offset, offset).firstOrNull()?.item
-                    val ref = refs.firstOrNull { it.id == id } ?: return@awaitEachGesture
-                    down.consume()
-                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
-                    up.consume()
-                    openAuthor(ref)
-                }
-            }
-            .semantics {
-                customActions = refs.map { ref ->
-                    CustomAccessibilityAction("$openLabel ${ref.name}") {
-                        openAuthor(ref)
-                        true
-                    }
-                }
-            },
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        onTextLayout = { layout = it },
-    )
-}
-
-private const val AUTHOR_TAG = "author"
 
 @PreviewLightDark
 @Composable
