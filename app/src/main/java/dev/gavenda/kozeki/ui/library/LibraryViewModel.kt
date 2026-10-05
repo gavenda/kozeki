@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -52,6 +53,28 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
     }
 }
 
+/** The order the books of a filter are shown in. Books that tie keep the order of [RECENT]. */
+enum class LibrarySort(@param:StringRes val label: Int) {
+    /** Books with an EPUB first, most recently read at the top, then the ones still without a file. */
+    RECENT(R.string.sort_recent),
+    TITLE(R.string.sort_title),
+
+    /** Newest first. */
+    DATE_ADDED(R.string.sort_date_added),
+
+    /** The user's own rating, highest first, with the books not rated yet at the end. */
+    RATING(R.string.sort_rating),
+    ;
+
+    /** [books], given in the order of [RECENT], in this order. */
+    fun sorted(books: List<Book>): List<Book> = when (this) {
+        RECENT -> books
+        TITLE -> books.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+        DATE_ADDED -> books.sortedByDescending { it.addedAt }
+        RATING -> books.sortedByDescending { it.rating ?: -1f }
+    }
+}
+
 /** The books picked in the grid, and which of them each action applies to. */
 data class LibrarySelection(val books: List<Book> = emptyList()) {
     val ids: Set<String> = books.mapTo(HashSet()) { it.id }
@@ -75,6 +98,7 @@ data class LibrarySelection(val books: List<Book> = emptyList()) {
 data class LibraryUiState(
     val loading: Boolean = true,
     val filter: LibraryFilter = LibraryFilter.READING,
+    val sort: LibrarySort = LibrarySort.RECENT,
     val favorites: List<Book> = emptyList(),
     val others: List<Book> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
@@ -114,20 +138,28 @@ class LibraryViewModel(
         withFile + without
     }
 
+    private val sort = settings.librarySort.map { name ->
+        LibrarySort.entries.firstOrNull { it.name == name } ?: LibrarySort.RECENT
+    }
+
+    private val view = combine(chosenFilter, sort, ::Pair)
+
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
     val uiState: StateFlow<LibraryUiState> =
-        combine(books, chosenFilter, importing, selectedIds, purchaseDefaults) { books, chosen, busy, selected, defaults ->
+        combine(books, view, importing, selectedIds, purchaseDefaults) { books, view, busy, selected, defaults ->
+            val (chosen, sort) = view
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
             val filter = chosen ?: when {
                 counts.getValue(LibraryFilter.READING) > 0 -> LibraryFilter.READING
                 else -> LibraryFilter.ALL
             }
-            val (favorites, others) = books.filter(filter::matches).partition { it.isFavorite }
+            val (favorites, others) = sort.sorted(books.filter(filter::matches)).partition { it.isFavorite }
             LibraryUiState(
                 loading = false,
                 filter = filter,
+                sort = sort,
                 favorites = favorites,
                 others = others,
                 counts = counts,
@@ -143,6 +175,10 @@ class LibraryViewModel(
     fun selectFilter(filter: LibraryFilter) {
         chosenFilter.value = filter
         clearSelection()
+    }
+
+    fun selectSort(sort: LibrarySort) {
+        viewModelScope.launch { settings.setLibrarySort(sort.name) }
     }
 
     fun toggleSelection(book: Book) {

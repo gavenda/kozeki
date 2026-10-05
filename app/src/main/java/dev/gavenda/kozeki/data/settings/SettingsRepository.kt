@@ -65,6 +65,9 @@ class SettingsRepository(context: Context) {
     /** ISO 4217 code last used for a purchase price, so the next one defaults to it. */
     val lastCurrency: Flow<String?> = store.data.map { it[Keys.LastCurrency] }.distinctUntilChanged()
 
+    /** Name of the order the library was last put in, or null while the user has not picked one. */
+    val librarySort: Flow<String?> = store.data.map { it[Keys.LibrarySort] }.distinctUntilChanged()
+
     suspend fun setDailyGoalMinutes(minutes: Int) {
         store.edit { it[Keys.DailyGoalMinutes] = minutes.coerceIn(1, 24 * 60) }
     }
@@ -85,12 +88,17 @@ class SettingsRepository(context: Context) {
         store.edit { it[Keys.LastCurrency] = code }
     }
 
+    suspend fun setLibrarySort(name: String) {
+        store.edit { it[Keys.LibrarySort] = name }
+    }
+
     private object Keys {
         val DailyGoalMinutes = intPreferencesKey("daily_goal_minutes")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val DynamicColor = booleanPreferencesKey("dynamic_color")
         val ReaderPreferences = stringPreferencesKey("reader_preferences")
         val LastCurrency = stringPreferencesKey("last_currency")
+        val LibrarySort = stringPreferencesKey("library_sort")
     }
 
     companion object {

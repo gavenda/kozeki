@@ -2,7 +2,12 @@ package dev.gavenda.kozeki.ui.book
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +26,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
@@ -56,13 +62,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.pluralStringResource
@@ -197,12 +206,30 @@ fun BookDetailContent(
     // "" means a new note is being written; null means no note dialog.
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
     var showingAllReviews by rememberSaveable { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    // The header carries the title, so the bar only takes it over once the header's copy, which
+    // sits at the very top of the list, has scrolled under it.
+    var titleHeight by remember { mutableIntStateOf(0) }
+    val titleInBar by remember(listState) {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 ||
+                (titleHeight > 0 && listState.firstVisibleItemScrollOffset >= titleHeight)
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = {},
+                title = {
+                    AnimatedVisibility(
+                        visible = book != null && titleInBar,
+                        enter = fadeIn() + slideInVertically { it / 2 },
+                        exit = fadeOut() + slideOutVertically { it / 2 },
+                    ) {
+                        Text(book?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = actions.onBack) {
                         Icon(
@@ -271,6 +298,7 @@ fun BookDetailContent(
 
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             LazyColumn(
+                state = listState,
                 modifier = Modifier.widthIn(max = 720.dp),
                 contentPadding = PaddingValues(
                     start = 16.dp,
@@ -280,7 +308,7 @@ fun BookDetailContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                item(key = "header") { Header(book, actions.onSetRating) }
+                item(key = "header") { Header(book, actions.onSetRating, onTitleHeight = { titleHeight = it }) }
                 item(key = "primary") { PrimaryAction(book, state.importing, actions) }
                 if (book.canChangeState) {
                     item(key = "state") { StateSelector(book.state, actions.onSetState) }
@@ -418,11 +446,15 @@ fun BookDetailContent(
 }
 
 @Composable
-private fun Header(book: Book, onSetRating: (Float?) -> Unit) {
+private fun Header(book: Book, onSetRating: (Float?) -> Unit, onTitleHeight: (Int) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         BookCover(book, Modifier.width(128.dp), shape = MaterialTheme.shapes.large)
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(book.title, style = MaterialTheme.typography.headlineSmallEmphasized)
+            Text(
+                text = book.title,
+                style = MaterialTheme.typography.headlineSmallEmphasized,
+                modifier = Modifier.onSizeChanged { onTitleHeight(it.height) },
+            )
             book.subtitle?.let {
                 Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

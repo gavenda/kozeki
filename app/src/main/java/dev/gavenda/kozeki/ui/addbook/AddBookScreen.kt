@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.TravelExplore
@@ -53,6 +52,7 @@ import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
+import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
@@ -60,6 +60,7 @@ import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultDetails
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
+import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -228,16 +229,8 @@ fun AddBookContent(
                                 MetadataResultItem(
                                     result = result,
                                     onClick = { onSelect(result) },
-                                    trailingContent = if (result.sourceId in state.added) {
-                                        {
-                                            Icon(
-                                                Icons.Rounded.Check,
-                                                contentDescription = stringResource(R.string.add_book_already_added),
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
+                                    trailingContent = state.owned[result.sourceId]?.let { book -> { OwnedBadge(book) } },
+                                    onOpenAuthor = onOpenAuthor,
                                 )
                             }
                             loadingMoreItem(state.loadingMore)
@@ -287,7 +280,7 @@ private val PreviewResults = listOf(
 private fun AddBookResultsPreview() {
     AppTheme {
         AddBookContent(
-            state = AddBookUiState(query = "le guin", results = PreviewResults, added = setOf("b")),
+            state = AddBookUiState(query = "le guin", results = PreviewResults, owned = mapOf("b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED))),
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onQueryChange = {},

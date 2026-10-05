@@ -6,18 +6,25 @@ import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
+import dev.gavenda.kozeki.data.metadata.OwnedBooks
 import dev.gavenda.kozeki.data.model.Acquisition
+import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.ui.LookupError
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -32,8 +39,8 @@ data class AddBookUiState(
     val error: LookupError? = null,
     /** The result whose details are open. */
     val selected: BookMetadata? = null,
-    /** Source IDs added during this visit, so their rows can show it. */
-    val added: Set<String> = emptySet(),
+    /** The results already among the user's own books, by source ID, so their rows can show it. */
+    val owned: Map<String, Book> = emptyMap(),
 )
 
 sealed interface AddBookEvent {
@@ -46,7 +53,13 @@ class AddBookViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AddBookUiState())
-    val uiState: StateFlow<AddBookUiState> = _uiState.asStateFlow()
+
+    val uiState: StateFlow<AddBookUiState> =
+        combine(_uiState, library.observeAll().map(::OwnedBooks)) { state, owned ->
+            state.copy(owned = owned.among(state.results.orEmpty()))
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AddBookUiState())
 
     private val eventChannel = Channel<AddBookEvent>(Channel.BUFFERED)
     val events: Flow<AddBookEvent> = eventChannel.receiveAsFlow()
@@ -140,7 +153,7 @@ class AddBookViewModel(
     fun add(result: BookMetadata, acquisition: Acquisition) {
         viewModelScope.launch {
             val bookId = library.addFromMetadata(result, acquisition)
-            _uiState.update { it.copy(selected = null, added = it.added + result.sourceId) }
+            _uiState.update { it.copy(selected = null) }
             eventChannel.send(AddBookEvent.Added(bookId, result.title, acquisition))
         }
     }

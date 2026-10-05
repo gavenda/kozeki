@@ -126,6 +126,7 @@ class HardcoverProvider(
             isbn10 = isbn13?.let(Isbn::toIsbn10),
             isbn13 = isbn13,
             coverUrl = book["image"].asObject()?.string("url")?.takeIf { it.startsWith("https://") },
+            averageRating = book.float("rating")?.takeIf { it > 0f },
             infoUrl = book.string("slug")?.let { "https://hardcover.app/books/$it" },
         )
     }
@@ -287,6 +288,7 @@ class HardcoverProvider(
             isbn13 = isbn13,
             categories = strings(document["genres"]),
             coverUrl = document["image"].asObject()?.string("url")?.takeIf { it.startsWith("https://") },
+            averageRating = document.float("rating")?.takeIf { it > 0f },
             infoUrl = slug?.let { "https://hardcover.app/books/$it" },
         )
     }
@@ -317,7 +319,7 @@ class HardcoverProvider(
                 "book: { canonical_id: { _is_null: true } } }, " +
                 "order_by: [{ book: { users_count: desc } }, { id: asc }], limit: \$limit, offset: \$offset)"
         private const val AUTHOR_BOOK_FIELDS =
-            "id title subtitle slug description release_date release_year pages compilation image { url } " +
+            "id title subtitle slug description release_date release_year pages rating compilation image { url } " +
                 "contributions { contribution author { id name } } " +
                 "default_physical_edition { isbn_13 } default_ebook_edition { isbn_13 }"
 

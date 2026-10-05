@@ -1,6 +1,11 @@
 package dev.gavenda.kozeki.ui.author
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +23,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PersonOff
 import androidx.compose.material.icons.rounded.SearchOff
@@ -37,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -58,6 +64,7 @@ import dev.gavenda.kozeki.data.metadata.Author
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
+import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
@@ -66,6 +73,7 @@ import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultDetails
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
+import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -133,11 +141,34 @@ fun AuthorContent(
     onOpenAuthor: (AuthorRef) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    val author = state.author
+    // The header carries the name, so the bar only takes it over once the header's copy has
+    // scrolled under it. The name is centred on the photo, so that is the photo's midpoint.
+    val nameOffset = with(LocalDensity.current) { (HeaderVerticalPadding + PhotoSize / 2).roundToPx() }
+    val nameScrolledAway by remember(listState, nameOffset) {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > nameOffset }
+    }
+    val titleInBar = when {
+        state.loading -> false
+        // Nothing else on these states says whose page this is.
+        state.error != null || state.notFound || author == null -> true
+        else -> nameScrolledAway
+    }
+
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = {
+                    AnimatedVisibility(
+                        visible = titleInBar,
+                        enter = fadeIn() + slideInVertically { it / 2 },
+                        exit = fadeOut() + slideOutVertically { it / 2 },
+                    ) {
+                        Text(state.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -151,7 +182,6 @@ fun AuthorContent(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
-            val author = state.author
             when {
                 state.loading -> Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                     LoadingIndicator()
@@ -171,7 +201,6 @@ fun AuthorContent(
                 )
 
                 else -> {
-                    val listState = rememberLazyListState()
                     LoadMoreEffect(listState, state.books.size, state.canLoadMore, onLoadMore)
                     LazyColumn(state = listState, modifier = Modifier.widthIn(max = 720.dp)) {
                         item(key = "author", contentType = "author") { AuthorHeader(author) }
@@ -196,16 +225,7 @@ fun AuthorContent(
                             MetadataResultItem(
                                 result = result,
                                 onClick = { onSelect(result) },
-                                trailingContent = if (result.sourceId in state.owned) {
-                                    {
-                                        Icon(
-                                            Icons.Rounded.Check,
-                                            contentDescription = stringResource(R.string.add_book_already_added),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
+                                trailingContent = state.owned[result.sourceId]?.let { book -> { OwnedBadge(book) } },
                             )
                         }
                         loadingMoreItem(state.loadingMore)
@@ -225,13 +245,13 @@ fun AuthorContent(
 @Composable
 private fun AuthorHeader(author: Author, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = HeaderVerticalPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 modifier = Modifier
-                    .size(88.dp)
+                    .size(PhotoSize)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                 contentAlignment = Alignment.Center,
@@ -290,6 +310,9 @@ private fun AuthorHeader(author: Author, modifier: Modifier = Modifier) {
     }
 }
 
+private val HeaderVerticalPadding = 8.dp
+private val PhotoSize = 88.dp
+
 private val PreviewAuthor = Author(
     id = "1",
     name = "Ursula K. Le Guin",
@@ -332,7 +355,7 @@ private fun AuthorPreview() {
                 author = PreviewAuthor,
                 loading = false,
                 books = PreviewBooks,
-                owned = setOf("b"),
+                owned = mapOf("b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED)),
             ),
             snackbarHostState = remember { SnackbarHostState() },
             onBack = {},

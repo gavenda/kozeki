@@ -7,17 +7,24 @@ import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
+import dev.gavenda.kozeki.data.metadata.OwnedBooks
 import dev.gavenda.kozeki.data.model.Acquisition
+import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.addbook.AddBookEvent
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -35,8 +42,8 @@ data class AuthorUiState(
     val notFound: Boolean = false,
     /** The book whose details are open. */
     val selected: BookMetadata? = null,
-    /** Source IDs of the books already among the user's own, so their rows can show it. */
-    val owned: Set<String> = emptySet(),
+    /** The books already among the user's own, by source ID, so their rows can show it. */
+    val owned: Map<String, Book> = emptyMap(),
 )
 
 class AuthorViewModel(
@@ -47,7 +54,13 @@ class AuthorViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthorUiState(name = name))
-    val uiState: StateFlow<AuthorUiState> = _uiState.asStateFlow()
+
+    val uiState: StateFlow<AuthorUiState> =
+        combine(_uiState, library.observeAll().map(::OwnedBooks)) { state, owned ->
+            state.copy(owned = owned.among(state.books))
+        }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _uiState.value)
 
     private val eventChannel = Channel<AddBookEvent>(Channel.BUFFERED)
     val events: Flow<AddBookEvent> = eventChannel.receiveAsFlow()
@@ -59,12 +72,6 @@ class AuthorViewModel(
     private var pager: BookSearch? = null
 
     init {
-        viewModelScope.launch {
-            library.observeAll().collect { books ->
-                val owned = books.filter { it.source == metadata.source }.mapNotNullTo(mutableSetOf()) { it.sourceId }
-                _uiState.update { it.copy(owned = owned) }
-            }
-        }
         load()
     }
 

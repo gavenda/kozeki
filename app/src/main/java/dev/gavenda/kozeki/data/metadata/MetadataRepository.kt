@@ -47,7 +47,7 @@ class MetadataRepository(
     }
 
     suspend fun findByIsbn(isbn13: String): List<BookMetadata> =
-        books("isbn|$isbn13", LOOKUP_TTL) { provider.findByIsbn(isbn13) }
+        books("isbn|$SEARCH_VERSION|$isbn13", LOOKUP_TTL) { provider.findByIsbn(isbn13) }
 
     suspend fun searchByTitleAndAuthor(title: String, author: String?): List<BookMetadata> {
         val key = "title|$SEARCH_VERSION|${BookMatcher.normalize(title)}|${author?.let(BookMatcher::normalize).orEmpty()}"
@@ -57,7 +57,7 @@ class MetadataRepository(
     /** The author with [authorId] and one page of their books, the first being 1. */
     suspend fun author(authorId: String, page: Int = 1): AuthorPage =
         cached(
-            key = "author|$authorId|$page",
+            key = "author|$SEARCH_VERSION|$authorId|$page",
             serializer = AuthorPage.serializer(),
             lifetime = { if (it.author == null) EMPTY_TTL else AUTHOR_TTL },
         ) { provider.author(authorId, page) }
@@ -132,8 +132,8 @@ class MetadataRepository(
         const val MIN_QUERY_LENGTH = 3
         const val MIN_REQUEST_GAP_MS = 400L
 
-        /** Bumped when what a search returns changes, so answers cached under the old rules are not served. */
-        const val SEARCH_VERSION = 3
+        /** Bumped when what a lookup returns changes, so answers cached under the old rules are not served. */
+        const val SEARCH_VERSION = 4
         val SEARCH_TTL: Duration = Duration.ofDays(7)
         val LOOKUP_TTL: Duration = Duration.ofDays(30)
         val EMPTY_TTL: Duration = Duration.ofDays(1)

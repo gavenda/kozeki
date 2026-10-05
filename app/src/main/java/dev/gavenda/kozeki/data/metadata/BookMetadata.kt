@@ -22,6 +22,8 @@ data class BookMetadata(
     val isbn13: String? = null,
     val categories: List<String> = emptyList(),
     val coverUrl: String? = null,
+    /** Mean rating by the source's readers out of 5, or null when nobody has rated the book. */
+    val averageRating: Float? = null,
     /** The book's page on the source. */
     val infoUrl: String? = null,
 ) {

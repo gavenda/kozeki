@@ -44,6 +44,11 @@
     <!-- Library -->
     <string name="filter_planning">Planning</string>
     <string name="filter_all">All</string>
+    <string name="sort_books">Sort books</string>
+    <string name="sort_recent">Recently read</string>
+    <string name="sort_title">Title</string>
+    <string name="sort_date_added">Date added</string>
+    <string name="sort_rating">My rating</string>
     <string name="library_favorites">Favorites</string>
     <string name="library_other_books">Other books</string>
     <string name="library_paused_at">Paused · %1$s</string>
@@ -188,6 +193,7 @@
 
     <!-- Reviews -->
     <string name="reviews_title">Reviews</string>
+    <string name="result_open_author">Open</string>
     <string name="reviews_average">%1$.1f</string>
     <plurals name="reviews_ratings_count">
         <item quantity="one">%1$s rating</item>
@@ -261,7 +267,6 @@
     <string name="add_book_as_purchased">I own this</string>
     <string name="add_book_added_wishlist">Added “%1$s” to your wishlist</string>
     <string name="add_book_added_purchased">Added “%1$s” to purchased</string>
-    <string name="add_book_already_added">Added</string>
     <string name="action_view">View</string>
 
     <string name="author_error_title">Author unavailable</string>

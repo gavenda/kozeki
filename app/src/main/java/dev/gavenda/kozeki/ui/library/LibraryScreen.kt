@@ -27,6 +27,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
+import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Bookmarks
@@ -146,6 +147,7 @@ fun LibraryScreen(
         snackbarHostState = snackbarHostState,
         onSearchQueryChange = searchViewModel::onQueryChange,
         onFilterSelected = viewModel::selectFilter,
+        onSortSelected = viewModel::selectSort,
         onImportClick = { picker.launch(EpubMimeTypes) },
         onAddBook = onAddBook,
         onBookClick = { onOpenBook(it.id) },
@@ -193,6 +195,7 @@ fun LibraryContent(
     snackbarHostState: SnackbarHostState,
     onSearchQueryChange: (String) -> Unit,
     onFilterSelected: (LibraryFilter) -> Unit,
+    onSortSelected: (LibrarySort) -> Unit,
     onImportClick: () -> Unit,
     onAddBook: () -> Unit,
     onBookClick: (Book) -> Unit,
@@ -270,7 +273,7 @@ fun LibraryContent(
             )
 
             else -> Column(Modifier.padding(top = innerPadding.calculateTopPadding())) {
-                FilterRow(state, onFilterSelected)
+                FilterRow(state, onFilterSelected, onSortSelected)
                 if (state.isFilterEmpty) {
                     EmptyState(
                         icon = Icons.Rounded.FilterListOff,
@@ -416,32 +419,65 @@ private fun AddBooksMenu(importing: Boolean, onImportClick: () -> Unit, onAddBoo
 }
 
 @Composable
-private fun FilterRow(state: LibraryUiState, onFilterSelected: (LibraryFilter) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        LibraryFilter.entries.forEach { filter ->
-            val selected = filter == state.filter
-            FilterChip(
-                selected = selected,
-                onClick = { onFilterSelected(filter) },
-                label = { Text(stringResource(filter.label)) },
-                leadingIcon = if (selected) {
-                    { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                } else {
-                    null
-                },
-                trailingIcon = {
-                    Text(
-                        text = (state.counts[filter] ?: 0).toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                },
-            )
+private fun FilterRow(
+    state: LibraryUiState,
+    onFilterSelected: (LibraryFilter) -> Unit,
+    onSortSelected: (LibrarySort) -> Unit,
+) {
+    // The order stays put at the end of the row while the filters scroll past it.
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            LibraryFilter.entries.forEach { filter ->
+                val selected = filter == state.filter
+                FilterChip(
+                    selected = selected,
+                    onClick = { onFilterSelected(filter) },
+                    label = { Text(stringResource(filter.label)) },
+                    leadingIcon = if (selected) {
+                        { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else {
+                        null
+                    },
+                    trailingIcon = {
+                        Text(
+                            text = (state.counts[filter] ?: 0).toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                )
+            }
+        }
+        SortMenu(state.sort, onSortSelected, Modifier.padding(end = 4.dp))
+    }
+}
+
+@Composable
+private fun SortMenu(sort: LibrarySort, onSortSelected: (LibrarySort) -> Unit, modifier: Modifier = Modifier) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = stringResource(R.string.sort_books))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            LibrarySort.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(option.label)) },
+                    onClick = {
+                        expanded = false
+                        onSortSelected(option)
+                    },
+                    leadingIcon = {
+                        // An empty slot keeps the labels of the other orders in line.
+                        if (option == sort) Icon(Icons.Rounded.Check, contentDescription = null)
+                    },
+                )
+            }
         }
     }
 }
@@ -715,6 +751,7 @@ private fun LibraryContentPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onSearchQueryChange = {},
             onFilterSelected = {},
+            onSortSelected = {},
             onImportClick = {},
             onAddBook = {},
             onBookClick = {},
@@ -743,6 +780,7 @@ private fun LibrarySelectionPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onSearchQueryChange = {},
             onFilterSelected = {},
+            onSortSelected = {},
             onImportClick = {},
             onAddBook = {},
             onBookClick = {},
@@ -762,6 +800,7 @@ private fun LibraryEmptyPreview() {
             snackbarHostState = remember { SnackbarHostState() },
             onSearchQueryChange = {},
             onFilterSelected = {},
+            onSortSelected = {},
             onImportClick = {},
             onAddBook = {},
             onBookClick = {},
