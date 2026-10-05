@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Only read on Android 11 and older, which this app does not support. Kept in step with data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="file" path="books/" />
+</full-backup-content>

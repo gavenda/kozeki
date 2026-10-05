@@ -1,0 +1,344 @@
+<resources>
+    <string name="app_name">Kozeki</string>
+
+    <!-- Navigation -->
+    <string name="nav_library">Library</string>
+    <string name="nav_calendar">Calendar</string>
+    <string name="nav_statistics">Statistics</string>
+
+    <!-- Common actions -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_ok">OK</string>
+    <string name="action_retry">Try again</string>
+    <string name="action_save">Save</string>
+    <string name="action_search">Search</string>
+    <string name="action_show_less">Show less</string>
+    <string name="action_show_more">Show more</string>
+    <string name="action_undo">Undo</string>
+
+    <!-- Reading states -->
+    <string name="state_planned">Planned</string>
+    <string name="state_reading">Reading</string>
+    <string name="state_completed">Completed</string>
+    <string name="state_dropped">Dropped</string>
+    <string name="state_paused">Paused</string>
+
+    <!-- Durations and counts -->
+    <string name="duration_hours_minutes">%1$dh %2$dm</string>
+    <string name="duration_hours">%1$dh</string>
+    <string name="duration_minutes">%1$dm</string>
+    <string name="duration_under_minute">&lt;1m</string>
+    <string name="x_of_y">%1$d of %2$d</string>
+    <plurals name="pages_count">
+        <item quantity="one">%1$d page</item>
+        <item quantity="other">%1$d pages</item>
+    </plurals>
+    <plurals name="book_count">
+        <item quantity="one">%1$d book</item>
+        <item quantity="other">%1$d books</item>
+    </plurals>
+
+    <!-- Library -->
+    <string name="filter_planning">Planning</string>
+    <string name="filter_all">All</string>
+    <string name="library_favorites">Favorites</string>
+    <string name="library_other_books">Other books</string>
+    <string name="library_paused_at">Paused · %1$s</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_message">Import an EPUB to start reading, or find a book online to keep on your wishlist. Kozeki keeps track of your chapter and progress as you go.</string>
+    <string name="library_add">Add books</string>
+    <string name="library_add_import">Import EPUB</string>
+    <string name="library_add_find">Find a book online</string>
+    <string name="library_owned_no_epub">Owned, no EPUB yet</string>
+    <string name="library_filter_empty_title">Nothing here</string>
+    <string name="library_filter_empty_message">No books match this filter. Pick another one above.</string>
+
+    <!-- Import -->
+    <string name="import_epub">Import</string>
+    <string name="importing">Importing…</string>
+    <string name="import_done">Imported “%1$s”</string>
+    <string name="import_attached">Added the EPUB to “%1$s”</string>
+    <string name="import_duplicate">“%1$s” is already in your library</string>
+    <string name="import_failed_not_epub">That file is not a readable EPUB</string>
+    <string name="import_failed_protected">That EPUB is protected by DRM and cannot be opened</string>
+    <string name="import_failed_unreadable">The file could not be read</string>
+    <plurals name="import_summary">
+        <item quantity="one">Imported %1$d of %2$d files.</item>
+        <item quantity="other">Imported %1$d of %2$d files.</item>
+    </plurals>
+    <plurals name="import_summary_failed">
+        <item quantity="one">%1$d could not be opened.</item>
+        <item quantity="other">%1$d could not be opened.</item>
+    </plurals>
+
+    <!-- Book -->
+    <string name="favorite">Favorite</string>
+    <string name="favorite_add">Add to favorites</string>
+    <string name="favorite_remove">Remove from favorites</string>
+    <string name="book_more_actions">More actions</string>
+    <string name="book_mark_as">Mark as %1$s</string>
+    <string name="book_not_found">This book is no longer in Kozeki.</string>
+    <string name="book_file_missing">EPUB not on this device</string>
+    <string name="book_file_missing_message">The EPUB for this book is not on this device. Import it again to keep reading; your progress is kept.</string>
+    <string name="book_start">Start reading</string>
+    <string name="book_continue">Continue reading</string>
+    <string name="book_open">Open</string>
+    <string name="book_read_again">Read again</string>
+    <string name="book_status">Status</string>
+    <string name="book_reading_number">Reading %1$d</string>
+    <string name="book_chapter">Chapter</string>
+    <string name="book_page">Page</string>
+    <string name="book_time_read">Time read</string>
+    <string name="progress_epub">EPUB</string>
+    <string name="progress_physical">Physical book</string>
+    <string name="physical_prompt">Reading a physical copy? Keep track of the page you are on.</string>
+    <string name="physical_set">Set page</string>
+    <string name="physical_update">Update page</string>
+    <string name="physical_dialog_title">Physical book progress</string>
+    <string name="physical_page">Current page</string>
+    <string name="physical_page_count">Total pages</string>
+    <string name="physical_stop">Stop tracking</string>
+    <string name="book_about">Synopsis</string>
+    <string name="book_no_details">No details yet. Link this book to a metadata source to fill them in.</string>
+    <string name="book_view_on_source">View on %1$s</string>
+    <string name="detail_publisher">Publisher</string>
+    <string name="detail_published">Published</string>
+    <string name="detail_pages">Pages</string>
+    <string name="detail_language">Language</string>
+    <string name="detail_isbn">ISBN</string>
+    <string name="detail_categories">Categories</string>
+    <string name="delete_book_title">Delete this book?</string>
+    <string name="delete_book_message">“%1$s”, its EPUB, notes and reading history will be removed. This cannot be undone.</string>
+
+    <!-- Rating -->
+    <string name="rating_none">Not rated</string>
+    <string name="rating_value">Rated %1$.1f out of 5</string>
+    <string name="rating_clear">Clear rating</string>
+    <plurals name="rating_stars">
+        <item quantity="one">Rate %1$d star</item>
+        <item quantity="other">Rate %1$d stars</item>
+    </plurals>
+
+    <!-- Purchase -->
+    <string name="purchase_title">Ownership</string>
+    <string name="wishlist_tab">Wishlist</string>
+    <string name="purchased_tab">Purchased</string>
+    <string name="purchase_dialog_title">Purchase details</string>
+    <string name="purchase_price">Price</string>
+    <string name="purchase_currency">Currency</string>
+    <string name="purchase_date">Bought on</string>
+    <string name="purchase_location">Bought at</string>
+    <string name="purchase_bought_on">Bought on %1$s</string>
+    <string name="purchase_no_price">No price recorded</string>
+
+    <!-- Notes -->
+    <string name="notes_title">Notes</string>
+    <string name="notes_empty">No notes yet.</string>
+    <string name="note_add">Add note</string>
+    <string name="note_edit">Edit note</string>
+    <string name="note_hint">Note</string>
+
+    <!-- Reading history -->
+    <string name="history_title">Reading history</string>
+    <plurals name="history_reading">
+        <item quantity="one">Reading %1$d</item>
+        <item quantity="other">Reading %1$d</item>
+    </plurals>
+    <string name="history_started">Started %1$s</string>
+    <string name="history_completed">Completed %1$s</string>
+    <string name="history_dropped">Dropped %1$s</string>
+
+    <!-- Metadata sources and matching -->
+    <string name="source_google_books">Google Books</string>
+    <string name="source_hardcover">Hardcover</string>
+    <string name="attribution_google">Powered by Google</string>
+    <string name="attribution_hardcover">Data from Hardcover</string>
+    <string name="match_find">Find metadata match</string>
+    <string name="match_unlink">Unlink from source</string>
+    <string name="match_sheet_title">Choose the matching book</string>
+    <string name="match_choose">Choose match</string>
+    <string name="match_search">Search</string>
+    <string name="match_pending_title">Details not looked up yet</string>
+    <string name="match_pending_message">Kozeki will look this book up when it is online and a metadata source is set up. Until then, it uses what the EPUB says about itself.</string>
+    <string name="match_review_title">Confirm the match</string>
+    <string name="match_review_message">Several books could be this one. Pick the right one to fill in its details.</string>
+    <string name="match_not_found_title">No match found</string>
+    <string name="match_not_found_message">The metadata source has no book with this title and author. You can search with different words.</string>
+    <string name="search_hint">Title, author or ISBN</string>
+    <string name="search_no_results">No books found.</string>
+    <string name="lookup_error_offline">You appear to be offline. Results you looked up before are still available.</string>
+    <string name="lookup_error_rate_limited">The metadata source\'s request limit has been reached. Try again later.</string>
+    <string name="lookup_error_not_configured">This metadata source is not set up. Check Settings.</string>
+    <string name="lookup_error_signed_out">Sign in to this metadata source in Settings first.</string>
+    <string name="lookup_error_unauthorized">The metadata source rejected the request. Check the key or sign in again in Settings.</string>
+    <string name="lookup_error_other">The lookup failed. Try again later.</string>
+
+    <!-- Reader -->
+    <string name="reader_contents">Contents</string>
+    <string name="reader_contents_empty">This book has no table of contents.</string>
+    <string name="reader_appearance">Appearance</string>
+    <string name="reader_theme">Theme</string>
+    <string name="reader_theme_system">App</string>
+    <string name="reader_theme_light">Light</string>
+    <string name="reader_theme_sepia">Sepia</string>
+    <string name="reader_theme_dark">Dark</string>
+    <string name="reader_text_size">Text size</string>
+    <string name="reader_text_smaller">Smaller text</string>
+    <string name="reader_text_larger">Larger text</string>
+    <string name="reader_font">Typeface</string>
+    <string name="reader_font_publisher">Original</string>
+    <string name="reader_font_serif">Serif</string>
+    <string name="reader_font_sans">Sans</string>
+    <string name="reader_font_mono">Mono</string>
+    <string name="reader_layout">Layout</string>
+    <string name="reader_layout_pages">Pages</string>
+    <string name="reader_layout_scroll">Scroll</string>
+    <string name="reader_justify">Justify text</string>
+    <string name="reader_fixed_layout_note">This book has a fixed layout, so text settings do not apply to it.</string>
+    <string name="reader_footer_position">%1$d / %2$d · %3$s</string>
+    <string name="reader_completed">Marked as completed</string>
+    <string name="reader_failed_title">Cannot open this book</string>
+    <string name="reader_failed_unsupported">This EPUB uses a layout the reader does not support.</string>
+    <string name="reader_failed_unreadable">The EPUB could not be opened. It may be damaged.</string>
+
+    <!-- Wishlist and purchased -->
+    <string name="wishlist_mark_purchased">Mark as purchased</string>
+    <string name="wishlist_move_back">Move to wishlist</string>
+    <string name="not_purchased">Not purchased</string>
+    <string name="purchase_mark_not_purchased">Mark as not purchased</string>
+
+    <!-- Search -->
+    <string name="search_books_hint">Search your books</string>
+    <string name="search_books_prompt">Find a book in your library, on your wishlist or among your purchases by its title or author.</string>
+    <string name="search_books_no_results">Nothing in your library, wishlist or purchases matches “%1$s”.</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_group_count">%1$s · %2$d</string>
+
+    <!-- Add book -->
+    <string name="add_book_title">Add book</string>
+    <string name="add_book_searching_in">Searching %1$s</string>
+    <string name="add_book_prompt_title">Find a book</string>
+    <string name="add_book_prompt_message">Search by title, author or ISBN, then press search. Results are kept on this device, so repeating a search costs nothing.</string>
+    <string name="add_book_no_results_message">Try fewer or different words, or the ISBN.</string>
+    <string name="add_book_error_title">Search unavailable</string>
+    <string name="add_book_to_wishlist">Add to wishlist</string>
+    <string name="add_book_as_purchased">I own this</string>
+    <string name="add_book_added_wishlist">Added “%1$s” to your wishlist</string>
+    <string name="add_book_added_purchased">Added “%1$s” to purchased</string>
+    <string name="add_book_already_added">Added</string>
+    <string name="action_view">View</string>
+
+    <!-- Calendar -->
+    <string name="calendar_title">Book calendar</string>
+    <string name="calendar_nothing_read">Nothing read this month</string>
+    <plurals name="calendar_summary">
+        <item quantity="one">Read on %1$d day · %2$s</item>
+        <item quantity="other">Read on %1$d days · %2$s</item>
+    </plurals>
+    <string name="calendar_previous_month">Previous month</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_day_description">%1$s: %2$s</string>
+    <string name="calendar_more_books">+%1$d</string>
+
+    <!-- Statistics -->
+    <string name="stats_range_day">Day</string>
+    <string name="stats_range_week">Week</string>
+    <string name="stats_range_month">Month</string>
+    <string name="stats_range_year">Year</string>
+    <string name="stats_today">Today</string>
+    <string name="stats_date_range">%1$s – %2$s</string>
+    <string name="stats_previous">Earlier</string>
+    <string name="stats_next">Later</string>
+    <string name="stats_books">Books</string>
+    <string name="stats_finished">Finished</string>
+    <string name="stats_timeline">Timeline</string>
+    <string name="stats_goal">Goal</string>
+    <string name="stats_goal_minutes">Goal: %1$dm</string>
+    <string name="stats_time_read">Time read</string>
+    <string name="stats_pages">Pages</string>
+    <string name="stats_days_read">Days read</string>
+    <string name="stats_goal_reached">Goal reached</string>
+    <string name="stats_time_per_day">Reading time per day</string>
+    <string name="stats_day_description">%1$s, %2$s</string>
+    <string name="stats_day_empty_title">Nothing read</string>
+    <string name="stats_day_empty_message">No reading was recorded on this day.</string>
+    <string name="stats_page_span">p. %1$d – %2$d</string>
+    <plurals name="stats_pages_gained">
+        <item quantity="one">+%1$d page (%2$d%%)</item>
+        <item quantity="other">+%1$d pages (%2$d%%)</item>
+    </plurals>
+    <string name="stats_pages_per_hour">%1$.1f pages per hour</string>
+    <plurals name="stats_pages_read">
+        <item quantity="one">%1$d page</item>
+        <item quantity="other">%1$d pages</item>
+    </plurals>
+    <plurals name="stats_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="stats_books_per_month">Books finished per month</string>
+    <string name="stats_time_per_month">Reading time per month</string>
+    <string name="stats_monthly_average">Monthly average</string>
+    <string name="stats_books_decimal">%1$.1f books</string>
+    <plurals name="stats_books_finished">
+        <item quantity="one">%1$d book finished</item>
+        <item quantity="other">%1$d books finished</item>
+    </plurals>
+    <plurals name="stats_goal_books">
+        <item quantity="one">Goal: %1$d book</item>
+        <item quantity="other">Goal: %1$d books</item>
+    </plurals>
+    <string name="stats_no_goal">No goal set for %1$d</string>
+    <string name="stats_set_goal">Set goal</string>
+    <string name="stats_ratings">Ratings</string>
+    <string name="stats_rating_average">%1$.1f average</string>
+    <plurals name="stats_stars">
+        <item quantity="one">%1$d star</item>
+        <item quantity="other">%1$d stars</item>
+    </plurals>
+    <string name="stats_longest_books">Longest books finished, in pages</string>
+    <string name="stats_spending">Spent on books</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_source_title">Metadata</string>
+    <string name="settings_source_provider">Provider</string>
+    <string name="settings_source_description">Your preferred book metadata provider</string>
+    <string name="settings_google_missing_key">No API key in this build</string>
+    <plurals name="settings_google_requests">
+        <item quantity="one">Ready · %1$d request today</item>
+        <item quantity="other">Ready · %1$d requests today</item>
+    </plurals>
+    <string name="settings_hardcover_signed_out">Tap to sign in with your Hardcover account</string>
+    <string name="settings_hardcover_signed_in">Signed in</string>
+    <string name="settings_hardcover_signed_in_as">Signed in as %1$s</string>
+    <string name="settings_hardcover_sign_in">Sign in</string>
+    <string name="settings_hardcover_sign_out">Sign out</string>
+    <string name="settings_hardcover_sign_out_title">Sign out of Hardcover?</string>
+    <string name="settings_hardcover_sign_out_message">Book lookups through Hardcover stop until you sign in again. Your library is not affected.</string>
+    <string name="settings_hardcover_denied">Access was declined on Hardcover, so nothing was connected.</string>
+    <string name="settings_hardcover_rejected">Hardcover did not accept the sign-in. Contact the developer.</string>
+    <string name="settings_appearance_title">Appearance</string>
+    <string name="settings_dynamic_color">Wallpaper colors</string>
+    <string name="settings_dynamic_color_description">Match system wallpaper colors</string>
+    <string name="settings_goals_title">Goals</string>
+    <string name="settings_daily_goal">Daily reading goal</string>
+    <string name="settings_daily_goal_value">%1$d min</string>
+    <string name="settings_yearly_goal">Books to finish in %1$d</string>
+    <string name="settings_goal_not_set">Not set</string>
+    <string name="settings_goal_decrease">One fewer</string>
+    <string name="settings_goal_increase">One more</string>
+    <string name="settings_cache_title">Lookup cache</string>
+    <string name="settings_cache_description">Cached search results</string>
+    <plurals name="settings_cache_entries">
+        <item quantity="one">%1$d stored lookup</item>
+        <item quantity="other">%1$d stored lookups</item>
+    </plurals>
+    <string name="settings_cache_clear">Clear</string>
+    <string name="settings_about_title">About</string>
+    <string name="settings_about_version">Kozeki %1$s</string>
+    <string name="settings_about_credits">A personal epub and library companion</string>
+</resources>

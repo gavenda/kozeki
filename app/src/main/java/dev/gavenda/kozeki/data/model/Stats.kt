@@ -1,0 +1,107 @@
+package dev.gavenda.kozeki.data.model
+
+import java.time.LocalDate
+
+/** Reading totals for one calendar day. */
+data class DayReading(
+    val date: LocalDate,
+    val durationMs: Long = 0L,
+    val pages: Int = 0,
+)
+
+/** What was read of one book over some period. */
+data class BookReading(
+    val book: Book,
+    val durationMs: Long,
+    val pages: Int,
+    val startPosition: Int? = null,
+    val endPosition: Int? = null,
+    /** Share of the book covered, 0.0 to 1.0. */
+    val progressGained: Double = 0.0,
+) {
+    /** Pages per hour, or null when too little was read to say. */
+    val pagesPerHour: Double?
+        get() = if (durationMs >= 60_000 && pages > 0) pages / (durationMs / 3_600_000.0) else null
+}
+
+data class TimelineEntry(
+    val book: Book,
+    val startedAt: Long,
+    val durationMs: Long,
+    val chapter: String?,
+)
+
+/** A read-through that ended with the book finished. */
+data class CompletedBook(
+    val book: Book,
+    val finishedOn: LocalDate,
+    val readThroughNumber: Int,
+)
+
+data class DailyStats(
+    val date: LocalDate,
+    val goalMinutes: Int,
+    val durationMs: Long,
+    val pages: Int,
+    val books: List<BookReading>,
+    val timeline: List<TimelineEntry>,
+    val completed: List<CompletedBook>,
+    /** The week around [date], for the day strip. */
+    val week: List<DayReading>,
+) {
+    val goalProgress: Float
+        get() = if (goalMinutes <= 0) 0f else (durationMs / 60_000f) / goalMinutes
+}
+
+/** A week or a month. */
+data class PeriodStats(
+    val start: LocalDate,
+    val endInclusive: LocalDate,
+    val goalMinutes: Int,
+    val days: List<DayReading>,
+    val durationMs: Long,
+    val pages: Int,
+    val sessionCount: Int,
+    val books: List<BookReading>,
+    val completed: List<CompletedBook>,
+) {
+    val daysRead: Int get() = days.count { it.durationMs > 0 }
+    val goalDaysMet: Int get() = days.count { goalMinutes > 0 && it.durationMs >= goalMinutes * 60_000L }
+}
+
+data class YearStats(
+    val year: Int,
+    val goalBooks: Int?,
+    val completed: List<CompletedBook>,
+    /** Twelve entries, January first. */
+    val completedPerMonth: List<Int>,
+    val durationPerMonth: List<Long>,
+    val pagesPerMonth: List<Int>,
+    val durationMs: Long,
+    val pages: Int,
+    val ratingAverage: Float?,
+    /** Number of rated books per whole star, index 0 being one star. */
+    val ratingCounts: List<Int>,
+    /** Money spent on books bought this year, per currency code. */
+    val spending: Map<String, Long>,
+    /** Monthly spending in [spendingCurrency], the currency most purchases used. */
+    val spendingPerMonth: List<Long>,
+    val spendingCurrency: String?,
+) {
+    val goalProgress: Float?
+        get() = goalBooks?.takeIf { it > 0 }?.let { completed.size.toFloat() / it }
+}
+
+/** One cell of the book calendar. */
+data class CalendarDay(
+    val date: LocalDate,
+    /** Books read that day, most-read first. */
+    val books: List<CalendarBook>,
+)
+
+data class CalendarBook(
+    val book: Book,
+    val durationMs: Long,
+    /** The book was finished on this day. */
+    val completed: Boolean,
+)
