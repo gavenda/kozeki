@@ -23,13 +23,14 @@ class OwnedBooks(books: List<Book> = emptyList()) {
     /**
      * The book of the user's that [result] is: the one linked to it, one with the same ISBN, or
      * one with the same title by the same author. The last catches an imported EPUB that was
-     * never matched, and one whose ISBN belongs to another edition than the result's.
+     * never matched, and one whose ISBN belongs to another edition than the result's. Volumes of
+     * a series share a title up to their number, so that has to agree as well.
      */
     fun find(result: BookMetadata): Book? =
         bySourceId[result.source to result.sourceId]
             ?: isbnsOf(result.isbn13, result.isbn10).firstNotNullOfOrNull(byIsbn::get)
             ?: byTitle[titleKey(result.title)].orEmpty().firstOrNull { book ->
-                book.authors.any { own -> result.authors.any { BookMatcher.authorSimilarity(own, it) >= SAME_AUTHOR } }
+                BookMatcher.volume(book.title) == BookMatcher.volume(result.title) && book.authors.any { own -> result.authors.any { BookMatcher.authorSimilarity(own, it) >= SAME_AUTHOR } }
             }
 
     operator fun contains(result: BookMetadata): Boolean = find(result) != null

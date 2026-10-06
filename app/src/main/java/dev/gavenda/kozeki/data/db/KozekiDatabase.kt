@@ -43,11 +43,29 @@ abstract class KozekiDatabase : RoomDatabase() {
          */
         private val DropGoogleBooks = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                addPreReleaseColumns(db)
                 db.execSQL(
                     "UPDATE books SET source = NULL, sourceId = NULL, sourceUrl = NULL, matchStatus = 'PENDING', " +
                         "updatedAt = CAST(strftime('%s', 'now') AS INTEGER) * 1000 WHERE source = 'GOOGLE_BOOKS'",
                 )
                 db.execSQL("DELETE FROM metadata_cache WHERE source = 'GOOGLE_BOOKS'")
+            }
+        }
+
+        /**
+         * Builds from before 1.0 made version 1 without the paper page counts and the place of
+         * purchase, which joined it with no version change. A database from one of those gets them here.
+         */
+        private fun addPreReleaseColumns(db: SupportSQLiteDatabase) {
+            val existing = buildSet {
+                db.query("PRAGMA table_info(books)").use { cursor ->
+                    val name = cursor.getColumnIndexOrThrow("name")
+                    while (cursor.moveToNext()) add(cursor.getString(name))
+                }
+            }
+            val added = listOf("physicalPage" to "INTEGER", "physicalPageCount" to "INTEGER", "purchaseLocation" to "TEXT")
+            for ((column, type) in added) {
+                if (column !in existing) db.execSQL("ALTER TABLE books ADD COLUMN $column $type")
             }
         }
 

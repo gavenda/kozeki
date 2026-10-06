@@ -7,7 +7,6 @@ import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.OwnedBooks
-import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -16,16 +15,13 @@ import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -41,15 +37,9 @@ data class AddBookUiState(
     val canLoadMore: Boolean = false,
     val loadingMore: Boolean = false,
     val error: LookupError? = null,
-    /** The result whose details are open. */
-    val selected: BookMetadata? = null,
     /** The results already among the user's own books, by source ID, so their rows can show it. */
     val owned: Map<String, Book> = emptyMap(),
 )
-
-sealed interface AddBookEvent {
-    data class Added(val bookId: String, val title: String, val acquisition: Acquisition) : AddBookEvent
-}
 
 class AddBookViewModel(
     private val metadata: MetadataRepository,
@@ -66,9 +56,6 @@ class AddBookViewModel(
         }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _uiState.value)
-
-    private val eventChannel = Channel<AddBookEvent>(Channel.BUFFERED)
-    val events: Flow<AddBookEvent> = eventChannel.receiveAsFlow()
 
     private var searchJob: Job? = null
     private var loadMoreJob: Job? = null
@@ -173,16 +160,6 @@ class AddBookViewModel(
         availabilityJob?.cancel()
         searched = null
         pager = null
-    }
-
-    fun select(result: BookMetadata?) = _uiState.update { it.copy(selected = result) }
-
-    fun add(result: BookMetadata, acquisition: Acquisition) {
-        viewModelScope.launch {
-            val bookId = library.addFromMetadata(result, acquisition)
-            _uiState.update { it.copy(selected = null) }
-            eventChannel.send(AddBookEvent.Added(bookId, result.title, acquisition))
-        }
     }
 
     private companion object {

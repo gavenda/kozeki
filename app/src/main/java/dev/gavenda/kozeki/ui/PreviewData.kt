@@ -1,6 +1,7 @@
 package dev.gavenda.kozeki.ui
 
 import dev.gavenda.kozeki.data.model.Acquisition
+import dev.gavenda.kozeki.data.model.AllTimeStats
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.BookReading
 import dev.gavenda.kozeki.data.model.CalendarBook
@@ -19,6 +20,7 @@ import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.TimelineEntry
+import dev.gavenda.kozeki.data.model.YearReading
 import dev.gavenda.kozeki.data.model.YearStats
 import java.time.LocalDate
 import java.time.YearMonth
@@ -217,7 +219,7 @@ object PreviewData {
         pages = week.sumOf { it.pages },
         sessionCount = 11,
         books = dailyStats.books,
-        completed = listOf(CompletedBook(books[2], Today.minusDays(2), 1)),
+        completed = listOf(CompletedBook(books[2], Today.minusDays(2), "c1")),
     )
 
     val monthStats: PeriodStats = run {
@@ -240,9 +242,9 @@ object PreviewData {
         year = 2026,
         goalBooks = 24,
         completed = listOf(
-            CompletedBook(books[2], Today.minusDays(2), 1),
-            CompletedBook(books[0], Today.minusDays(120), 1),
-            CompletedBook(books[6], Today.minusDays(200), 1),
+            CompletedBook(books[2], Today.minusDays(2), "c1"),
+            CompletedBook(books[0], Today.minusDays(120), "c2"),
+            CompletedBook(books[6], Today.minusDays(200), "c3"),
         ),
         completedPerMonth = listOf(2, 1, 3, 1, 0, 2, 4, 1, 2, 1, 0, 0),
         durationPerMonth = listOf(11, 6, 14, 9, 2, 10, 21, 8, 12, 5, 0, 0).map { it * 60 * MINUTE },
@@ -253,6 +255,26 @@ object PreviewData {
         ratingCounts = listOf(0, 1, 3, 6, 7),
         spending = mapOf("USD" to 15_640L),
         spendingPerMonth = listOf(1299, 0, 2598, 899, 0, 1999, 3497, 0, 2449, 2899, 0, 0),
+        spendingCurrency = "USD",
+    )
+
+    val allTimeStats = AllTimeStats(
+        since = LocalDate.of(2023, 3, 12),
+        completed = yearStats.completed,
+        booksPerMonth = 1.4f,
+        years = listOf(
+            YearReading(2023, completed = 9, durationMs = 61 * 60 * MINUTE),
+            YearReading(2024, completed = 21, durationMs = 143 * 60 * MINUTE),
+            YearReading(2025, completed = 14, durationMs = 96 * 60 * MINUTE),
+            YearReading(2026, completed = 17, durationMs = 98 * 60 * MINUTE),
+        ),
+        durationMs = 398 * 60 * MINUTE,
+        pages = 21_480,
+        daysRead = 612,
+        ratingAverage = 4.0f,
+        ratingCounts = listOf(1, 4, 11, 24, 21),
+        spending = mapOf("USD" to 58_930L),
+        spendingPerYear = mapOf(2022 to 4_597L, 2023 to 11_240L, 2024 to 16_812L, 2025 to 10_641L, 2026 to 15_640L),
         spendingCurrency = "USD",
     )
 

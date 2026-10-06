@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.CompletedBook
 import dev.gavenda.kozeki.data.model.YearStats
 import dev.gavenda.kozeki.ui.components.ChartBar
 import dev.gavenda.kozeki.ui.components.ColumnChart
@@ -69,25 +70,15 @@ internal fun LazyListScope.yearItems(
     if (year.ratingAverage != null) {
         item(key = "year-ratings") { RatingsCard(year.ratingAverage, year.ratingCounts) }
     }
-
-    val longest = year.completed
-        .distinctBy { it.book.id }
-        .mapNotNull { completed -> (completed.book.pageCount ?: completed.book.positionCount)?.let { completed.book to it } }
-        .sortedByDescending { it.second }
-        .take(LONGEST_BOOKS_SHOWN)
-    if (longest.isNotEmpty()) {
-        item(key = "year-longest") {
-            ChartCard(stringResource(R.string.stats_longest_books)) {
-                RankedBars(longest.map { (book, pages) -> RankedBar(book.title, pages.toFloat(), pages.toString()) })
-            }
-        }
-    }
+    longestBooks(year.completed)
     if (year.spending.isNotEmpty()) {
-        item(key = "year-spending") { SpendingCard(year) }
+        item(key = "year-spending") {
+            SpendingCard(year.spending, year.spendingCurrency, monthInitials(), year.spendingPerMonth)
+        }
     }
     if (year.completed.isNotEmpty()) {
         item(key = "completed-label") { SectionLabel(stringResource(R.string.stats_finished)) }
-        items(year.completed.asReversed(), key = { "completed-${it.book.id}-${it.readThroughNumber}" }) { completed ->
+        items(year.completed.asReversed(), key = { "completed-${it.readThroughId}" }) { completed ->
             CompletedRow(completed, onClick = { onBookClick(completed.book) })
         }
     }
@@ -171,17 +162,47 @@ private fun MonthlyChart(
     wholeNumbers: Boolean,
 ) {
     val locale = LocalLocale.current.platformLocale
+    ColumnChartCard(
+        title = title,
+        labels = monthInitials(),
+        names = Month.entries.map { it.getDisplayName(TextStyle.SHORT, locale) },
+        values = values,
+        valueText = valueText,
+        axisValue = axisValue,
+        wholeNumbers = wholeNumbers,
+    )
+}
+
+/** The twelve months as they go under a year's columns, January first. */
+@Composable
+private fun monthInitials(): List<String> {
+    val locale = LocalLocale.current.platformLocale
+    return Month.entries.map { it.getDisplayName(TextStyle.NARROW, locale) }
+}
+
+// ---- Pieces shared with the all-time view --------------------------------------------------
+
+/**
+ * A titled chart with one column per stretch of time. [labels] go under the columns, an empty one
+ * leaving its column bare; [names] are what the spoken description calls them.
+ */
+@Composable
+internal fun ColumnChartCard(
+    title: String,
+    labels: List<String>,
+    names: List<String>,
+    values: List<Float>,
+    valueText: @Composable (Float) -> String,
+    axisValue: (Float) -> String,
+    wholeNumbers: Boolean,
+) {
     val bars = values.mapIndexed { index, value ->
-        ChartBar(
-            label = Month.of(index + 1).getDisplayName(TextStyle.NARROW, locale),
-            value = value,
-            valueText = valueText(value),
-        )
+        ChartBar(label = labels[index], value = value, valueText = valueText(value))
     }
     val description = title + ": " + values
-        .mapIndexed { index, value -> Month.of(index + 1).getDisplayName(TextStyle.SHORT, locale) to value }
+        .mapIndexed { index, value -> names[index] to value }
         .filter { it.second > 0f }
-        .map { (month, value) -> "$month ${valueText(value)}" }
+        .map { (name, value) -> "$name ${valueText(value)}" }
         .joinToString("; ")
 
     ChartCard(title) {
@@ -190,7 +211,7 @@ private fun MonthlyChart(
 }
 
 @Composable
-private fun RatingsCard(average: Float, counts: List<Int>) {
+internal fun RatingsCard(average: Float, counts: List<Int>) {
     ChartCard(stringResource(R.string.stats_ratings)) {
         Text(
             text = stringResource(R.string.stats_rating_average, average),
@@ -210,20 +231,44 @@ private fun RatingsCard(average: Float, counts: List<Int>) {
     }
 }
 
+/** The longest of the [completed] books, in a card that is left out when no book's length is known. */
+internal fun LazyListScope.longestBooks(completed: List<CompletedBook>) {
+    val longest = completed
+        .distinctBy { it.book.id }
+        .mapNotNull { entry -> (entry.book.pageCount ?: entry.book.positionCount)?.let { entry.book to it } }
+        .sortedByDescending { it.second }
+        .take(LONGEST_BOOKS_SHOWN)
+    if (longest.isNotEmpty()) {
+        item(key = "longest-books") {
+            ChartCard(stringResource(R.string.stats_longest_books)) {
+                RankedBars(longest.map { (book, pages) -> RankedBar(book.title, pages.toFloat(), pages.toString()) })
+            }
+        }
+    }
+}
+
+/**
+ * The total spent in each currency of [spending], over a column per entry of [amounts]. Those are
+ * in [chartCurrency] alone and go with [labels].
+ */
 @Composable
-private fun SpendingCard(year: YearStats) {
+internal fun SpendingCard(
+    spending: Map<String, Long>,
+    chartCurrency: String?,
+    labels: List<String>,
+    amounts: List<Long>,
+) {
     ChartCard(stringResource(R.string.stats_spending)) {
-        year.spending.forEach { (currency, total) ->
+        spending.forEach { (currency, total) ->
             Text(
                 text = formatPrice(total, currency.ifEmpty { null }),
                 style = MaterialTheme.typography.headlineMediumEmphasized,
             )
         }
-        val currency = year.spendingCurrency?.ifEmpty { null }
-        val locale = LocalLocale.current.platformLocale
-        val bars = year.spendingPerMonth.mapIndexed { index, minor ->
+        val currency = chartCurrency?.ifEmpty { null }
+        val bars = amounts.mapIndexed { index, minor ->
             ChartBar(
-                label = Month.of(index + 1).getDisplayName(TextStyle.NARROW, locale),
+                label = labels[index],
                 // Plotted in minor units; only the labels are turned into money.
                 value = minor.toFloat(),
                 valueText = formatPrice(minor, currency),

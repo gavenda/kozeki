@@ -32,6 +32,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.MenuBook
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BookmarkAdd
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -154,9 +155,12 @@ fun BookDetailScreen(
     onRead: (String) -> Unit,
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
+    /** Shown until the stored book has loaded, for a page that was already showing this book. */
+    placeholder: Book? = null,
     viewModel: BookDetailViewModel = koinViewModel(key = bookId) { parametersOf(bookId) },
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val loaded by viewModel.uiState.collectAsStateWithLifecycle()
+    val state = if (loaded.loading && placeholder != null) loaded.copy(loading = false, book = placeholder) else loaded
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -211,14 +215,55 @@ fun BookDetailScreen(
     BookDetailContent(state, snackbarHostState, actions)
 }
 
+/**
+ * The page of a book found on a metadata source, before it is the user's own: what the source
+ * says about it and what its readers think, with the two ways to add it. Once added, the page
+ * becomes the book's own where it stands, without going anywhere.
+ */
+@Composable
+fun FoundBookScreen(
+    result: BookMetadata,
+    onBack: () -> Unit,
+    onRead: (String) -> Unit,
+    onEdit: (String) -> Unit,
+    onOpenAuthor: (AuthorRef) -> Unit,
+    viewModel: FoundBookViewModel = koinViewModel(key = "found-${result.source}-${result.sourceId}") {
+        parametersOf(result)
+    },
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    // The ID the book was stored under, once it has been added.
+    var addedId by rememberSaveable { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(viewModel) {
+        viewModel.events.collect { addedId = it.bookId }
+    }
+
+    addedId?.let { bookId ->
+        BookDetailScreen(bookId, onBack, onRead, onEdit, onOpenAuthor, placeholder = state.book)
+        return
+    }
+
+    val actions = remember(viewModel) {
+        BookDetailActions(onBack = onBack, onOpenAuthor = onOpenAuthor, onRetryReviews = viewModel::retryReviews)
+    }
+
+    BookDetailContent(state, snackbarHostState, actions, onAdd = viewModel::add)
+}
+
 @Composable
 fun BookDetailContent(
     state: BookDetailUiState,
     snackbarHostState: SnackbarHostState,
     actions: BookDetailActions,
     modifier: Modifier = Modifier,
+    onAdd: ((Acquisition) -> Unit)? = null,
 ) {
     val book = state.book
+    // With a way to add it, the book is not the user's own yet: there is nothing of theirs to
+    // show or change, only what the source says about it.
+    val owned = onAdd == null
     var menuOpen by remember { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
@@ -259,7 +304,7 @@ fun BookDetailContent(
                     }
                 },
                 actions = {
-                    if (book != null) {
+                    if (book != null && owned) {
                         if (book.canFavorite) {
                             IconToggleButton(checked = book.isFavorite, onCheckedChange = actions.onSetFavorite) {
                                 Icon(
@@ -351,8 +396,17 @@ fun BookDetailContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                item(key = "header") { Header(book, actions.onSetRating, actions.onOpenAuthor, onTitleHeight = { titleHeight = it }) }
-                item(key = "primary") { PrimaryAction(book, state.importing, actions) }
+                item(key = "header") {
+                    Header(
+                        book = book,
+                        onSetRating = actions.onSetRating.takeIf { owned },
+                        onOpenAuthor = actions.onOpenAuthor,
+                        onTitleHeight = { titleHeight = it },
+                    )
+                }
+                item(key = "primary") {
+                    if (onAdd != null) AddActions(onAdd) else PrimaryAction(book, state.importing, actions)
+                }
                 if (book.canChangeState) {
                     item(key = "state") { StateSelector(book.state, actions.onSetState) }
                 }
@@ -368,23 +422,25 @@ fun BookDetailContent(
                     item(key = "match") { MatchNoticeCard(notice, actions) }
                 }
                 item(key = "about") { AboutSection(book) }
-                item(key = "ownership") {
-                    OwnershipSection(book, onEdit = { editingPurchase = true }, onSetPurchase = actions.onSetPurchase)
-                }
-                item(key = "notes-header") {
-                    SectionTitle(stringResource(R.string.notes_title)) {
-                        TextButton(onClick = { editingNoteId = "" }) {
-                            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.note_add))
+                if (owned) {
+                    item(key = "ownership") {
+                        OwnershipSection(book, onEdit = { editingPurchase = true }, onSetPurchase = actions.onSetPurchase)
+                    }
+                    item(key = "notes-header") {
+                        SectionTitle(stringResource(R.string.notes_title)) {
+                            TextButton(onClick = { editingNoteId = "" }) {
+                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(stringResource(R.string.note_add))
+                            }
                         }
                     }
-                }
-                if (state.notes.isEmpty()) {
-                    item(key = "notes-empty") { MutedText(stringResource(R.string.notes_empty)) }
-                } else {
-                    items(state.notes, key = { "note-${it.id}" }) { note ->
-                        NoteCard(note, onClick = { editingNoteId = note.id })
+                    if (state.notes.isEmpty()) {
+                        item(key = "notes-empty") { MutedText(stringResource(R.string.notes_empty)) }
+                    } else {
+                        items(state.notes, key = { "note-${it.id}" }) { note ->
+                            NoteCard(note, onClick = { editingNoteId = note.id })
+                        }
                     }
                 }
                 if (state.readThroughs.isNotEmpty()) {
@@ -437,7 +493,7 @@ fun BookDetailContent(
             )
         }
         if (editingPurchase) {
-            PurchaseSheet(
+            PurchaseDialog(
                 book = book,
                 lastCurrency = state.lastCurrency,
                 locationHistory = state.purchaseLocations,
@@ -449,7 +505,7 @@ fun BookDetailContent(
             )
         }
         if (editingPhysicalProgress) {
-            PhysicalProgressSheet(
+            PhysicalProgressDialog(
                 book = book,
                 onSave = { page, pageCount ->
                     editingPhysicalProgress = false
@@ -460,7 +516,7 @@ fun BookDetailContent(
         }
         editingNoteId?.let { noteId ->
             val note = state.notes.firstOrNull { it.id == noteId }
-            NoteSheet(
+            NoteDialog(
                 note = note,
                 onSave = { text ->
                     actions.onSaveNote(note?.id, text)
@@ -492,7 +548,8 @@ fun BookDetailContent(
 @Composable
 private fun Header(
     book: Book,
-    onSetRating: (Float?) -> Unit,
+    /** Null for a book that is not the user's own yet, which they have no rating for. */
+    onSetRating: ((Float?) -> Unit)?,
     onOpenAuthor: (AuthorRef) -> Unit,
     onTitleHeight: (Int) -> Unit,
 ) {
@@ -517,13 +574,40 @@ private fun Header(
                     maxLines = Int.MAX_VALUE,
                 )
             }
-            Spacer(Modifier.height(4.dp))
-            RatingBar(rating = book.rating, onRatingChange = onSetRating)
-            if (book.rating != null) {
-                TextButton(onClick = { onSetRating(null) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                    Text(stringResource(R.string.rating_clear))
+            if (onSetRating != null) {
+                Spacer(Modifier.height(4.dp))
+                RatingBar(rating = book.rating, onRatingChange = onSetRating)
+                if (book.rating != null) {
+                    TextButton(onClick = { onSetRating(null) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text(stringResource(R.string.rating_clear))
+                    }
                 }
             }
+        }
+    }
+}
+
+/** The two ways to make a found book the user's own: as one they have, or as one they want. */
+@Composable
+private fun AddActions(onAdd: (Acquisition) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { onAdd(Acquisition.WISHLIST) },
+            shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Rounded.BookmarkAdd, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.add_book_to_wishlist))
+        }
+        FilledTonalButton(
+            onClick = { onAdd(Acquisition.PURCHASED) },
+            shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(Icons.Rounded.Check, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.add_book_as_purchased))
         }
     }
 }
@@ -1046,6 +1130,36 @@ private fun BookDetailPhysicalPreview() {
             state = BookDetailUiState(loading = false, book = PreviewData.books[5]),
             snackbarHostState = remember { SnackbarHostState() },
             actions = BookDetailActions(),
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun BookDetailFoundPreview() {
+    AppTheme {
+        BookDetailContent(
+            state = BookDetailUiState(
+                loading = false,
+                book = BookMetadata(
+                    source = MetadataSource.HARDCOVER,
+                    sourceId = "a",
+                    title = "Good Omens",
+                    subtitle = "The Nice and Accurate Prophecies of Agnes Nutter, Witch",
+                    authors = listOf("Terry Pratchett", "Neil Gaiman"),
+                    authorRefs = listOf(AuthorRef("1", "Terry Pratchett"), AuthorRef("2", "Neil Gaiman")),
+                    description = "The world will end on Saturday. Next Saturday, in fact. Just after tea.",
+                    publisher = "Gollancz",
+                    publishedDate = "1990-05-10",
+                    pageCount = 412,
+                    isbn13 = "9780060853983",
+                    infoUrl = "https://hardcover.app/books/good-omens",
+                ).toBook(),
+                reviews = ReviewsUiState(loading = true),
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            actions = BookDetailActions(),
+            onAdd = {},
         )
     }
 }

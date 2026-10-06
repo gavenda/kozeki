@@ -66,6 +66,7 @@ class LibraryRepository(
             books.clearWishlistFavorites(clock.millis())
             books.planWishlist(clock.millis())
             books.unassumePurchases(clock.millis())
+            readThroughs.renumberDuplicates(clock.millis())
         }
     }
 
@@ -434,6 +435,8 @@ class LibraryRepository(
 
             val now = clock.millis()
             readThroughs.moveToBook(other.id, bookId, now)
+            // Each entry counted its own read-throughs from one, so together they may repeat a number.
+            readThroughs.renumberDuplicates(now)
             sessions.moveToBook(other.id, bookId, now)
             notes.moveToBook(other.id, bookId, now)
             // A cover the user chose for the entry that goes away comes along too.
@@ -465,8 +468,9 @@ class LibraryRepository(
 
     /**
      * Moves a book to [newState], keeping its read-throughs consistent: Reading and Paused have one
-     * open, Completed and Dropped close it. Going back from Completed or Dropped reopens the last
-     * read-through, which makes a mis-tap undoable; use [readAgain] to start a new one.
+     * open, Completed and Dropped close it. Leaving Completed or Dropped takes that end back: the last
+     * read-through is reopened, or given the other outcome, so a book no longer completed stops
+     * counting as one. That makes a mis-tap undoable; use [readAgain] to start a new one.
      *
      * A wishlist entry is always Planned, so asking for any other state is ignored.
      */
@@ -479,28 +483,21 @@ class LibraryRepository(
             var progression = book.progression
             var physicalPage = book.physicalPage
 
+            // The read-through the book's finished state closed. A change of mind is about that one.
+            val closed = if (book.state in FINISHED_STATES) readThroughs.getLatest(bookId) else null
+            // Completing pinned the progress to the end; any other state shows where the reader is.
+            if (book.state == ReadingState.COMPLETED) progression = progressionOf(book.locator) ?: book.progression
+
             when (newState) {
                 ReadingState.READING, ReadingState.PAUSED -> {
                     if (readThroughs.getOpen(bookId) == null) {
-                        val latest = readThroughs.getLatest(bookId)
-                        if (latest != null && book.state in FINISHED_STATES) {
-                            readThroughs.upsert(
-                                latest.copy(
-                                    finishedAt = null,
-                                    finishedOn = null,
-                                    outcome = null,
-                                    sync = latest.sync.touched(now),
-                                ),
-                            )
-                            progression = progressionOf(book.locator) ?: book.progression
-                        } else {
-                            startReadThrough(bookId, now)
-                        }
+                        if (closed != null) reopen(closed, now) else startReadThrough(bookId, now)
                     }
                 }
 
                 ReadingState.COMPLETED, ReadingState.DROPPED -> {
-                    val open = readThroughs.getOpen(bookId) ?: startReadThrough(bookId, now)
+                    // From the other finished state the outcome changes, with no new read-through.
+                    val open = readThroughs.getOpen(bookId) ?: closed ?: startReadThrough(bookId, now)
                     val outcome =
                         if (newState == ReadingState.COMPLETED) ReadOutcome.COMPLETED else ReadOutcome.DROPPED
                     readThroughs.upsert(
@@ -522,7 +519,7 @@ class LibraryRepository(
 
                 ReadingState.PLANNED -> {
                     // A read-through nobody read in is noise; one with sessions waits to be resumed.
-                    val open = readThroughs.getOpen(bookId)
+                    val open = readThroughs.getOpen(bookId) ?: closed?.let { reopen(it, now) }
                     if (open != null && sessions.countForBook(bookId) == 0) {
                         readThroughs.upsert(open.copy(sync = open.sync.deleted(now)))
                     }
@@ -602,6 +599,18 @@ class LibraryRepository(
                     setState(bookId, ReadingState.READING)
             }
         }
+    }
+
+    /** Takes back the end of [readThrough], so it no longer counts as completed or dropped. */
+    private suspend fun reopen(readThrough: ReadThroughEntity, now: Long): ReadThroughEntity {
+        val reopened = readThrough.copy(
+            finishedAt = null,
+            finishedOn = null,
+            outcome = null,
+            sync = readThrough.sync.touched(now),
+        )
+        readThroughs.upsert(reopened)
+        return reopened
     }
 
     private suspend fun startReadThrough(bookId: String, now: Long): ReadThroughEntity {

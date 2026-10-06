@@ -7,16 +7,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -26,9 +24,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -40,7 +36,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -53,11 +48,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.ui.PreviewData
-import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.defaultCurrency
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.parsePrice
@@ -70,26 +65,20 @@ import java.util.Currency
 
 /** Creates a note, or edits and optionally deletes [note]. */
 @Composable
-fun NoteSheet(
+fun NoteDialog(
     note: Note?,
     onSave: (String) -> Unit,
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberExpandedSheetState()) {
-        NoteSheetContent(note, onSave, onDelete)
-    }
-}
-
-@Composable
-private fun NoteSheetContent(note: Note?, onSave: (String) -> Unit, onDelete: (() -> Unit)?) {
     var text by rememberSaveable(note?.id) { mutableStateOf(note?.text.orEmpty()) }
 
-    SheetForm(
+    FormDialog(
         title = stringResource(if (note == null) R.string.note_add else R.string.note_edit),
         saveLabel = stringResource(R.string.note_save),
         saveEnabled = text.isNotBlank(),
         onSave = { onSave(text) },
+        onDismiss = onDismiss,
         removeLabel = stringResource(R.string.note_remove),
         onRemove = onDelete,
     ) {
@@ -111,18 +100,11 @@ private fun NoteSheetContent(note: Note?, onSave: (String) -> Unit, onDelete: ((
  * page when the user stops tracking the physical copy.
  */
 @Composable
-fun PhysicalProgressSheet(
+fun PhysicalProgressDialog(
     book: Book,
     onSave: (page: Int?, pageCount: Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberExpandedSheetState()) {
-        PhysicalProgressSheetContent(book, onSave)
-    }
-}
-
-@Composable
-private fun PhysicalProgressSheetContent(book: Book, onSave: (page: Int?, pageCount: Int?) -> Unit) {
     // Opens with the old page selected, so typing the new one replaces it.
     var page by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         val text = book.physicalPage?.toString().orEmpty()
@@ -137,11 +119,12 @@ private fun PhysicalProgressSheetContent(book: Book, onSave: (page: Int?, pageCo
     val pageCountValid = pageCount.isEmpty() || (total != null && total > 0)
     val pageValid = pageNumber != null && (total == null || pageNumber <= total)
 
-    SheetForm(
+    FormDialog(
         title = stringResource(R.string.physical_dialog_title),
         saveLabel = stringResource(R.string.physical_save),
         saveEnabled = pageValid && pageCountValid,
         onSave = { onSave(pageNumber, total) },
+        onDismiss = onDismiss,
         removeLabel = stringResource(R.string.physical_stop),
         onRemove = if (book.physicalPage != null) {
             { onSave(null, total) }
@@ -177,24 +160,12 @@ private fun PhysicalProgressSheetContent(book: Book, onSave: (page: Int?, pageCo
  * unknown. [locationHistory] holds the places entered before, which are suggested while typing.
  */
 @Composable
-fun PurchaseSheet(
+fun PurchaseDialog(
     book: Book,
     lastCurrency: String?,
     locationHistory: List<String>,
     onSave: (priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) -> Unit,
     onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberExpandedSheetState()) {
-        PurchaseSheetContent(book, lastCurrency, locationHistory, onSave)
-    }
-}
-
-@Composable
-private fun PurchaseSheetContent(
-    book: Book,
-    lastCurrency: String?,
-    locationHistory: List<String>,
-    onSave: (priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) -> Unit,
 ) {
     val initialCurrency = book.purchaseCurrency ?: lastCurrency ?: defaultCurrency().currencyCode
     var price by rememberSaveable {
@@ -210,7 +181,7 @@ private fun PurchaseSheetContent(
     val priceMinor = if (price.isBlank()) null else parsePrice(price, currency)
     val priceValid = price.isBlank() || priceMinor != null
 
-    SheetForm(
+    FormDialog(
         title = stringResource(R.string.purchase_dialog_title),
         saveLabel = stringResource(R.string.purchase_save),
         saveEnabled = priceValid && currencyValid,
@@ -222,6 +193,7 @@ private fun PurchaseSheetContent(
                 location.trim().ifEmpty { null },
             )
         },
+        onDismiss = onDismiss,
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
@@ -348,62 +320,67 @@ private fun LocationField(value: String, onValueChange: (String) -> Unit, histor
 }
 
 /**
- * The layout the editing sheets share: a title, the fields, then the save button at the end of a
- * row that starts with the destructive action when there is one. Swiping the sheet away discards.
+ * The dialog the editing forms share: a title, the fields, then the actions, with the destructive
+ * one first when there is one. A tap outside does not close it, so what was typed is only
+ * discarded on purpose, with Cancel or Back.
  */
 @Composable
-private fun SheetForm(
+private fun FormDialog(
     title: String,
     saveLabel: String,
     saveEnabled: Boolean,
     onSave: () -> Unit,
+    onDismiss: () -> Unit,
     removeLabel: String? = null,
     onRemove: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .verticalScroll(rememberScrollState())
-            .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onSave, enabled = saveEnabled) { Text(saveLabel) } },
+        dismissButton = {
+            // The dialog lays these out from the end, so the one written last comes first.
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
             if (removeLabel != null && onRemove != null) {
                 TextButton(onClick = onRemove) {
                     Text(removeLabel, color = MaterialTheme.colorScheme.error)
                 }
             }
-            Spacer(Modifier.weight(1f))
-            Button(onClick = onSave, enabled = saveEnabled) { Text(saveLabel) }
-        }
-    }
-}
-
-@PreviewLightDark
-@Composable
-private fun NoteSheetContentPreview() {
-    AppTheme { Surface { NoteSheetContent(note = PreviewData.notes.first(), onSave = {}, onDelete = {}) } }
-}
-
-@PreviewLightDark
-@Composable
-private fun PurchaseSheetContentPreview() {
-    AppTheme {
-        Surface {
-            PurchaseSheetContent(
-                book = PreviewData.books.first(),
-                lastCurrency = "USD",
-                locationHistory = listOf("Kobo", "Kinokuniya"),
-                onSave = { _, _, _, _ -> },
+        },
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content,
             )
-        }
+        },
+        properties = DialogProperties(dismissOnClickOutside = false),
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun NoteDialogPreview() {
+    AppTheme { NoteDialog(note = PreviewData.notes.first(), onSave = {}, onDelete = {}, onDismiss = {}) }
+}
+
+@PreviewLightDark
+@Composable
+private fun PurchaseDialogPreview() {
+    AppTheme {
+        PurchaseDialog(
+            book = PreviewData.books.first(),
+            lastCurrency = "USD",
+            locationHistory = listOf("Kobo", "Kinokuniya"),
+            onSave = { _, _, _, _ -> },
+            onDismiss = {},
+        )
     }
 }
 
 @PreviewLightDark
 @Composable
-private fun PhysicalProgressSheetContentPreview() {
-    AppTheme { Surface { PhysicalProgressSheetContent(book = PreviewData.books[5], onSave = { _, _ -> }) } }
+private fun PhysicalProgressDialogPreview() {
+    AppTheme { PhysicalProgressDialog(book = PreviewData.books[5], onSave = { _, _ -> }, onDismiss = {}) }
 }

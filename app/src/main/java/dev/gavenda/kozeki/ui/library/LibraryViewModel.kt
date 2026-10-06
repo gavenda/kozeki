@@ -29,9 +29,11 @@ import kotlinx.coroutines.launch
  * The reading states sort the books by where the user is with them. A book that is only wanted is
  * always Planned, so it is listed there as well as under its own filter. Purchased is every book
  * with a purchase on record, with or without an EPUB; an EPUB alone does not put a book there.
+ * Favorites cut across all of that.
  */
 enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<ReadingState>?) {
     ALL(R.string.filter_all, null),
+    FAVORITES(R.string.library_favorites, null),
     READING(R.string.state_reading, setOf(ReadingState.READING)),
     PLANNED(R.string.filter_planning, setOf(ReadingState.PLANNED)),
     COMPLETED(R.string.state_completed, setOf(ReadingState.COMPLETED)),
@@ -45,6 +47,7 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
         val wished = book.acquisition == Acquisition.WISHLIST
         return when (this) {
             ALL -> true
+            FAVORITES -> book.isFavorite
             WISHLIST -> wished
             PURCHASED -> book.acquisition == Acquisition.PURCHASED
             PLANNED -> wished || book.state == ReadingState.PLANNED
@@ -75,6 +78,15 @@ enum class LibrarySort(@param:StringRes val label: Int) {
     }
 }
 
+/** How the books of the library are laid out. */
+enum class LibraryDisplay {
+    /** A grid of covers. */
+    COVERS,
+
+    /** One row per book, with a small cover and more of its details in words. */
+    LIST,
+}
+
 /** The books picked in the grid, and which of them each action applies to. */
 data class LibrarySelection(val books: List<Book> = emptyList()) {
     val ids: Set<String> = books.mapTo(HashSet()) { it.id }
@@ -95,12 +107,35 @@ data class LibrarySelection(val books: List<Book> = emptyList()) {
     val notPurchased: List<Book> = books.filter { it.acquisition != Acquisition.PURCHASED }
 }
 
+/** A run of books in the grid. [heading] is the filter they would be found under; null for no heading. */
+data class LibrarySection(val heading: LibraryFilter?, val books: List<Book>)
+
+/**
+ * How [books], already filtered and sorted, are laid out: every book at once is grouped by reading
+ * state, the ones being read first, while any narrower filter is a single run.
+ */
+fun librarySections(filter: LibraryFilter, books: List<Book>): List<LibrarySection> = when {
+    books.isEmpty() -> emptyList()
+    filter != LibraryFilter.ALL -> listOf(LibrarySection(null, books))
+    else -> STATE_FILTERS.mapNotNull { state ->
+        books.filter(state::matches).takeIf { it.isNotEmpty() }?.let { LibrarySection(state, it) }
+    }
+}
+
+private val STATE_FILTERS = listOf(
+    LibraryFilter.READING,
+    LibraryFilter.PLANNED,
+    LibraryFilter.COMPLETED,
+    LibraryFilter.PAUSED,
+    LibraryFilter.DROPPED,
+)
+
 data class LibraryUiState(
     val loading: Boolean = true,
-    val filter: LibraryFilter = LibraryFilter.READING,
+    val filter: LibraryFilter = LibraryFilter.ALL,
     val sort: LibrarySort = LibrarySort.RECENT,
-    val favorites: List<Book> = emptyList(),
-    val others: List<Book> = emptyList(),
+    val display: LibraryDisplay = LibraryDisplay.COVERS,
+    val sections: List<LibrarySection> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
     val totalBooks: Int = 0,
     val importing: Boolean = false,
@@ -109,10 +144,13 @@ data class LibraryUiState(
     val selection: LibrarySelection = LibrarySelection(),
 ) {
     val selecting: Boolean get() = !selection.isEmpty
-    val allSelected: Boolean get() = selection.size == favorites.size + others.size
+    /** Every book on screen, in the order shown. */
+    val books: List<Book> get() = sections.flatMap { it.books }
+
+    val allSelected: Boolean get() = selection.size == sections.sumOf { it.books.size }
 
     val isLibraryEmpty: Boolean get() = !loading && totalBooks == 0
-    val isFilterEmpty: Boolean get() = !loading && favorites.isEmpty() && others.isEmpty()
+    val isFilterEmpty: Boolean get() = !loading && sections.isEmpty()
 }
 
 sealed interface LibraryEvent {
@@ -125,8 +163,7 @@ class LibraryViewModel(
     private val scheduleMatching: () -> Unit,
 ) : ViewModel() {
 
-    // Null until the user picks one, so the first view can avoid opening on an empty filter.
-    private val chosenFilter = MutableStateFlow<LibraryFilter?>(null)
+    private val chosenFilter = MutableStateFlow(LibraryFilter.ALL)
     private val importing = MutableStateFlow(false)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
 
@@ -142,33 +179,33 @@ class LibraryViewModel(
         LibrarySort.entries.firstOrNull { it.name == name } ?: LibrarySort.RECENT
     }
 
-    private val view = combine(chosenFilter, sort, ::Pair)
+    private val display = settings.libraryDisplay.map { name ->
+        LibraryDisplay.entries.firstOrNull { it.name == name } ?: LibraryDisplay.COVERS
+    }
+
+    private val view = combine(chosenFilter, sort, display, ::Triple)
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
     val uiState: StateFlow<LibraryUiState> =
         combine(books, view, importing, selectedIds, purchaseDefaults) { books, view, busy, selected, defaults ->
-            val (chosen, sort) = view
+            val (filter, sort, display) = view
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
-            val filter = chosen ?: when {
-                counts.getValue(LibraryFilter.READING) > 0 -> LibraryFilter.READING
-                else -> LibraryFilter.ALL
-            }
-            val (favorites, others) = sort.sorted(books.filter(filter::matches)).partition { it.isFavorite }
+            val shown = sort.sorted(books.filter(filter::matches))
             LibraryUiState(
                 loading = false,
                 filter = filter,
                 sort = sort,
-                favorites = favorites,
-                others = others,
+                display = display,
+                sections = librarySections(filter, shown),
                 counts = counts,
                 totalBooks = books.size,
                 importing = busy,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
-                selection = LibrarySelection((favorites + others).filter { it.id in selected }),
+                selection = LibrarySelection(shown.filter { it.id in selected }),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
@@ -181,13 +218,17 @@ class LibraryViewModel(
         viewModelScope.launch { settings.setLibrarySort(sort.name) }
     }
 
+    fun selectDisplay(display: LibraryDisplay) {
+        viewModelScope.launch { settings.setLibraryDisplay(display.name) }
+    }
+
     fun toggleSelection(book: Book) {
         selectedIds.update { if (book.id in it) it - book.id else it + book.id }
     }
 
     fun selectAll() {
         val state = uiState.value
-        selectedIds.value = (state.favorites + state.others).mapTo(HashSet()) { it.id }
+        selectedIds.value = state.books.mapTo(HashSet()) { it.id }
     }
 
     fun clearSelection() {

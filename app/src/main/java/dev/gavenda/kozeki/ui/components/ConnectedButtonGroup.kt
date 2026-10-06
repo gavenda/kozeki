@@ -1,6 +1,7 @@
 package dev.gavenda.kozeki.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,13 @@ import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
 /**
+ * How near a label may come to the sides of its button. The options share the width equally, so
+ * this only shows once a label nearly fills its share, where the 16 dp a button keeps by default
+ * would cut it short: five options on a narrow phone.
+ */
+private val LabelSidePadding = 4.dp
+
+/**
  * A single-choice row of connected toggle buttons, the Material 3 Expressive replacement for
  * segmented buttons. Options share the width equally. [icons], when given, has one per option.
  */
@@ -41,6 +49,13 @@ fun ConnectedButtonGroup(
     colors: ToggleButtonColors = ToggleButtonDefaults.colors(),
     icons: List<ImageVector>? = null,
 ) {
+    val defaultPadding = ToggleButtonDefaults.contentPaddingFor(ToggleButtonDefaults.size)
+    val contentPadding = PaddingValues(
+        start = LabelSidePadding,
+        top = defaultPadding.calculateTopPadding(),
+        end = LabelSidePadding,
+        bottom = defaultPadding.calculateBottomPadding(),
+    )
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
@@ -58,6 +73,7 @@ fun ConnectedButtonGroup(
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
+                contentPadding = contentPadding,
             ) {
                 if (icons != null) {
                     Icon(icons[index], contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
@@ -76,7 +92,7 @@ private fun ConnectedButtonGroupPreview() {
         Surface {
             var selected by remember { mutableIntStateOf(1) }
             ConnectedButtonGroup(
-                options = listOf("Day", "Week", "Month", "Year"),
+                options = listOf("Day", "Week", "Month", "Year", "All"),
                 selectedIndex = selected,
                 onSelect = { selected = it },
                 modifier = Modifier

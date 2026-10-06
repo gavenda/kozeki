@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.model.AllTimeStats
 import dev.gavenda.kozeki.data.model.DailyStats
 import dev.gavenda.kozeki.data.model.PeriodStats
 import dev.gavenda.kozeki.data.model.YearStats
@@ -29,6 +30,7 @@ enum class StatsRange(@param:StringRes val label: Int) {
     WEEK(R.string.stats_range_week),
     MONTH(R.string.stats_range_month),
     YEAR(R.string.stats_range_year),
+    ALL(R.string.stats_range_all),
 }
 
 data class StatisticsUiState(
@@ -40,6 +42,7 @@ data class StatisticsUiState(
     val day: DailyStats? = null,
     val period: PeriodStats? = null,
     val year: YearStats? = null,
+    val allTime: AllTimeStats? = null,
 ) {
     val weekStart: LocalDate get() = anchor.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
 
@@ -50,6 +53,7 @@ data class StatisticsUiState(
             StatsRange.WEEK -> weekStart.plusDays(7) <= today
             StatsRange.MONTH -> YearMonth.from(anchor) < YearMonth.from(today)
             StatsRange.YEAR -> anchor.year < today.year
+            StatsRange.ALL -> false
         }
 }
 
@@ -79,6 +83,7 @@ class StatisticsViewModel(
                     stats.observePeriod(month.atDay(1), month.atEndOfMonth()).map { base.copy(period = it) }
                 }
                 StatsRange.YEAR -> stats.observeYear(anchor.year).map { base.copy(year = it) }
+                StatsRange.ALL -> stats.observeAllTime(today).map { base.copy(allTime = it) }
             }
         }
         .stateIn(
@@ -107,6 +112,8 @@ class StatisticsViewModel(
             StatsRange.WEEK -> anchor.value.plusWeeks(direction)
             StatsRange.MONTH -> anchor.value.plusMonths(direction)
             StatsRange.YEAR -> anchor.value.plusYears(direction)
+            // All time is a single period, with no other to step to.
+            StatsRange.ALL -> return
         }
         // Stepping forward from mid-period can overshoot today; the period itself is still valid.
         anchor.value = minOf(moved, today)

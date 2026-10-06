@@ -31,16 +31,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,7 +46,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,14 +61,11 @@ import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
-import dev.gavenda.kozeki.ui.addbook.AddBookEvent
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
-import dev.gavenda.kozeki.ui.components.MetadataResultDetails
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
-import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -87,43 +77,18 @@ fun AuthorScreen(
     name: String,
     onBack: () -> Unit,
     onOpenBook: (String) -> Unit,
+    onOpenResult: (BookMetadata) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
     viewModel: AuthorViewModel = koinViewModel(key = authorId) { parametersOf(authorId, name) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-    val resources = LocalResources.current
-
-    LaunchedEffect(viewModel, resources) {
-        viewModel.events.collect { event ->
-            when (event) {
-                is AddBookEvent.Added -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = resources.getString(
-                            if (event.acquisition == Acquisition.WISHLIST) {
-                                R.string.add_book_added_wishlist
-                            } else {
-                                R.string.add_book_added_purchased
-                            },
-                            event.title,
-                        ),
-                        actionLabel = resources.getString(R.string.action_view),
-                        duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) onOpenBook(event.bookId)
-                }
-            }
-        }
-    }
-
     AuthorContent(
         state = state,
-        snackbarHostState = snackbarHostState,
         onBack = onBack,
         onRetry = viewModel::load,
         onLoadMore = viewModel::loadMore,
-        onSelect = viewModel::select,
-        onAdd = viewModel::add,
+        onOpenResult = onOpenResult,
+        onOpenBook = onOpenBook,
         // A co-author has a page of their own; this author's is the one already open.
         onOpenAuthor = { if (it.id != authorId) onOpenAuthor(it) },
     )
@@ -132,12 +97,11 @@ fun AuthorScreen(
 @Composable
 fun AuthorContent(
     state: AuthorUiState,
-    snackbarHostState: SnackbarHostState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
-    onSelect: (BookMetadata?) -> Unit,
-    onAdd: (BookMetadata, Acquisition) -> Unit,
+    onOpenResult: (BookMetadata) -> Unit,
+    onOpenBook: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -179,7 +143,6 @@ fun AuthorContent(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
             when {
@@ -222,10 +185,12 @@ fun AuthorContent(
                             }
                         }
                         items(state.books, key = { it.sourceId }, contentType = { "book" }) { result ->
+                            val owned = state.owned[result.sourceId]
                             MetadataResultItem(
                                 result = result,
-                                onClick = { onSelect(result) },
-                                trailingContent = state.owned[result.sourceId]?.let { book -> { OwnedBadge(book) } },
+                                // One the user already has opens as their book; there is nothing left to add.
+                                onClick = { if (owned != null) onOpenBook(owned.id) else onOpenResult(result) },
+                                trailingContent = owned?.let { book -> { OwnedBadge(book) } },
                             )
                         }
                         loadingMoreItem(state.loadingMore)
@@ -235,11 +200,6 @@ fun AuthorContent(
         }
     }
 
-    state.selected?.let { result ->
-        ModalBottomSheet(onDismissRequest = { onSelect(null) }, sheetState = rememberExpandedSheetState()) {
-            MetadataResultDetails(result, onAdd, onOpenAuthor)
-        }
-    }
 }
 
 @Composable
@@ -357,12 +317,11 @@ private fun AuthorPreview() {
                 books = PreviewBooks,
                 owned = mapOf("b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED)),
             ),
-            snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onRetry = {},
             onLoadMore = {},
-            onSelect = {},
-            onAdd = { _, _ -> },
+            onOpenResult = {},
+            onOpenBook = {},
             onOpenAuthor = {},
         )
     }
@@ -374,12 +333,11 @@ private fun AuthorErrorPreview() {
     AppTheme {
         AuthorContent(
             state = AuthorUiState(name = PreviewAuthor.name, loading = false, error = LookupError.OFFLINE),
-            snackbarHostState = remember { SnackbarHostState() },
             onBack = {},
             onRetry = {},
             onLoadMore = {},
-            onSelect = {},
-            onAdd = { _, _ -> },
+            onOpenResult = {},
+            onOpenBook = {},
             onOpenAuthor = {},
         )
     }

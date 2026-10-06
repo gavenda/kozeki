@@ -70,6 +70,9 @@ class SettingsRepository(context: Context) {
     /** Name of the order the library was last put in, or null while the user has not picked one. */
     val librarySort: Flow<String?> = store.data.map { it[Keys.LibrarySort] }.distinctUntilChanged()
 
+    /** Name of the way the library's books were last laid out, or null while the user has not picked one. */
+    val libraryDisplay: Flow<String?> = store.data.map { it[Keys.LibraryDisplay] }.distinctUntilChanged()
+
     // Opened here, ahead of its first use, so that reading it later does not wait for the disk.
     private val searchPreferences = context.applicationContext.getSharedPreferences("search", Context.MODE_PRIVATE)
 
@@ -109,6 +112,10 @@ class SettingsRepository(context: Context) {
         store.edit { it[Keys.LibrarySort] = name }
     }
 
+    suspend fun setLibraryDisplay(name: String) {
+        store.edit { it[Keys.LibraryDisplay] = name }
+    }
+
     private object Keys {
         val DailyGoalMinutes = intPreferencesKey("daily_goal_minutes")
         val ThemeMode = stringPreferencesKey("theme_mode")
@@ -116,6 +123,7 @@ class SettingsRepository(context: Context) {
         val ReaderPreferences = stringPreferencesKey("reader_preferences")
         val LastCurrency = stringPreferencesKey("last_currency")
         val LibrarySort = stringPreferencesKey("library_sort")
+        val LibraryDisplay = stringPreferencesKey("library_display")
     }
 
     companion object {

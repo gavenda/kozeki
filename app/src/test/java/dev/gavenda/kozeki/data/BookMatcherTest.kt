@@ -97,4 +97,40 @@ class BookMatcherTest {
         )
         assertTrue(ranked.isEmpty())
     }
+
+    @Test
+    fun `a title names its volume in several ways`() {
+        assertEquals(2, BookMatcher.volume("Reincarnated as a Sword (Light Novel), Vol. 2"))
+        assertEquals(2, BookMatcher.volume("Dune: Book 02"))
+        assertEquals(12, BookMatcher.volume("Spice and Wolf, Volume 12"))
+        assertEquals(3, BookMatcher.volume("Mistborn 3"))
+        assertNull(BookMatcher.volume("The Left Hand of Darkness"))
+    }
+
+    @Test
+    fun `another volume of the series is not a confident match`() {
+        val ranked = BookMatcher.rank(
+            title = "Reincarnated as a Sword (Light Novel), Vol. 2",
+            authors = listOf("Yuu Tanaka"),
+            candidates = listOf(
+                result("v1", "Reincarnated as a Sword (Light Novel), Vol. 1", "Yuu Tanaka", coverUrl = "c", description = "d"),
+                result("v2", "Reincarnated as a Sword (Light Novel), Vol. 2", "Yuu Tanaka"),
+                result("v3", "Reincarnated as a Sword (Light Novel), Vol. 3", "Yuu Tanaka", coverUrl = "c", description = "d"),
+            ),
+        )
+        assertEquals("v2", BookMatcher.confidentMatch(ranked)?.sourceId)
+    }
+
+    @Test
+    fun `a title without a volume is not matched to one of several volumes`() {
+        val ranked = BookMatcher.rank(
+            title = "Reincarnated as a Sword",
+            authors = listOf("Yuu Tanaka"),
+            candidates = listOf(
+                result("v1", "Reincarnated as a Sword (Light Novel), Vol. 1", "Yuu Tanaka"),
+                result("v2", "Reincarnated as a Sword (Light Novel), Vol. 2", "Yuu Tanaka"),
+            ),
+        )
+        assertNull(BookMatcher.confidentMatch(ranked))
+    }
 }

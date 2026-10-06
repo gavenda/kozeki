@@ -16,8 +16,10 @@ import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.Lifecycle
@@ -32,7 +34,9 @@ import androidx.navigation.toRoute
 import dev.gavenda.kozeki.ui.addbook.AddBookScreen
 import dev.gavenda.kozeki.ui.addbook.BookFormScreen
 import dev.gavenda.kozeki.ui.author.AuthorScreen
+import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.ui.book.BookDetailScreen
+import dev.gavenda.kozeki.ui.book.FoundBookScreen
 import dev.gavenda.kozeki.ui.calendar.CalendarScreen
 import dev.gavenda.kozeki.ui.library.LibraryScreen
 import dev.gavenda.kozeki.ui.navigation.AddBookRoute
@@ -40,6 +44,7 @@ import dev.gavenda.kozeki.ui.navigation.AuthorRoute
 import dev.gavenda.kozeki.ui.navigation.BookRoute
 import dev.gavenda.kozeki.ui.navigation.CalendarRoute
 import dev.gavenda.kozeki.ui.navigation.DayRoute
+import dev.gavenda.kozeki.ui.navigation.FoundBookRoute
 import dev.gavenda.kozeki.ui.navigation.LibraryRoute
 import dev.gavenda.kozeki.ui.navigation.BookFormRoute
 import dev.gavenda.kozeki.ui.navigation.ReaderRoute
@@ -51,6 +56,7 @@ import dev.gavenda.kozeki.ui.settings.SettingsScreen
 import dev.gavenda.kozeki.ui.statistics.StatisticsScreen
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.LocalDate
+import kotlinx.serialization.json.Json
 
 /** The whole app: the navigation frame around a graph of screens. */
 @Composable
@@ -78,6 +84,8 @@ fun KozekiApp() {
         NavHost(
             navController = navController,
             startDestination = LibraryRoute,
+            // A page sliding out sideways would otherwise pass over the navigation rail and hide it.
+            modifier = Modifier.clipToBounds(),
             enterTransition = { slideIntoContainer(slideDirection(forward = true), slideSpec()) },
             exitTransition = { slideOutOfContainer(slideDirection(forward = true), slideSpec()) },
             popEnterTransition = { slideIntoContainer(slideDirection(forward = false), slideSpec()) },
@@ -119,8 +127,19 @@ fun KozekiApp() {
                 AddBookScreen(
                     onBack = { entry.back() },
                     onOpenBook = { entry.open(BookRoute(it)) },
+                    onOpenResult = { entry.open(FoundBookRoute(Json.encodeToString(it))) },
                     onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                     onOpenSettings = { entry.open(SettingsRoute) },
+                )
+            }
+            composable<FoundBookRoute> { entry ->
+                val result = remember(entry) { Json.decodeFromString<BookMetadata>(entry.toRoute<FoundBookRoute>().metadata) }
+                FoundBookScreen(
+                    result = result,
+                    onBack = { entry.back() },
+                    onRead = { entry.open(ReaderRoute(it)) },
+                    onEdit = { entry.open(BookFormRoute(it)) },
+                    onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
             }
             composable<BookFormRoute> { entry ->
@@ -138,6 +157,7 @@ fun KozekiApp() {
                     name = route.name,
                     onBack = { entry.back() },
                     onOpenBook = { entry.open(BookRoute(it)) },
+                    onOpenResult = { entry.open(FoundBookRoute(Json.encodeToString(it))) },
                     onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
             }

@@ -64,4 +64,15 @@ class OwnedBooksTest {
         val results = listOf(result("312", "Dune"), result("x", "Children of Dune", "Frank Herbert"))
         assertEquals(mapOf("312" to "linked"), owned.among(results).mapValues { it.value.id })
     }
+
+    @Test
+    fun `only the volume that is owned is found among the volumes of a series`() {
+        val series = OwnedBooks(
+            listOf(Book(id = "v1", title = "Reincarnated as a Sword (Light Novel), Vol. 1", authors = listOf("Yuu Tanaka"))),
+        )
+        assertTrue(result("a", "Reincarnated as a Sword (Light Novel), Vol. 1", "Yuu Tanaka", "LLO") in series)
+        assertFalse(result("b", "Reincarnated as a Sword (Light Novel), Vol. 2", "Yuu Tanaka", "Llo") in series)
+        assertFalse(result("c", "Reincarnated as a Sword (Light Novel), Vol. 10", "Yuu Tanaka") in series)
+        assertFalse(result("d", "Reincarnated as a Sword (Light Novel)", "Yuu Tanaka") in series)
+    }
 }

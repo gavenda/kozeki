@@ -41,6 +41,13 @@ data class AuthorRoute(val authorId: String, val name: String)
 @Serializable
 data object SettingsRoute
 
+/**
+ * A book found on a metadata source that is not among the user's own yet. [metadata] is the whole
+ * [dev.gavenda.kozeki.data.metadata.BookMetadata] as JSON, since nothing is stored to look it up from.
+ */
+@Serializable
+data class FoundBookRoute(val metadata: String)
+
 /** Daily statistics for one specific day, reached from the calendar. */
 @Serializable
 data class DayRoute(val epochDay: Long)

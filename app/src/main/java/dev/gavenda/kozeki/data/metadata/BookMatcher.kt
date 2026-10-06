@@ -15,6 +15,13 @@ object BookMatcher {
 
     private const val CLEAR_LEAD = 0.08
 
+    /** What a title alike in all but its volume number is worth: a candidate, never a confident one. */
+    private const val OTHER_VOLUME = 0.5
+
+    // Matched against normalized text, where "Vol. 2" has become "vol 2".
+    private val NUMBERED_VOLUME = Regex("\\b(?:vol|volume|book|part|tome|band) (\\d+)\\b")
+    private val TRAILING_NUMBER = Regex(" (\\d+)$")
+
     fun rank(title: String, authors: List<String>, candidates: List<BookMetadata>): List<Scored> =
         candidates
             .map { Scored(it, score(title, authors, it)) }
@@ -36,11 +43,19 @@ object BookMatcher {
     }
 
     fun score(title: String, authors: List<String>, candidate: BookMetadata): Double {
-        val titleScore = maxOf(
+        val likeness = maxOf(
             similarity(normalize(title), normalize(candidate.title)),
             similarity(normalize(mainTitle(title)), normalize(mainTitle(candidate.title))),
             similarity(normalize(title), normalize(listOfNotNull(candidate.title, candidate.subtitle).joinToString(" "))),
         )
+        // The volumes of a series share everything but their number, which then has to decide.
+        val ownVolume = volume(title)
+        val theirVolume = volume(candidate.title)
+        val titleScore = if (ownVolume != null && theirVolume != null && ownVolume != theirVolume) {
+            likeness * OTHER_VOLUME
+        } else {
+            likeness
+        }
         // Without authors on both sides a title alone is never enough to be confident.
         if (authors.isEmpty() || candidate.authors.isEmpty()) return titleScore * 0.85
         val authorScore = authors.maxOf { local ->
@@ -60,8 +75,18 @@ object BookMatcher {
     internal fun mainTitle(title: String): String =
         title.substringBefore(':').substringBefore(" - ").substringBefore('(').ifBlank { title }
 
+    /**
+     * The number a title gives the book within its series: 2 for "Dune (Light Novel), Vol. 2",
+     * "Dune: Book 02" and "Dune 2". Null when it names none.
+     */
+    internal fun volume(title: String): Int? {
+        val text = normalize(title)
+        return (NUMBERED_VOLUME.find(text) ?: TRAILING_NUMBER.find(text))?.groupValues?.get(1)?.toIntOrNull()
+    }
+
     private fun sameWork(a: BookMetadata, b: BookMetadata): Boolean =
         normalize(mainTitle(a.title)) == normalize(mainTitle(b.title)) &&
+            volume(a.title) == volume(b.title) &&
             (a.authors.isEmpty() || b.authors.isEmpty() || authorSimilarity(a.authors.first(), b.authors.first()) > 0.6)
 
     private fun completeness(metadata: BookMetadata): Int =

@@ -121,6 +121,9 @@ interface ReadThroughDao {
     )
     fun observeCompletedBetween(fromDay: Long, toDay: Long): Flow<List<ReadThroughEntity>>
 
+    @Query("SELECT * FROM read_throughs WHERE deletedAt IS NULL AND outcome = 'COMPLETED' ORDER BY finishedAt")
+    fun observeCompleted(): Flow<List<ReadThroughEntity>>
+
     @Upsert
     suspend fun upsert(readThrough: ReadThroughEntity)
 
@@ -129,6 +132,22 @@ interface ReadThroughDao {
 
     @Query("UPDATE read_throughs SET bookId = :to, updatedAt = :now WHERE bookId = :from")
     suspend fun moveToBook(from: String, to: String, now: Long)
+
+    /**
+     * Read-throughs count up from one per book, but two entries merged into one each bring their
+     * own count. A book left with two of the same number has all of its read-throughs numbered
+     * again, in the order they were started.
+     */
+    @Query(
+        "UPDATE read_throughs SET updatedAt = :now, number = (" +
+            "SELECT COUNT(*) FROM read_throughs AS earlier " +
+            "WHERE earlier.bookId = read_throughs.bookId AND earlier.deletedAt IS NULL AND (" +
+            "earlier.startedAt < read_throughs.startedAt OR " +
+            "(earlier.startedAt = read_throughs.startedAt AND earlier.id <= read_throughs.id))) " +
+            "WHERE deletedAt IS NULL AND bookId IN (" +
+            "SELECT bookId FROM read_throughs WHERE deletedAt IS NULL GROUP BY bookId, number HAVING COUNT(*) > 1)",
+    )
+    suspend fun renumberDuplicates(now: Long)
 }
 
 @Dao
@@ -142,6 +161,9 @@ interface ReadingSessionDao {
             "ORDER BY startedAt",
     )
     fun observeBetween(fromDay: Long, toDay: Long): Flow<List<ReadingSessionEntity>>
+
+    @Query("SELECT * FROM reading_sessions WHERE deletedAt IS NULL ORDER BY startedAt")
+    fun observeAll(): Flow<List<ReadingSessionEntity>>
 
     @Query("SELECT * FROM reading_sessions WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY startedAt DESC")
     fun observeForBook(bookId: String): Flow<List<ReadingSessionEntity>>

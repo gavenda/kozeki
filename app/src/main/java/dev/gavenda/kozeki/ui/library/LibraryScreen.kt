@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
 import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.automirrored.rounded.ViewList
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Bookmarks
@@ -49,6 +50,7 @@ import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.FilterListOff
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RemoveShoppingCart
 import androidx.compose.material.icons.rounded.SelectAll
@@ -77,6 +79,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
 import androidx.compose.material3.TopAppBarDefaults
@@ -114,7 +117,7 @@ import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.book.DeleteBooksDialog
-import dev.gavenda.kozeki.ui.book.PurchaseSheet
+import dev.gavenda.kozeki.ui.book.PurchaseDialog
 import dev.gavenda.kozeki.ui.components.AdaptiveColumns
 import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
@@ -168,6 +171,7 @@ fun LibraryScreen(
         onSearchQueryChange = searchViewModel::onQueryChange,
         onFilterSelected = viewModel::selectFilter,
         onSortSelected = viewModel::selectSort,
+        onDisplaySelected = viewModel::selectDisplay,
         onImportClick = { picker.launch(EpubMimeTypes) },
         onAddBook = onAddBook,
         onAddManually = onAddManually,
@@ -218,6 +222,7 @@ fun LibraryContent(
     onSearchQueryChange: (String) -> Unit,
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
+    onDisplaySelected: (LibraryDisplay) -> Unit,
     onImportClick: () -> Unit,
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
@@ -308,7 +313,7 @@ fun LibraryContent(
             }
 
             else -> Column(Modifier.padding(top = innerPadding.calculateTopPadding())) {
-                FilterRow(state, onFilterSelected, onSortSelected)
+                FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected)
                 if (state.isFilterEmpty) {
                     EmptyState(
                         icon = Icons.Rounded.FilterListOff,
@@ -316,51 +321,62 @@ fun LibraryContent(
                         message = stringResource(R.string.library_filter_empty_message),
                     )
                 } else {
+                    // A list is the same grid with rows for cells, so the place scrolled to and the
+                    // headings carry over. A wide window sets the rows side by side.
+                    val list = state.display == LibraryDisplay.LIST
+                    // A row brings its own margins, which the tint of a picked one fills.
+                    val edge = if (list) 8.dp else 16.dp
                     LazyVerticalGrid(
-                        columns = AdaptiveColumns(minColumns = 3, minCellWidth = 112.dp),
+                        columns = if (list) {
+                            AdaptiveColumns(minColumns = 1, minCellWidth = 360.dp)
+                        } else {
+                            AdaptiveColumns(minColumns = 3, minCellWidth = 112.dp)
+                        },
                         state = gridState,
                         contentPadding = PaddingValues(
-                            start = 16.dp,
-                            end = 16.dp,
+                            start = edge,
+                            end = edge,
                             top = 8.dp,
                             // Room for the floating action button to clear the last row.
                             bottom = innerPadding.calculateBottomPadding() + 96.dp,
                         ),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (list) 8.dp else 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (list) 0.dp else 16.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        if (state.favorites.isNotEmpty()) {
-                            item(key = "header-favorites", span = { GridItemSpan(maxLineSpan) }) {
-                                SectionHeader(stringResource(R.string.library_favorites))
-                            }
-                            items(state.favorites, key = { it.id }) { book ->
-                                LibraryBookItem(
-                                book = book,
-                                selecting = state.selecting,
-                                selected = book.id in selection.ids,
-                                actions = selectionActions,
-                                onOpen = onBookClick,
-                                onOpenAuthor = onAuthorClick,
-                                modifier = Modifier.animateItem(),
-                            )
-                            }
-                            if (state.others.isNotEmpty()) {
-                                item(key = "header-others", span = { GridItemSpan(maxLineSpan) }) {
-                                    SectionHeader(stringResource(R.string.library_other_books))
+                        state.sections.forEach { section ->
+                            section.heading?.let { heading ->
+                                item(key = "header-${heading.name}", span = { GridItemSpan(maxLineSpan) }) {
+                                    SectionHeader(
+                                        text = stringResource(heading.label),
+                                        // In line with the text of the rows under it.
+                                        modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier,
+                                    )
                                 }
                             }
-                        }
-                        items(state.others, key = { it.id }) { book ->
-                            LibraryBookItem(
-                                book = book,
-                                selecting = state.selecting,
-                                selected = book.id in selection.ids,
-                                actions = selectionActions,
-                                onOpen = onBookClick,
-                                onOpenAuthor = onAuthorClick,
-                                modifier = Modifier.animateItem(),
-                            )
+                            items(section.books, key = { it.id }, contentType = { state.display }) { book ->
+                                if (list) {
+                                    LibraryBookRow(
+                                        book = book,
+                                        selecting = state.selecting,
+                                        selected = book.id in selection.ids,
+                                        actions = selectionActions,
+                                        onOpen = onBookClick,
+                                        onOpenAuthor = onAuthorClick,
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                } else {
+                                    LibraryBookItem(
+                                        book = book,
+                                        selecting = state.selecting,
+                                        selected = book.id in selection.ids,
+                                        actions = selectionActions,
+                                        onOpen = onBookClick,
+                                        onOpenAuthor = onAuthorClick,
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -370,7 +386,7 @@ fun LibraryContent(
 
     val single = selection.books.singleOrNull()
     if (editingPurchase && single != null) {
-        PurchaseSheet(
+        PurchaseDialog(
             book = single,
             lastCurrency = state.lastCurrency,
             locationHistory = state.purchaseLocations,
@@ -480,6 +496,7 @@ private fun FilterRow(
     state: LibraryUiState,
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
+    onDisplaySelected: (LibraryDisplay) -> Unit,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     Column {
@@ -488,34 +505,31 @@ private fun FilterRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(modifier = Modifier.weight(1f, fill = false), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = { filtersOpen = !filtersOpen }) {
-                    Icon(
-                        Icons.Rounded.FilterAlt,
-                        contentDescription = stringResource(R.string.filter_books),
-                        tint = if (state.filter == LibraryFilter.ALL) {
-                            LocalContentColor.current
-                        } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                    )
-                }
-                // The chips may be tucked away, so the row itself says which of them is in effect.
+            // The chips may be tucked away, so the button that opens them says which is in effect.
+            TextButton(
+                onClick = { filtersOpen = !filtersOpen },
+                modifier = Modifier.weight(1f, fill = false),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = if (state.filter == LibraryFilter.ALL) {
+                        LocalContentColor.current
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                ),
+            ) {
+                Icon(Icons.Rounded.FilterAlt, contentDescription = stringResource(R.string.filter_books))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(state.filter.label),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Text(
-                    text = (state.counts[state.filter] ?: 0).toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
-            SortMenu(state.sort, onSortSelected)
+            Row {
+                DisplayToggle(state.display, onDisplaySelected)
+                SortMenu(state.sort, onSortSelected)
+            }
         }
         // The chips slide out from under the row and push the books down, rather than cover them.
         AnimatedVisibility(
@@ -548,6 +562,20 @@ private fun FilterRow(
                 }
             }
         }
+    }
+}
+
+/** Flips between covers and a list. The button shows the layout a tap leads to. */
+@Composable
+private fun DisplayToggle(display: LibraryDisplay, onDisplaySelected: (LibraryDisplay) -> Unit) {
+    val other = if (display == LibraryDisplay.LIST) LibraryDisplay.COVERS else LibraryDisplay.LIST
+    IconButton(onClick = { onDisplaySelected(other) }) {
+        Icon(
+            imageVector = if (other == LibraryDisplay.LIST) Icons.AutoMirrored.Rounded.ViewList else Icons.Rounded.GridView,
+            contentDescription = stringResource(
+                if (other == LibraryDisplay.LIST) R.string.display_as_list else R.string.display_as_covers,
+            ),
+        )
     }
 }
 
@@ -627,32 +655,32 @@ private fun LibraryBookItem(
                     Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
             }
-            if (book.isFavorite) {
-                CoverBadge(Modifier.align(Alignment.TopEnd)) {
-                    Icon(
-                        Icons.Rounded.Favorite,
-                        contentDescription = stringResource(R.string.favorite),
-                        modifier = Modifier.size(14.dp),
-                    )
+            val (badgeIcon, badgeLabel) = availabilityBadge(book)
+            // The heart sits above that badge, and takes its corner when there is none.
+            Column(
+                modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (book.isFavorite) {
+                    CoverBadge {
+                        Icon(
+                            Icons.Rounded.Favorite,
+                            contentDescription = stringResource(R.string.favorite),
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
                 }
-            }
-            // Why the book cannot be opened yet: wanted, owned without an EPUB, or the EPUB is elsewhere.
-            val (badgeIcon, badgeLabel) = when {
-                book.acquisition == Acquisition.WISHLIST -> Icons.Rounded.Bookmark to R.string.wishlist_tab
-                !book.inLibrary -> Icons.Rounded.ShoppingBag to R.string.library_owned_no_epub
-                !book.hasFile -> Icons.Rounded.CloudOff to R.string.book_file_missing
-                else -> null to 0
-            }
-            if (badgeIcon != null) {
-                CoverBadge(Modifier.align(Alignment.BottomStart)) {
-                    Icon(badgeIcon, contentDescription = stringResource(badgeLabel), modifier = Modifier.size(14.dp))
+                if (badgeIcon != null) {
+                    CoverBadge {
+                        Icon(badgeIcon, contentDescription = stringResource(badgeLabel), modifier = Modifier.size(14.dp))
+                    }
                 }
             }
             // A book not started yet has nothing to show for its state.
             if (book.state != ReadingState.PLANNED) {
-                // In the middle of the cover, on a backing the art still shows through.
+                // In the upper right, on a backing the art still shows through.
                 CoverBadge(
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
                     contentPadding = 3.dp,
                     color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.8f),
                 ) {
@@ -702,6 +730,115 @@ private fun LibraryBookItem(
     }
 }
 
+/** One book of the list: a small cover, with what the grid shows as badges spelled out beside it. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LibraryBookRow(
+    book: Book,
+    selecting: Boolean,
+    selected: Boolean,
+    actions: SelectionActions,
+    onOpen: (Book) -> Unit,
+    onOpenAuthor: (AuthorRef) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val container by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+    )
+
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.medium)
+            .drawBehind { drawRect(container) }
+            .combinedClickable(
+                // While picking, a tap picks too; opening a book waits until the selection is over.
+                onClick = { if (selecting) actions.onToggle(book) else onOpen(book) },
+                onLongClick = { actions.onToggle(book) },
+                onLongClickLabel = stringResource(R.string.selection_select),
+            )
+            .semantics { if (selecting) this.selected = selected }
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box {
+            BookCover(book, Modifier.width(56.dp), MaterialTheme.shapes.small, showTitleOnPlaceholder = false)
+            if (selected) {
+                Surface(
+                    modifier = Modifier.align(Alignment.Center),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
+                }
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = book.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (book.authors.isNotEmpty()) {
+                // While picking, a tap on a name picks the book like a tap anywhere else on it.
+                if (selecting) {
+                    Text(
+                        text = book.authorLine,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    AuthorLinks(
+                        authors = book.authors,
+                        refs = book.authorRefs,
+                        onOpenAuthor = onOpenAuthor,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            val (badgeIcon, badgeLabel) = availabilityBadge(book)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                val tint = MaterialTheme.colorScheme.onSurfaceVariant
+                if (book.isFavorite) {
+                    Icon(
+                        Icons.Rounded.Favorite,
+                        contentDescription = stringResource(R.string.favorite),
+                        modifier = Modifier.size(14.dp),
+                        tint = tint,
+                    )
+                }
+                if (badgeIcon != null) {
+                    Icon(badgeIcon, contentDescription = null, modifier = Modifier.size(14.dp), tint = tint)
+                }
+                // There is room here to say why the book cannot be opened, rather than only hint at it.
+                Text(
+                    text = if (badgeIcon != null) stringResource(badgeLabel) else stringResource(book.state.labelRes),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = tint,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (book.state == ReadingState.READING) {
+            ReadingProgressRing(book.overallProgression)
+        }
+    }
+}
+
+/** Why the book cannot be opened yet: wanted, owned without an EPUB, or the EPUB is elsewhere. Null when it can. */
+private fun availabilityBadge(book: Book): Pair<ImageVector?, Int> = when {
+    book.acquisition == Acquisition.WISHLIST -> Icons.Rounded.Bookmark to R.string.wishlist_tab
+    !book.inLibrary -> Icons.Rounded.ShoppingBag to R.string.library_owned_no_epub
+    !book.hasFile -> Icons.Rounded.CloudOff to R.string.book_file_missing
+    else -> null to 0
+}
+
 /** A book's state in words, for when there is no author to name and for screen readers. */
 @Composable
 private fun statusLine(book: Book): String = when (book.state) {
@@ -717,7 +854,7 @@ private fun CoverBadge(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.padding(6.dp),
+        modifier = modifier,
         shape = CircleShape,
         color = color,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -866,8 +1003,7 @@ private fun LibraryContentPreview() {
             state = LibraryUiState(
                 loading = false,
                 filter = LibraryFilter.ALL,
-                favorites = books.filter { it.isFavorite },
-                others = books.filterNot { it.isFavorite },
+                sections = librarySections(LibraryFilter.ALL, books),
                 counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) },
                 totalBooks = books.size,
             ),
@@ -876,6 +1012,39 @@ private fun LibraryContentPreview() {
             onSearchQueryChange = {},
             onFilterSelected = {},
             onSortSelected = {},
+            onDisplaySelected = {},
+            onImportClick = {},
+            onAddBook = {},
+            onAddManually = {},
+            onBookClick = {},
+            onAuthorClick = {},
+            selectionActions = SelectionActions(),
+            onSettingsClick = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun LibraryListPreview() {
+    val books = PreviewData.books
+    AppTheme {
+        LibraryContent(
+            state = LibraryUiState(
+                loading = false,
+                filter = LibraryFilter.ALL,
+                display = LibraryDisplay.LIST,
+                sections = librarySections(LibraryFilter.ALL, books),
+                counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) },
+                totalBooks = books.size,
+                selection = LibrarySelection(books.take(1)),
+            ),
+            search = SearchUiState(),
+            snackbarHostState = remember { SnackbarHostState() },
+            onSearchQueryChange = {},
+            onFilterSelected = {},
+            onSortSelected = {},
+            onDisplaySelected = {},
             onImportClick = {},
             onAddBook = {},
             onAddManually = {},
@@ -896,8 +1065,7 @@ private fun LibrarySelectionPreview() {
             state = LibraryUiState(
                 loading = false,
                 filter = LibraryFilter.ALL,
-                favorites = books.filter { it.isFavorite },
-                others = books.filterNot { it.isFavorite },
+                sections = librarySections(LibraryFilter.ALL, books),
                 counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) },
                 totalBooks = books.size,
                 selection = LibrarySelection(books.take(3)),
@@ -907,6 +1075,7 @@ private fun LibrarySelectionPreview() {
             onSearchQueryChange = {},
             onFilterSelected = {},
             onSortSelected = {},
+            onDisplaySelected = {},
             onImportClick = {},
             onAddBook = {},
             onAddManually = {},
@@ -929,6 +1098,7 @@ private fun LibraryEmptyPreview() {
             onSearchQueryChange = {},
             onFilterSelected = {},
             onSortSelected = {},
+            onDisplaySelected = {},
             onImportClick = {},
             onAddBook = {},
             onAddManually = {},

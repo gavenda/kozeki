@@ -76,7 +76,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.formatPercent
-import dev.gavenda.kozeki.ui.book.NoteSheet
+import dev.gavenda.kozeki.ui.book.NoteDialog
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -287,7 +287,7 @@ private fun ReaderReady(
             onDismiss = { sheet = ReaderSheet.NONE },
         )
 
-        ReaderSheet.NOTE -> NoteSheet(
+        ReaderSheet.NOTE -> NoteDialog(
             note = null,
             onSave = { text ->
                 viewModel.saveNote(text)

@@ -75,7 +75,7 @@ internal fun LazyListScope.dayItems(
     }
     if (day.completed.isNotEmpty()) {
         item(key = "completed-label") { SectionLabel(stringResource(R.string.stats_finished)) }
-        items(day.completed, key = { "completed-${it.book.id}-${it.readThroughNumber}" }) { completed ->
+        items(day.completed, key = { "completed-${it.readThroughId}" }) { completed ->
             CompletedRow(completed, onClick = { onBookClick(completed.book) })
         }
     }

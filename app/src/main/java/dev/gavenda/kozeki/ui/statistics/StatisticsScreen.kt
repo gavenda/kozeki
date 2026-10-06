@@ -96,7 +96,13 @@ fun StatisticsContent(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // Each bar gets a behavior of its kind. A collapsing one with no bar to collapse would take
+    // every drag upwards for itself and leave the list unable to scroll.
+    val scrollBehavior = if (onBack == null) {
+        TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    } else {
+        TopAppBarDefaults.pinnedScrollBehavior()
+    }
 
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -122,6 +128,7 @@ fun StatisticsContent(
                             )
                         }
                     },
+                    scrollBehavior = scrollBehavior,
                 )
             }
         },
@@ -147,21 +154,23 @@ fun StatisticsContent(
                             onSelect = { onSelectRange(ranges[it]) },
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        PeriodNavigator(periodLabel(state), state.canGoForward, onPrevious, onNext)
+                        periodLabel(state)?.let { PeriodNavigator(it, state.canGoForward, onPrevious, onNext) }
                     }
                 }
                 when (state.range) {
                     StatsRange.DAY -> state.day?.let { dayItems(it, state.today, onSelectDate, onBookClick) }
                     StatsRange.WEEK, StatsRange.MONTH -> state.period?.let { periodItems(it, state.range, onBookClick) }
                     StatsRange.YEAR -> state.year?.let { yearItems(it, state.today, onBookClick, onSettingsClick) }
+                    StatsRange.ALL -> state.allTime?.let { allTimeItems(it, onBookClick) }
                 }
             }
         }
     }
 }
 
+/** What the period being shown is called, or null for all time, which is not one of several. */
 @Composable
-private fun periodLabel(state: StatisticsUiState): String = when (state.range) {
+private fun periodLabel(state: StatisticsUiState): String? = when (state.range) {
     StatsRange.DAY -> if (state.anchor == state.today) stringResource(R.string.stats_today) else formatDate(state.anchor)
     StatsRange.WEEK -> {
         val formatter = DateTimeFormatter.ofPattern("MMM d")
@@ -173,6 +182,7 @@ private fun periodLabel(state: StatisticsUiState): String = when (state.range) {
     }
     StatsRange.MONTH -> formatMonth(YearMonth.from(state.anchor))
     StatsRange.YEAR -> state.anchor.year.toString()
+    StatsRange.ALL -> null
 }
 
 @Composable
@@ -196,7 +206,7 @@ private fun PeriodNavigator(label: String, canGoForward: Boolean, onPrevious: ()
     }
 }
 
-// ---- Pieces shared by the day, period and year views ---------------------------------------
+// ---- Pieces shared by the day, period, year and all-time views -----------------------------
 
 @Composable
 internal fun SectionLabel(text: String, modifier: Modifier = Modifier) {
@@ -369,6 +379,28 @@ private fun StatisticsYearPreview() {
                 today = PreviewData.dailyStats.date,
                 firstDayOfWeek = PreviewFirstDayOfWeek,
                 year = PreviewData.yearStats,
+            ),
+            onSelectRange = {},
+            onPrevious = {},
+            onNext = {},
+            onSelectDate = {},
+            onBookClick = {},
+            onSettingsClick = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun StatisticsAllTimePreview() {
+    AppTheme {
+        StatisticsContent(
+            state = StatisticsUiState(
+                range = StatsRange.ALL,
+                anchor = PreviewData.dailyStats.date,
+                today = PreviewData.dailyStats.date,
+                firstDayOfWeek = PreviewFirstDayOfWeek,
+                allTime = PreviewData.allTimeStats,
             ),
             onSelectRange = {},
             onPrevious = {},

@@ -40,7 +40,7 @@ internal fun LazyListScope.periodItems(
     }
     if (period.completed.isNotEmpty()) {
         item(key = "completed-label") { SectionLabel(stringResource(R.string.stats_finished)) }
-        items(period.completed, key = { "completed-${it.book.id}-${it.readThroughNumber}" }) { completed ->
+        items(period.completed, key = { "completed-${it.readThroughId}" }) { completed ->
             CompletedRow(completed, onClick = { onBookClick(completed.book) })
         }
     }

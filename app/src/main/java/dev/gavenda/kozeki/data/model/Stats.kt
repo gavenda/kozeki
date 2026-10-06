@@ -35,7 +35,8 @@ data class TimelineEntry(
 data class CompletedBook(
     val book: Book,
     val finishedOn: LocalDate,
-    val readThroughNumber: Int,
+    /** Sets this apart from the other times the book was finished, which its number may not. */
+    val readThroughId: String,
 )
 
 data class DailyStats(
@@ -90,6 +91,39 @@ data class YearStats(
 ) {
     val goalProgress: Float?
         get() = goalBooks?.takeIf { it > 0 }?.let { completed.size.toFloat() / it }
+}
+
+/** Reading totals for one calendar year. */
+data class YearReading(
+    val year: Int,
+    /** Read-throughs finished that year. */
+    val completed: Int = 0,
+    val durationMs: Long = 0L,
+)
+
+/** Everything on record, with no period to step through. */
+data class AllTimeStats(
+    /** The first day something was read or finished, or null while nothing has been. */
+    val since: LocalDate?,
+    val completed: List<CompletedBook>,
+    /** Books finished a month, over the months from [since] to the present. */
+    val booksPerMonth: Float,
+    /** One entry per year, from the year of [since] to the current one. */
+    val years: List<YearReading>,
+    val durationMs: Long,
+    val pages: Int,
+    val daysRead: Int,
+    val ratingAverage: Float?,
+    /** Number of rated books per whole star, index 0 being one star. */
+    val ratingCounts: List<Int>,
+    /** Money spent on books, per currency code. */
+    val spending: Map<String, Long>,
+    /** Yearly spending in [spendingCurrency], from the year of its first purchase to the current one. */
+    val spendingPerYear: Map<Int, Long>,
+    val spendingCurrency: String?,
+) {
+    /** Nothing was read, finished or bought yet. */
+    val isEmpty: Boolean get() = since == null && spending.isEmpty()
 }
 
 /** One cell of the book calendar. */

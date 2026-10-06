@@ -48,12 +48,13 @@
     <string name="filter_all">All</string>
     <string name="sort_books">Sort books</string>
     <string name="filter_books">Filter books</string>
+    <string name="display_as_list">Show as list</string>
+    <string name="display_as_covers">Show as covers</string>
     <string name="sort_recent">Recently read</string>
     <string name="sort_title">Title</string>
     <string name="sort_date_added">Date added</string>
     <string name="sort_rating">My rating</string>
     <string name="library_favorites">Favorites</string>
-    <string name="library_other_books">Other books</string>
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_empty_message">Import an EPUB to start reading, or find a book online to keep on your wishlist. Kozeki keeps track of your chapter and progress as you go.</string>
     <string name="library_add">Add books</string>
@@ -285,9 +286,6 @@
     <string name="add_book_error_title">Search unavailable</string>
     <string name="add_book_to_wishlist">I want this</string>
     <string name="add_book_as_purchased">I own this</string>
-    <string name="add_book_added_wishlist">Added “%1$s” to your wishlist</string>
-    <string name="add_book_added_purchased">Added “%1$s” to purchased</string>
-    <string name="action_view">View</string>
     <string name="manual_book_title">Add manually</string>
     <string name="book_form_edit_title">Edit details</string>
     <string name="book_form_discard_changes">Discard changes?</string>
@@ -333,6 +331,7 @@
     <string name="stats_range_week">Week</string>
     <string name="stats_range_month">Month</string>
     <string name="stats_range_year">Year</string>
+    <string name="stats_range_all">All</string>
     <string name="stats_today">Today</string>
     <string name="stats_date_range">%1$s – %2$s</string>
     <string name="stats_previous">Earlier</string>
@@ -386,6 +385,11 @@
     </plurals>
     <string name="stats_longest_books">Longest books finished, in pages</string>
     <string name="stats_spending">Spent on books</string>
+    <string name="stats_since">Since %1$s</string>
+    <string name="stats_books_per_year">Books finished per year</string>
+    <string name="stats_time_per_year">Reading time per year</string>
+    <string name="stats_all_time_empty_title">Nothing read yet</string>
+    <string name="stats_all_time_empty_message">Reading time, pages and finished books add up here as you go.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
