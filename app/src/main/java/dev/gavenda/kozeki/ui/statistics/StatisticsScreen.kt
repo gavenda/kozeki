@@ -226,7 +226,10 @@ internal fun ChartCard(title: String, modifier: Modifier = Modifier, content: @C
     }
 }
 
-/** What was read of one book: where from and to, for how long, and how fast. */
+/**
+ * What was read of one book: where from and to, for how long, and how fast. A physical copy was not
+ * timed, so its card leads with the pages read in place of the time.
+ */
 @Composable
 internal fun BookReadingCard(reading: BookReading, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
@@ -243,22 +246,34 @@ internal fun BookReadingCard(reading: BookReading, onClick: () -> Unit, modifier
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(formatDuration(reading.durationMs), style = MaterialTheme.typography.titleMediumEmphasized)
+                Text(
+                    text = if (reading.physical) {
+                        pluralStringResource(R.plurals.stats_pages_read, reading.pages, reading.pages)
+                    } else {
+                        formatDuration(reading.durationMs)
+                    },
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                )
                 val details = buildList {
                     val from = reading.startPosition
                     val to = reading.endPosition
-                    if (from != null && to != null) add(stringResource(R.string.stats_page_span, from, to))
-                    if (reading.pages > 0) {
-                        add(
-                            pluralStringResource(
-                                R.plurals.stats_pages_gained,
-                                reading.pages,
-                                reading.pages,
-                                (reading.progressGained * 100).roundToInt(),
-                            ),
-                        )
+                    val span = if (from != null && to != null) stringResource(R.string.stats_page_span, from, to) else null
+                    if (reading.physical) {
+                        add(listOfNotNull(stringResource(R.string.progress_physical), span).joinToString(" · "))
+                    } else {
+                        span?.let { add(it) }
+                        if (reading.pages > 0) {
+                            add(
+                                pluralStringResource(
+                                    R.plurals.stats_pages_gained,
+                                    reading.pages,
+                                    reading.pages,
+                                    (reading.progressGained * 100).roundToInt(),
+                                ),
+                            )
+                        }
+                        reading.pagesPerHour?.let { add(stringResource(R.string.stats_pages_per_hour, it)) }
                     }
-                    reading.pagesPerHour?.let { add(stringResource(R.string.stats_pages_per_hour, it)) }
                 }
                 details.forEach { line ->
                     Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

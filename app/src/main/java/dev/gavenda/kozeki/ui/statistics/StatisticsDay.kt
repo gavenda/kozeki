@@ -56,7 +56,8 @@ internal fun LazyListScope.dayItems(
     item(key = "week-strip") { WeekStrip(day.week, day.date, today, day.goalMinutes, onSelectDate) }
     item(key = "day-summary") { DaySummary(day) }
 
-    if (day.durationMs == 0L && day.completed.isEmpty()) {
+    // Pages of a physical copy take no time on record, so it is the timeline that tells a day with reading.
+    if (day.timeline.isEmpty() && day.completed.isEmpty()) {
         item(key = "day-empty") {
             EmptyState(
                 icon = Icons.Rounded.AutoStories,
@@ -146,13 +147,20 @@ private fun DaySummary(day: DailyStats) {
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                // The one figure this view leads with.
-                Text(formatDuration(day.durationMs), style = MaterialTheme.typography.displaySmallEmphasized)
+                val pages = pluralStringResource(R.plurals.stats_pages_read, day.pages, day.pages)
+                // The one figure this view leads with. A day read only on paper has no time, so its pages lead.
+                val untimed = day.durationMs == 0L && day.pages > 0
                 Text(
-                    text = pluralStringResource(R.plurals.stats_pages_read, day.pages, day.pages),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = if (untimed) pages else formatDuration(day.durationMs),
+                    style = MaterialTheme.typography.displaySmallEmphasized,
                 )
+                if (!untimed) {
+                    Text(
+                        text = pages,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
@@ -162,7 +170,7 @@ private fun DaySummary(day: DailyStats) {
 private fun TimelineRow(entry: TimelineEntry) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = formatTime(entry.startedAt),
+            text = formatTime(entry.at),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(72.dp),
@@ -175,7 +183,15 @@ private fun TimelineRow(entry: TimelineEntry) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = listOfNotNull(formatDuration(entry.durationMs), entry.chapter).joinToString(" · "),
+                text = when (entry) {
+                    is TimelineEntry.Session ->
+                        listOfNotNull(formatDuration(entry.durationMs), entry.chapter).joinToString(" · ")
+                    // Nobody timed a physical copy, so it says how far it was read in place of how long.
+                    is TimelineEntry.Pages -> listOf(
+                        stringResource(R.string.progress_physical),
+                        stringResource(R.string.stats_page_span, entry.startPage, entry.endPage),
+                    ).joinToString(" · ")
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

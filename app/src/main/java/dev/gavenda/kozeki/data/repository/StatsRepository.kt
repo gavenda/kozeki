@@ -1,6 +1,7 @@
 package dev.gavenda.kozeki.data.repository
 
 import dev.gavenda.kozeki.data.db.KozekiDatabase
+import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
 import dev.gavenda.kozeki.data.db.ReadingSessionEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
@@ -38,6 +39,7 @@ class StatsRepository(
     private val clock: Clock,
 ) {
     private val sessions = db.readingSessionDao()
+    private val physicalReadings = db.physicalReadingDao()
     private val readThroughs = db.readThroughDao()
     private val goals = db.yearlyGoalDao()
 
@@ -46,24 +48,24 @@ class StatsRepository(
         val weekEnd = weekStart.plusDays(7)
         return combine(
             sessions.observeBetween(weekStart.toEpochDay(), weekEnd.toEpochDay()),
+            physicalReadings.observeBetween(weekStart.toEpochDay(), weekEnd.toEpochDay()),
             readThroughs.observeCompletedBetween(date.toEpochDay(), date.toEpochDay() + 1),
             library.observeAll(),
             settings.dailyGoalMinutes,
-        ) { weekSessions, finished, books, goal ->
+        ) { weekSessions, weekPhysical, finished, books, goal ->
             val byId = books.associateBy { it.id }
             val today = weekSessions.filter { it.day == date.toEpochDay() }
+            val physical = weekPhysical.filter { it.day == date.toEpochDay() }
+            val paper = paperOnly(physical, byId)
             DailyStats(
                 date = date,
                 goalMinutes = goal,
                 durationMs = today.sumOf { it.durationMs },
-                pages = today.sumOf { it.pages },
-                books = perBook(today, byId),
-                timeline = today.mapNotNull { session ->
-                    val book = byId[session.bookId] ?: return@mapNotNull null
-                    TimelineEntry(book, session.startedAt, session.durationMs, session.endChapter ?: session.startChapter)
-                },
+                pages = today.sumOf { it.pages } + paper.sumOf { it.pages },
+                books = perBook(today, paper, byId),
+                timeline = timeline(today, physical, byId),
                 completed = completed(finished, byId),
-                week = perDay(weekSessions, weekStart, weekEnd),
+                week = perDay(weekSessions, paperOnly(weekPhysical, byId), weekStart, weekEnd),
             )
         }.flowOn(Dispatchers.Default)
     }
@@ -73,21 +75,23 @@ class StatsRepository(
         val end = endInclusive.plusDays(1)
         return combine(
             sessions.observeBetween(start.toEpochDay(), end.toEpochDay()),
+            physicalReadings.observeBetween(start.toEpochDay(), end.toEpochDay()),
             readThroughs.observeCompletedBetween(start.toEpochDay(), end.toEpochDay()),
             library.observeAll(),
             settings.dailyGoalMinutes,
-        ) { periodSessions, finished, books, goal ->
+        ) { periodSessions, physical, finished, books, goal ->
             val byId = books.associateBy { it.id }
             val known = periodSessions.filter { it.bookId in byId }
+            val paper = paperOnly(physical, byId)
             PeriodStats(
                 start = start,
                 endInclusive = endInclusive,
                 goalMinutes = goal,
-                days = perDay(known, start, end),
+                days = perDay(known, paper, start, end),
                 durationMs = known.sumOf { it.durationMs },
-                pages = known.sumOf { it.pages },
+                pages = known.sumOf { it.pages } + paper.sumOf { it.pages },
                 sessionCount = known.size,
-                books = perBook(known, byId),
+                books = perBook(known, paper, byId),
                 completed = completed(finished, byId),
             )
         }.flowOn(Dispatchers.Default)
@@ -98,12 +102,14 @@ class StatsRepository(
         val end = start.plusYears(1)
         return combine(
             sessions.observeBetween(start.toEpochDay(), end.toEpochDay()),
+            physicalReadings.observeBetween(start.toEpochDay(), end.toEpochDay()),
             readThroughs.observeCompletedBetween(start.toEpochDay(), end.toEpochDay()),
             library.observeAll(),
             goals.observe(year),
-        ) { yearSessions, finished, books, goal ->
+        ) { yearSessions, physical, finished, books, goal ->
             val byId = books.associateBy { it.id }
             val known = yearSessions.filter { it.bookId in byId }
+            val paper = paperOnly(physical, byId)
             val done = completed(finished, byId)
             val rated = ratings(done)
 
@@ -119,10 +125,11 @@ class StatsRepository(
                     known.filter { LocalDate.ofEpochDay(it.day).monthValue == month }.sumOf { it.durationMs }
                 },
                 pagesPerMonth = monthly { month ->
-                    known.filter { LocalDate.ofEpochDay(it.day).monthValue == month }.sumOf { it.pages }
+                    known.filter { LocalDate.ofEpochDay(it.day).monthValue == month }.sumOf { it.pages } +
+                        paper.filter { LocalDate.ofEpochDay(it.day).monthValue == month }.sumOf { it.pages }
                 },
                 durationMs = known.sumOf { it.durationMs },
-                pages = known.sumOf { it.pages },
+                pages = known.sumOf { it.pages } + paper.sumOf { it.pages },
                 ratingAverage = rated.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
                 ratingCounts = starCounts(rated),
                 spending = spendingByCurrency(purchases),
@@ -139,11 +146,18 @@ class StatsRepository(
     /** Everything on record. Its yearly figures and its monthly average run up to [today]. */
     fun observeAllTime(today: LocalDate): Flow<AllTimeStats> = combine(
         sessions.observeAll(),
+        physicalReadings.observeAll(),
         readThroughs.observeCompleted(),
         library.observeAll(),
-    ) { allSessions, finished, books ->
+    ) { allSessions, physical, finished, books ->
         val byId = books.associateBy { it.id }
-        allTimeStats(allSessions.filter { it.bookId in byId }, completed(finished, byId), books, today)
+        allTimeStats(
+            sessions = allSessions.filter { it.bookId in byId },
+            completed = completed(finished, byId),
+            books = books,
+            today = today,
+            paper = paperOnly(physical, byId),
+        )
     }.flowOn(Dispatchers.Default)
 
     /** Every day of [month] on which something was read or finished. */
@@ -152,23 +166,28 @@ class StatsRepository(
         val end = month.plusMonths(1).atDay(1)
         return combine(
             sessions.observeBetween(start.toEpochDay(), end.toEpochDay()),
+            physicalReadings.observeBetween(start.toEpochDay(), end.toEpochDay()),
             readThroughs.observeCompletedBetween(start.toEpochDay(), end.toEpochDay()),
             library.observeAll(),
-        ) { monthSessions, finished, books ->
+        ) { monthSessions, physical, finished, books ->
             val byId = books.associateBy { it.id }
             val finishedByDay = finished.groupBy { it.finishedOn }
             val sessionsByDay = monthSessions.groupBy { it.day }
+            val paperByDay = paperOnly(physical, byId).groupBy { it.day }
 
-            (sessionsByDay.keys + finishedByDay.keys.filterNotNull()).associate { day ->
+            (sessionsByDay.keys + paperByDay.keys + finishedByDay.keys.filterNotNull()).associate { day ->
                 val durations = sessionsByDay[day].orEmpty()
                     .groupBy { it.bookId }
                     .mapValues { (_, list) -> list.sumOf { it.durationMs } }
+                val paperIds = paperByDay[day].orEmpty().map { it.bookId }.toSet()
                 val finishedIds = finishedByDay[day].orEmpty().map { it.bookId }.toSet()
                 val date = LocalDate.ofEpochDay(day)
                 date to CalendarDay(
                     date = date,
-                    books = (durations.keys + finishedIds)
-                        .mapNotNull { id -> byId[id]?.let { CalendarBook(it, durations[id] ?: 0L, id in finishedIds) } }
+                    books = (durations.keys + paperIds + finishedIds)
+                        .mapNotNull { id ->
+                            byId[id]?.let { CalendarBook(it, durations[id] ?: 0L, id in finishedIds, id in paperIds) }
+                        }
                         // Finished books lead, since the day's rating belongs to them.
                         .sortedWith(compareByDescending<CalendarBook> { it.completed }.thenByDescending { it.durationMs }),
                 )
@@ -184,18 +203,30 @@ class StatsRepository(
         goals.upsert(YearlyGoalEntity(year, books.coerceAtLeast(1), SyncStamp.created(now)))
     }
 
-    private fun perDay(list: List<ReadingSessionEntity>, start: LocalDate, endExclusive: LocalDate): List<DayReading> {
+    private fun perDay(
+        list: List<ReadingSessionEntity>,
+        paper: List<PhysicalReadingEntity>,
+        start: LocalDate,
+        endExclusive: LocalDate,
+    ): List<DayReading> {
         val byDay = list.groupBy { it.day }
+        val paperByDay = paper.groupBy { it.day }
         return generateSequence(start) { it.plusDays(1) }
             .takeWhile { it < endExclusive }
             .map { date ->
                 val day = byDay[date.toEpochDay()].orEmpty()
-                DayReading(date, day.sumOf { it.durationMs }, day.sumOf { it.pages })
+                val onPaper = paperByDay[date.toEpochDay()].orEmpty()
+                DayReading(date, day.sumOf { it.durationMs }, day.sumOf { it.pages } + onPaper.sumOf { it.pages })
             }
             .toList()
     }
 
-    private fun perBook(list: List<ReadingSessionEntity>, books: Map<String, Book>): List<BookReading> =
+    /** What was read of each book: in the reader, most time first, then on [paper]. */
+    private fun perBook(
+        list: List<ReadingSessionEntity>,
+        paper: List<PhysicalReadingEntity>,
+        books: Map<String, Book>,
+    ): List<BookReading> =
         list.groupBy { it.bookId }
             .mapNotNull { (bookId, bookSessions) ->
                 val book = books[bookId] ?: return@mapNotNull null
@@ -211,7 +242,7 @@ class StatsRepository(
                     progressGained = book.positionCount?.takeIf { it > 0 }?.let { pages.toDouble() / it } ?: 0.0,
                 )
             }
-            .sortedByDescending { it.durationMs }
+            .sortedByDescending { it.durationMs } + paperBooks(paper, books)
 
     private fun completed(list: List<ReadThroughEntity>, books: Map<String, Book>): List<CompletedBook> =
         list.mapNotNull { readThrough ->
@@ -224,22 +255,76 @@ class StatsRepository(
 }
 
 /**
+ * A day's reading in the order it happened: its [sessions] in the reader and the pages of
+ * [physical] copies entered on it, leaving out books that no longer exist. Kept apart from the
+ * database so that it can be tested without one.
+ */
+internal fun timeline(
+    sessions: List<ReadingSessionEntity>,
+    physical: List<PhysicalReadingEntity>,
+    books: Map<String, Book>,
+): List<TimelineEntry> {
+    val read = sessions.mapNotNull { session ->
+        val book = books[session.bookId] ?: return@mapNotNull null
+        TimelineEntry.Session(book, session.startedAt, session.durationMs, session.endChapter ?: session.startChapter)
+    }
+    val entered = physical.mapNotNull { reading ->
+        val book = books[reading.bookId] ?: return@mapNotNull null
+        TimelineEntry.Pages(book, reading.recordedAt, reading.startPage, reading.endPage)
+    }
+    return (read + entered).sortedBy { it.at }
+}
+
+/**
+ * The [physical] readings that the statistics tell a book by: those of books that have no EPUB.
+ * A book with one is told by its sessions in the reader alone, so that reading it on paper as well
+ * is not counted twice. Readings of books that no longer exist are left out too.
+ */
+internal fun paperOnly(physical: List<PhysicalReadingEntity>, books: Map<String, Book>): List<PhysicalReadingEntity> =
+    physical.filter { books[it.bookId]?.inLibrary == false }
+
+/**
+ * What was read on [paper] of each book, most pages first. Nobody timed it, so there is no duration
+ * and the pages are those of the physical copy.
+ */
+internal fun paperBooks(paper: List<PhysicalReadingEntity>, books: Map<String, Book>): List<BookReading> =
+    paper.groupBy { it.bookId }
+        .mapNotNull { (bookId, readings) ->
+            val book = books[bookId] ?: return@mapNotNull null
+            BookReading(
+                book = book,
+                durationMs = 0L,
+                pages = readings.sumOf { it.pages },
+                startPosition = readings.minOf { it.startPage },
+                endPosition = readings.maxOf { it.endPage },
+                physical = true,
+            )
+        }
+        .sortedByDescending { it.pages }
+
+private val PhysicalReadingEntity.pages: Int get() = endPage - startPage
+
+/**
  * Adds up [sessions] and [completed] read-throughs, both of books that still exist, and what was
- * spent on [books]. Kept apart from the database so that it can be tested without one.
+ * spent on [books]. What was read on [paper], of the books that have no EPUB, adds its pages and
+ * its days but no time. Kept apart from the database so that it can be tested without one.
  */
 internal fun allTimeStats(
     sessions: List<ReadingSessionEntity>,
     completed: List<CompletedBook>,
     books: List<Book>,
     today: LocalDate,
+    paper: List<PhysicalReadingEntity> = emptyList(),
 ): AllTimeStats {
-    val firstSession = sessions.minOfOrNull { it.day }?.let(LocalDate::ofEpochDay)
-    val since = listOfNotNull(firstSession, completed.minOfOrNull { it.finishedOn }).minOrNull()
+    val firstRead = (sessions.map { it.day } + paper.map { it.day }).minOrNull()?.let(LocalDate::ofEpochDay)
+    val since = listOfNotNull(firstRead, completed.minOfOrNull { it.finishedOn }).minOrNull()
     // Counted from the month of the first reading: the time before it would only understate the average.
     val months = since?.let { ChronoUnit.MONTHS.between(YearMonth.from(it), YearMonth.from(today)) + 1 } ?: 1
     val durationPerYear = sessions.groupingBy { LocalDate.ofEpochDay(it.day).year }
         .fold(0L) { total, session -> total + session.durationMs }
     val completedPerYear = completed.groupingBy { it.finishedOn.year }.eachCount()
+    val paperYears = paper.map { LocalDate.ofEpochDay(it.day).year }
+    val timedDays = sessions.groupBy { it.day }.filterValues { day -> day.sumOf { it.durationMs } > 0 }.keys
     val rated = ratings(completed)
 
     val purchases = books.filter { it.purchasedOn != null && it.purchasePriceMinor != null }
@@ -250,12 +335,13 @@ internal fun allTimeStats(
         since = since,
         completed = completed,
         booksPerMonth = completed.size.toFloat() / months.coerceAtLeast(1),
-        years = yearSpan(durationPerYear.keys + completedPerYear.keys, today.year).map { year ->
+        years = yearSpan(durationPerYear.keys + completedPerYear.keys + paperYears, today.year).map { year ->
             YearReading(year, completedPerYear[year] ?: 0, durationPerYear[year] ?: 0L)
         },
         durationMs = sessions.sumOf { it.durationMs },
-        pages = sessions.sumOf { it.pages },
-        daysRead = sessions.groupBy { it.day }.count { (_, day) -> day.sumOf { it.durationMs } > 0 },
+        pages = sessions.sumOf { it.pages } + paper.sumOf { it.pages },
+        // A day read on paper took no time on record, and is a day read all the same.
+        daysRead = (timedDays + paper.map { it.day }).size,
         ratingAverage = rated.takeIf { it.isNotEmpty() }?.average()?.toFloat(),
         ratingCounts = starCounts(rated),
         spending = spendingByCurrency(purchases),

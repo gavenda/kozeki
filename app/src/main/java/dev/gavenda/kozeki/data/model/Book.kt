@@ -123,6 +123,23 @@ data class ReadThrough(
     val outcome: ReadOutcome? = null,
 )
 
+/** Pages of a physical copy that are on record as read, from the page it was on to the one entered. */
+data class PhysicalReading(
+    val startPage: Int,
+    val endPage: Int,
+)
+
+/**
+ * How many pages of [readings] taking a physical copy from [currentPage] to [newPage] unreads:
+ * the ones on record past the new page, when that is an earlier one. A null page is a copy that is
+ * not tracked, so stopping takes back all of them and moving on takes back none.
+ */
+fun pagesUnread(readings: List<PhysicalReading>, currentPage: Int?, newPage: Int?): Int {
+    val page = newPage ?: 0
+    if (page >= (currentPage ?: 0)) return 0
+    return readings.sumOf { (it.endPage - maxOf(it.startPage, page)).coerceAtLeast(0) }
+}
+
 /** Where the reader currently is, as written back to the book. */
 data class ReadingProgress(
     val locatorJson: String,

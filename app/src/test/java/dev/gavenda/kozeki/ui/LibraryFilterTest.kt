@@ -17,19 +17,19 @@ class LibraryFilterTest {
     private fun filtersFor(book: Book): Set<LibraryFilter> = LibraryFilter.entries.filter { it.matches(book) }.toSet()
 
     @Test
-    fun `a wishlisted book is planned`() {
+    fun `a wishlisted book is kept out of Planning`() {
         assertEquals(
-            setOf(LibraryFilter.PLANNED, LibraryFilter.WISHLIST, LibraryFilter.ALL),
+            setOf(LibraryFilter.WISHLIST, LibraryFilter.ALL),
             filtersFor(book(ReadingState.PLANNED, Acquisition.WISHLIST)),
         )
     }
 
     // The repository keeps wishlist entries Planned; a stale row must still not show up elsewhere.
     @Test
-    fun `a wishlisted book is planned whatever state it carries`() {
+    fun `a wishlisted book is only on the wishlist whatever state it carries`() {
         ReadingState.entries.forEach { state ->
             assertEquals(
-                setOf(LibraryFilter.PLANNED, LibraryFilter.WISHLIST, LibraryFilter.ALL),
+                setOf(LibraryFilter.WISHLIST, LibraryFilter.ALL),
                 filtersFor(book(state, Acquisition.WISHLIST)),
             )
         }
@@ -76,18 +76,31 @@ class LibraryFilterTest {
     fun `every book at once is grouped by state with reading first`() {
         val books = listOf(
             book(ReadingState.DROPPED, Acquisition.PURCHASED).copy(id = "dropped"),
+            book(ReadingState.PLANNED, Acquisition.WISHLIST).copy(id = "wished"),
             book(ReadingState.PLANNED, Acquisition.PURCHASED).copy(id = "planned", isFavorite = true),
             book(ReadingState.READING, Acquisition.PURCHASED).copy(id = "reading"),
-            book(ReadingState.PLANNED, Acquisition.WISHLIST).copy(id = "wished"),
+            book(ReadingState.PLANNED, Acquisition.DOWNLOADED).copy(id = "downloaded"),
+            book(ReadingState.COMPLETED, Acquisition.PURCHASED).copy(id = "completed"),
         )
         assertEquals(
             listOf(
                 LibraryFilter.READING to listOf("reading"),
-                LibraryFilter.PLANNED to listOf("planned", "wished"),
+                LibraryFilter.PLANNED to listOf("planned", "downloaded"),
+                LibraryFilter.WISHLIST to listOf("wished"),
+                LibraryFilter.COMPLETED to listOf("completed"),
                 LibraryFilter.DROPPED to listOf("dropped"),
             ),
             librarySections(LibraryFilter.ALL, books).map { section -> section.heading to section.books.map { it.id } },
         )
+    }
+
+    @Test
+    fun `the groups take in every book exactly once`() {
+        val books = ReadingState.entries.flatMap { state ->
+            Acquisition.entries.map { acquisition -> book(state, acquisition).copy(id = "$state-$acquisition") }
+        }
+        val grouped = librarySections(LibraryFilter.ALL, books).flatMap { it.books }
+        assertEquals(books.map { it.id }.sorted(), grouped.map { it.id }.sorted())
     }
 
     @Test

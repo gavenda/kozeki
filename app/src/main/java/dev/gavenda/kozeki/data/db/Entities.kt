@@ -137,6 +137,29 @@ data class ReadingSessionEntity(
     @Embedded val sync: SyncStamp,
 )
 
+/**
+ * Pages read in a physical copy, put on record when the user moves its page on. Nobody timed it,
+ * so it has no duration. Unlike a session it does not stay as written: taking the page back
+ * removes what was recorded past it.
+ */
+@Entity(
+    tableName = "physical_readings",
+    indices = [Index("bookId"), Index("day")],
+)
+data class PhysicalReadingEntity(
+    @PrimaryKey val id: String,
+    val bookId: String,
+    val readThroughId: String?,
+    /** When the page reached was entered, which is as close to when it was read as is known. */
+    val recordedAt: Long,
+    /** Epoch day [recordedAt] fell on, in the device's zone at the time. */
+    val day: Long,
+    /** The page the copy was on before. */
+    val startPage: Int,
+    val endPage: Int,
+    @Embedded val sync: SyncStamp,
+)
+
 @Entity(
     tableName = "notes",
     indices = [Index("bookId")],

@@ -179,6 +179,51 @@ interface ReadingSessionDao {
 }
 
 @Dao
+interface PhysicalReadingDao {
+
+    @Insert
+    suspend fun insert(reading: PhysicalReadingEntity)
+
+    @Query(
+        "SELECT * FROM physical_readings WHERE deletedAt IS NULL AND day >= :fromDay AND day < :toDay " +
+            "ORDER BY recordedAt",
+    )
+    fun observeBetween(fromDay: Long, toDay: Long): Flow<List<PhysicalReadingEntity>>
+
+    @Query("SELECT * FROM physical_readings WHERE deletedAt IS NULL ORDER BY recordedAt")
+    fun observeAll(): Flow<List<PhysicalReadingEntity>>
+
+    @Query("SELECT * FROM physical_readings WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY recordedAt")
+    fun observeForBook(bookId: String): Flow<List<PhysicalReadingEntity>>
+
+    @Query("SELECT COUNT(*) FROM physical_readings WHERE bookId = :bookId AND deletedAt IS NULL")
+    suspend fun countForBook(bookId: String): Int
+
+    /**
+     * Removes what one read-through has on record as read from [page] onwards. A reading that only
+     * ends past it is left for [cutShortAt].
+     */
+    @Query(
+        "UPDATE physical_readings SET deletedAt = :now, updatedAt = :now WHERE bookId = :bookId " +
+            "AND readThroughId IS :readThroughId AND deletedAt IS NULL AND startPage >= :page",
+    )
+    suspend fun softDeleteFrom(bookId: String, readThroughId: String?, page: Int, now: Long)
+
+    /** Ends at [page] the readings of one read-through that went past it. */
+    @Query(
+        "UPDATE physical_readings SET endPage = :page, updatedAt = :now WHERE bookId = :bookId " +
+            "AND readThroughId IS :readThroughId AND deletedAt IS NULL AND endPage > :page",
+    )
+    suspend fun cutShortAt(bookId: String, readThroughId: String?, page: Int, now: Long)
+
+    @Query("UPDATE physical_readings SET deletedAt = :now, updatedAt = :now WHERE bookId = :bookId AND deletedAt IS NULL")
+    suspend fun softDeleteForBook(bookId: String, now: Long)
+
+    @Query("UPDATE physical_readings SET bookId = :to, updatedAt = :now WHERE bookId = :from")
+    suspend fun moveToBook(from: String, to: String, now: Long)
+}
+
+@Dao
 interface NoteDao {
 
     @Query("SELECT * FROM notes WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY createdAt DESC")

@@ -10,11 +10,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
@@ -233,16 +240,63 @@ internal fun RatingsCard(average: Float, counts: List<Int>) {
 
 /** The longest of the [completed] books, in a card that is left out when no book's length is known. */
 internal fun LazyListScope.longestBooks(completed: List<CompletedBook>) {
-    val longest = completed
-        .distinctBy { it.book.id }
-        .mapNotNull { entry -> (entry.book.pageCount ?: entry.book.positionCount)?.let { entry.book to it } }
-        .sortedByDescending { it.second }
-        .take(LONGEST_BOOKS_SHOWN)
-    if (longest.isNotEmpty()) {
-        item(key = "longest-books") {
-            ChartCard(stringResource(R.string.stats_longest_books)) {
-                RankedBars(longest.map { (book, pages) -> RankedBar(book.title, pages.toFloat(), pages.toString()) })
+    val physical = longestFinished(completed, physical = true)
+    val epubs = longestFinished(completed, physical = false)
+    if (physical.isNotEmpty() || epubs.isNotEmpty()) {
+        item(key = "longest-books") { LongestBooksCard(physical, epubs) }
+    }
+}
+
+/**
+ * The longest of the [completed] books with their pages, longest first, of one kind: the [physical]
+ * ones, which are the books without an EPUB, or the ones with an EPUB. A physical copy is as long
+ * as the user says it is; an EPUB without a page count goes by its positions. A book finished more
+ * than once is listed once, and one whose length is not known not at all.
+ */
+internal fun longestFinished(
+    completed: List<CompletedBook>,
+    physical: Boolean,
+    limit: Int = LONGEST_BOOKS_SHOWN,
+): List<Pair<Book, Int>> = completed
+    .map { it.book }
+    .distinctBy { it.id }
+    .filter { it.inLibrary != physical }
+    .mapNotNull { book ->
+        val pages = if (physical) book.physicalPageCount ?: book.pageCount else book.pageCount ?: book.positionCount
+        pages?.takeIf { it > 0 }?.let { book to it }
+    }
+    .sortedByDescending { it.second }
+    .take(limit)
+
+/** The two kinds of [longestFinished] behind a tab each, the physical books on the left and shown first. */
+@Composable
+private fun LongestBooksCard(physical: List<Pair<Book, Int>>, epubs: List<Pair<Book, Int>>) {
+    // Until a tab is picked, the card opens on the physical books, or on the EPUBs when it has only those.
+    var picked by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selected = picked ?: if (physical.isEmpty()) 1 else 0
+    val tabs = listOf(R.string.stats_longest_physical, R.string.stats_longest_epub)
+
+    ChartCard(stringResource(R.string.stats_longest_books)) {
+        SecondaryTabRow(selectedTabIndex = selected, containerColor = Color.Transparent) {
+            tabs.forEachIndexed { index, label ->
+                Tab(
+                    selected = index == selected,
+                    onClick = { picked = index },
+                    text = { Text(stringResource(label)) },
+                )
             }
+        }
+        val longest = if (selected == 0) physical else epubs
+        if (longest.isEmpty()) {
+            Text(
+                text = stringResource(
+                    if (selected == 0) R.string.stats_longest_physical_empty else R.string.stats_longest_epub_empty,
+                ),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            RankedBars(longest.map { (book, pages) -> RankedBar(book.title, pages.toFloat(), pages.toString()) })
         }
     }
 }

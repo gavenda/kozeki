@@ -13,11 +13,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookEntity::class,
         ReadThroughEntity::class,
         ReadingSessionEntity::class,
+        PhysicalReadingEntity::class,
         NoteEntity::class,
         YearlyGoalEntity::class,
         MetadataCacheEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -26,6 +27,7 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun bookDao(): BookDao
     abstract fun readThroughDao(): ReadThroughDao
     abstract fun readingSessionDao(): ReadingSessionDao
+    abstract fun physicalReadingDao(): PhysicalReadingDao
     abstract fun noteDao(): NoteDao
     abstract fun yearlyGoalDao(): YearlyGoalDao
     abstract fun metadataCacheDao(): MetadataCacheDao
@@ -33,7 +35,7 @@ abstract class KozekiDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): KozekiDatabase =
             Room.databaseBuilder(context, KozekiDatabase::class.java, "kozeki.db")
-                .addMigrations(DropGoogleBooks, AddAuthorRefs, AddCustomCover)
+                .addMigrations(DropGoogleBooks, AddAuthorRefs, AddCustomCover, AddPhysicalReadings)
                 .build()
 
         /**
@@ -80,6 +82,25 @@ abstract class KozekiDatabase : RoomDatabase() {
         private val AddCustomCover = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN customCover INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /**
+         * Moving the page of a physical copy on is put on record from here on. The pages entered
+         * before left nothing behind to fill it with.
+         */
+        private val AddPhysicalReadings = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `physical_readings` (`id` TEXT NOT NULL, `bookId` TEXT NOT NULL, " +
+                        "`readThroughId` TEXT, `recordedAt` INTEGER NOT NULL, `day` INTEGER NOT NULL, " +
+                        "`startPage` INTEGER NOT NULL, `endPage` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, " +
+                        "`updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, `syncedAt` INTEGER, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_physical_readings_bookId` ON `physical_readings` (`bookId`)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_physical_readings_day` ON `physical_readings` (`day`)")
             }
         }
     }

@@ -5,6 +5,7 @@ import androidx.room.withTransaction
 import dev.gavenda.kozeki.data.db.BookEntity
 import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.db.NoteEntity
+import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
 import dev.gavenda.kozeki.data.db.ReadingSessionEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
@@ -23,11 +24,13 @@ import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.Note
+import dev.gavenda.kozeki.data.model.PhysicalReading
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingProgress
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.SessionDraft
+import dev.gavenda.kozeki.data.model.pagesUnread
 import dev.gavenda.kozeki.data.model.singleLine
 import dev.gavenda.kozeki.data.model.singleLines
 import java.time.Clock
@@ -39,6 +42,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -59,6 +63,7 @@ class LibraryRepository(
     private val books = db.bookDao()
     private val readThroughs = db.readThroughDao()
     private val sessions = db.readingSessionDao()
+    private val physicalReadings = db.physicalReadingDao()
     private val notes = db.noteDao()
 
     init {
@@ -98,6 +103,21 @@ class LibraryRepository(
         readThroughs.observeForBook(bookId).map { list ->
             list.map { ReadThrough(it.id, it.number, it.startedAt, it.finishedAt, it.outcome) }
         }
+
+    /**
+     * What is on record of reading the physical copy of [bookId] in the read-through it is in,
+     * oldest first. This is what [setPhysicalProgress] takes from when the page goes back.
+     */
+    fun observePhysicalReadings(bookId: String): Flow<List<PhysicalReading>> = combine(
+        books.observe(bookId),
+        readThroughs.observeForBook(bookId),
+        physicalReadings.observeForBook(bookId),
+    ) { book, newestFirst, readings ->
+        // The read-through [currentReadThrough] finds, picked from the rows already being watched.
+        val current = newestFirst.firstOrNull { it.finishedAt == null }
+            ?: newestFirst.firstOrNull()?.takeIf { book != null && book.state in FINISHED_STATES }
+        readings.filter { it.readThroughId == current?.id }.map { PhysicalReading(it.startPage, it.endPage) }
+    }
 
     // ---- Import ----------------------------------------------------------------------------
 
@@ -438,6 +458,7 @@ class LibraryRepository(
             // Each entry counted its own read-throughs from one, so together they may repeat a number.
             readThroughs.renumberDuplicates(now)
             sessions.moveToBook(other.id, bookId, now)
+            physicalReadings.moveToBook(other.id, bookId, now)
             notes.moveToBook(other.id, bookId, now)
             // A cover the user chose for the entry that goes away comes along too.
             val takeCover = other.customCover && !book.customCover && other.coverFile != null
@@ -518,9 +539,10 @@ class LibraryRepository(
                 }
 
                 ReadingState.PLANNED -> {
-                    // A read-through nobody read in is noise; one with sessions waits to be resumed.
+                    // A read-through nobody read in is noise; one that was read in waits to be resumed.
                     val open = readThroughs.getOpen(bookId) ?: closed?.let { reopen(it, now) }
-                    if (open != null && sessions.countForBook(bookId) == 0) {
+                    val unread = sessions.countForBook(bookId) == 0 && physicalReadings.countForBook(bookId) == 0
+                    if (open != null && unread) {
                         readThroughs.upsert(open.copy(sync = open.sync.deleted(now)))
                     }
                 }
@@ -575,6 +597,11 @@ class LibraryRepository(
      *
      * Like opening the reader, a first page turns a planned or paused book into Reading, and the
      * last page completes it. A wishlist entry is only wanted, so it has no copy to track.
+     *
+     * Moving the page on puts the pages in between on record as read now, which is what the
+     * timeline shows of a physical copy. Taking the page back, or no longer keeping one, removes
+     * what the read-through had on record past it: see [pagesUnread], which callers ask the user
+     * about before they get here.
      */
     suspend fun setPhysicalProgress(bookId: String, page: Int?, pageCount: Int?) {
         db.withTransaction {
@@ -584,6 +611,7 @@ class LibraryRepository(
             val count = pageCount?.takeIf { it > 0 }
             val total = count ?: book.pageCount?.takeIf { it > 0 }
             val reached = page?.coerceAtLeast(0)?.let { if (total != null) it.coerceAtMost(total) else it }
+            val before = book.physicalPage ?: 0
             books.upsert(
                 book.copy(
                     physicalPage = reached,
@@ -592,14 +620,42 @@ class LibraryRepository(
                     sync = book.sync.touched(now),
                 ),
             )
+            if ((reached ?: 0) < before) {
+                val readThroughId = currentReadThrough(bookId, book.state)?.id
+                physicalReadings.softDeleteFrom(bookId, readThroughId, reached ?: 0, now)
+                physicalReadings.cutShortAt(bookId, readThroughId, reached ?: 0, now)
+            }
             if (reached == null || reached == 0 || reached == book.physicalPage) return@withTransaction
-            when {
-                total != null && reached >= total -> setState(bookId, ReadingState.COMPLETED)
-                book.state == ReadingState.PLANNED || book.state == ReadingState.PAUSED ->
-                    setState(bookId, ReadingState.READING)
+            val state = when {
+                total != null && reached >= total -> ReadingState.COMPLETED
+                book.state == ReadingState.PLANNED || book.state == ReadingState.PAUSED -> ReadingState.READING
+                else -> book.state
+            }
+            setState(bookId, state)
+            if (reached > before) {
+                physicalReadings.insert(
+                    PhysicalReadingEntity(
+                        id = UUID.randomUUID().toString(),
+                        bookId = bookId,
+                        // Looked up once the state is set, which is what starts a read-through.
+                        readThroughId = currentReadThrough(bookId, state)?.id,
+                        recordedAt = now,
+                        day = today().toEpochDay(),
+                        startPage = before,
+                        endPage = reached,
+                        sync = SyncStamp.created(now),
+                    ),
+                )
             }
         }
     }
+
+    /**
+     * The read-through a book in [state] is in: the open one, or the one a finished state closed.
+     * A planned book that was never started, or was taken back to that, is in none.
+     */
+    private suspend fun currentReadThrough(bookId: String, state: ReadingState): ReadThroughEntity? =
+        readThroughs.getOpen(bookId) ?: if (state in FINISHED_STATES) readThroughs.getLatest(bookId) else null
 
     /** Takes back the end of [readThrough], so it no longer counts as completed or dropped. */
     private suspend fun reopen(readThrough: ReadThroughEntity, now: Long): ReadThroughEntity {
@@ -681,6 +737,7 @@ class LibraryRepository(
             val now = clock.millis()
             readThroughs.softDeleteForBook(bookId, now)
             sessions.softDeleteForBook(bookId, now)
+            physicalReadings.softDeleteForBook(bookId, now)
             notes.softDeleteForBook(bookId, now)
             books.upsert(book.copy(sync = book.sync.deleted(now)))
             cover = book.coverFile

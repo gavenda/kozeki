@@ -15,6 +15,7 @@ import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
+import dev.gavenda.kozeki.data.model.PhysicalReading
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.repository.LibraryRepository
@@ -65,6 +66,8 @@ data class BookDetailUiState(
     val notes: List<Note> = emptyList(),
     val readThroughs: List<ReadThrough> = emptyList(),
     val readingTimeMs: Long = 0L,
+    /** What is on record of reading the physical copy, which going back to an earlier page takes from. */
+    val physicalReadings: List<PhysicalReading> = emptyList(),
     val match: MatchUiState = MatchUiState(),
     /** Null while the book is not linked to a source that has reviews, which leaves nothing to ask for. */
     val reviews: ReviewsUiState? = null,
@@ -97,6 +100,7 @@ class BookDetailViewModel(
         val notes: List<Note>,
         val readThroughs: List<ReadThrough>,
         val readingTimeMs: Long,
+        val physicalReadings: List<PhysicalReading>,
     )
 
     private val match = MutableStateFlow(MatchUiState())
@@ -123,6 +127,7 @@ class BookDetailViewModel(
         library.observeNotes(bookId),
         library.observeReadThroughs(bookId),
         library.observeReadingTime(bookId),
+        library.observePhysicalReadings(bookId),
         ::BookData,
     )
 
@@ -140,6 +145,7 @@ class BookDetailViewModel(
                 notes = data.notes,
                 readThroughs = data.readThroughs,
                 readingTimeMs = data.readingTimeMs,
+                physicalReadings = data.physicalReadings,
                 match = matchState,
                 reviews = reviewsState,
                 importing = busy,

@@ -5,15 +5,21 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,13 +50,13 @@ import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.FilterListOff
 import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.RemoveShoppingCart
 import androidx.compose.material.icons.rounded.SelectAll
@@ -82,21 +88,28 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
+import androidx.compose.material3.nonInteractiveScrollbar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -127,12 +140,14 @@ import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.icon
 import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.components.outlinedIcon
+import dev.gavenda.kozeki.ui.components.ownershipBadge
 import dev.gavenda.kozeki.ui.formatPercent
 import dev.gavenda.kozeki.ui.search.SearchTopBar
 import dev.gavenda.kozeki.ui.search.SearchUiState
 import dev.gavenda.kozeki.ui.search.SearchViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 /** MIME types offered by the file picker. Some providers report EPUBs as generic binary data. */
@@ -238,6 +253,38 @@ fun LibraryContent(
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
 
+    // A filter that was just picked starts from its top. Left alone, the grid holds on to the book
+    // it was showing, which on the way back to every book is somewhere in the middle. Remembered
+    // past leaving the screen, so that coming back from a book keeps the place.
+    var shownFilter by rememberSaveable { mutableStateOf(state.filter) }
+    LaunchedEffect(state.filter) {
+        if (state.filter != shownFilter) {
+            shownFilter = state.filter
+            gridState.scrollToItem(0)
+        }
+    }
+
+    // More than a screen down and on the way back up is when the top is wanted, so that is when the
+    // button that adds books offers it instead. Going down, or near the top, it adds books as ever.
+    val turnDistance = with(LocalDensity.current) { ScrollTurnDistance.toPx() }
+    val scrollTurn = remember(turnDistance) { ScrollTurn(turnDistance) }
+    val offersTop by remember(scrollTurn) {
+        derivedStateOf {
+            val screenful = gridState.layoutInfo.visibleItemsInfo.size.coerceAtLeast(1)
+            scrollTurn.towardTop && gridState.firstVisibleItemIndex >= screenful
+        }
+    }
+    val scope = rememberCoroutineScope()
+    val scrollToTop: () -> Unit = {
+        scope.launch { gridState.animateScrollToItem(0) }
+        // The title comes back down with it, as it would had the way up been dragged.
+        scope.launch {
+            val bar = scrollBehavior.state
+            animate(bar.heightOffset, 0f) { value, _ -> bar.heightOffset = value }
+            bar.contentOffset = 0f
+        }
+    }
+
     BackHandler(state.selecting) { selectionActions.onClear() }
     // A dialog belongs to the selection it was opened for, not to whatever is picked next.
     LaunchedEffect(state.selecting) {
@@ -268,7 +315,7 @@ fun LibraryContent(
             // The empty state has its own button; two of them side by side would be noise.
             // While books are picked, the selection toolbar takes this corner.
             if (!state.selecting && (!state.isLibraryEmpty || state.importing)) {
-                AddBooksMenu(state.importing, onImportClick, onAddBook, onAddManually)
+                AddBooksMenu(state.importing, offersTop, scrollToTop, onImportClick, onAddBook, onAddManually)
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -326,6 +373,10 @@ fun LibraryContent(
                     val list = state.display == LibraryDisplay.LIST
                     // A row brings its own margins, which the tint of a picked one fills.
                     val edge = if (list) 8.dp else 16.dp
+                    // Shows how far down a long library is while it moves, then fades away.
+                    val scrollbar = gridState.scrollIndicatorState
+                        ?.let { Modifier.nonInteractiveScrollbar(it, Orientation.Vertical) }
+                        ?: Modifier
                     LazyVerticalGrid(
                         columns = if (list) {
                             AdaptiveColumns(minColumns = 1, minCellWidth = 360.dp)
@@ -342,7 +393,7 @@ fun LibraryContent(
                         ),
                         horizontalArrangement = Arrangement.spacedBy(if (list) 8.dp else 12.dp),
                         verticalArrangement = Arrangement.spacedBy(if (list) 0.dp else 16.dp),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().nestedScroll(scrollTurn).then(scrollbar),
                     ) {
                         state.sections.forEach { section ->
                             section.heading?.let { heading ->
@@ -426,37 +477,83 @@ private fun AddButtonContent(icon: ImageVector, @StringRes label: Int) {
     Text(stringResource(label))
 }
 
+/** How far the grid has to be moved one way before [ScrollTurn] takes it for the way it is going. */
+private val ScrollTurnDistance = 24.dp
+
+/**
+ * Tells which way a list was last moved by more than a nudge, [threshold] pixels of it. A finger
+ * wavers as it lifts, and a button that changed with every pixel would change under it.
+ */
+internal class ScrollTurn(private val threshold: Float) : NestedScrollConnection {
+    /** The list was last moved back toward its top. */
+    var towardTop by mutableStateOf(false)
+        private set
+
+    /** How far it has gone since it last changed direction; above zero is toward the top. */
+    private var run = 0f
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        val delta = available.y
+        if (delta != 0f) {
+            run = if (delta > 0f == run > 0f) run + delta else delta
+            if (run > threshold) towardTop = true else if (run < -threshold) towardTop = false
+        }
+        // Only watched: the list keeps all of it.
+        return Offset.Zero
+    }
+}
+
 /**
  * The ways a book gets in: as an EPUB from the device, looked up online without a file, or typed
- * in by hand.
+ * in by hand. While [offersTop] holds, the button leads back to the top of the library instead,
+ * unless its menu is open or an import is under way.
  */
 @Composable
 private fun AddBooksMenu(
     importing: Boolean,
+    offersTop: Boolean,
+    onScrollToTop: () -> Unit,
     onImportClick: () -> Unit,
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     BackHandler(expanded) { expanded = false }
-    val label = stringResource(if (importing) R.string.importing else R.string.library_add)
+    val toTop = offersTop && !expanded && !importing
+    val label = stringResource(
+        when {
+            importing -> R.string.importing
+            toTop -> R.string.library_scroll_to_top
+            else -> R.string.library_add
+        },
+    )
 
     FloatingActionButtonMenu(
         expanded = expanded,
         button = {
             ToggleFloatingActionButton(
                 checked = expanded,
-                onCheckedChange = { if (!importing) expanded = it },
+                onCheckedChange = { if (toTop) onScrollToTop() else if (!importing) expanded = it },
                 modifier = Modifier.semantics { contentDescription = label },
             ) {
                 if (importing) {
                     LoadingIndicator(Modifier.size(24.dp))
                 } else {
-                    Icon(
-                        imageVector = if (checkedProgress > 0.5f) Icons.Rounded.Close else Icons.Rounded.Add,
-                        contentDescription = null,
-                        modifier = Modifier.animateIcon({ checkedProgress }),
-                    )
+                    AnimatedContent(
+                        targetState = toTop,
+                        transitionSpec = { (scaleIn() + fadeIn()) togetherWith (scaleOut() + fadeOut()) },
+                        label = "add or to top",
+                    ) { top ->
+                        if (top) {
+                            Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null)
+                        } else {
+                            Icon(
+                                imageVector = if (checkedProgress > 0.5f) Icons.Rounded.Close else Icons.Rounded.Add,
+                                contentDescription = null,
+                                modifier = Modifier.animateIcon({ checkedProgress }),
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -655,8 +752,8 @@ private fun LibraryBookItem(
                     Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
             }
-            val (badgeIcon, badgeLabel) = availabilityBadge(book)
-            // The heart sits above that badge, and takes its corner when there is none.
+            val (badgeIcon, badgeLabel) = ownershipBadge(book)
+            // How the book is had goes in the lower left, with the heart above it.
             Column(
                 modifier = Modifier.align(Alignment.BottomStart).padding(6.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -670,10 +767,8 @@ private fun LibraryBookItem(
                         )
                     }
                 }
-                if (badgeIcon != null) {
-                    CoverBadge {
-                        Icon(badgeIcon, contentDescription = stringResource(badgeLabel), modifier = Modifier.size(14.dp))
-                    }
+                CoverBadge {
+                    Icon(badgeIcon, contentDescription = stringResource(badgeLabel), modifier = Modifier.size(14.dp))
                 }
             }
             // A book not started yet has nothing to show for its state.
@@ -801,7 +896,7 @@ private fun LibraryBookRow(
                     )
                 }
             }
-            val (badgeIcon, badgeLabel) = availabilityBadge(book)
+            val (badgeIcon, badgeLabel) = ownershipBadge(book)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 val tint = MaterialTheme.colorScheme.onSurfaceVariant
                 if (book.isFavorite) {
@@ -812,12 +907,16 @@ private fun LibraryBookRow(
                         tint = tint,
                     )
                 }
-                if (badgeIcon != null) {
-                    Icon(badgeIcon, contentDescription = null, modifier = Modifier.size(14.dp), tint = tint)
-                }
+                // Described only where the words beside it are about something else.
+                Icon(
+                    imageVector = badgeIcon,
+                    contentDescription = if (book.canRead) stringResource(badgeLabel) else null,
+                    modifier = Modifier.size(14.dp),
+                    tint = tint,
+                )
                 // There is room here to say why the book cannot be opened, rather than only hint at it.
                 Text(
-                    text = if (badgeIcon != null) stringResource(badgeLabel) else stringResource(book.state.labelRes),
+                    text = stringResource(if (book.canRead) book.state.labelRes else badgeLabel),
                     style = MaterialTheme.typography.bodySmall,
                     color = tint,
                     maxLines = 1,
@@ -829,14 +928,6 @@ private fun LibraryBookRow(
             ReadingProgressRing(book.overallProgression)
         }
     }
-}
-
-/** Why the book cannot be opened yet: wanted, owned without an EPUB, or the EPUB is elsewhere. Null when it can. */
-private fun availabilityBadge(book: Book): Pair<ImageVector?, Int> = when {
-    book.acquisition == Acquisition.WISHLIST -> Icons.Rounded.Bookmark to R.string.wishlist_tab
-    !book.inLibrary -> Icons.Rounded.ShoppingBag to R.string.library_owned_no_epub
-    !book.hasFile -> Icons.Rounded.CloudOff to R.string.book_file_missing
-    else -> null to 0
 }
 
 /** A book's state in words, for when there is no author to name and for screen readers. */

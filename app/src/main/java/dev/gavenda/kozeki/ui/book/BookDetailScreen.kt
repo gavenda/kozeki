@@ -507,6 +507,7 @@ fun BookDetailContent(
         if (editingPhysicalProgress) {
             PhysicalProgressDialog(
                 book = book,
+                readings = state.physicalReadings,
                 onSave = { page, pageCount ->
                     editingPhysicalProgress = false
                     actions.onSetPhysicalProgress(page, pageCount)

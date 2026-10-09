@@ -99,6 +99,9 @@ fun CalendarContent(
                     Text(
                         if (state.daysRead == 0) {
                             stringResource(R.string.calendar_nothing_read)
+                        } else if (state.durationMs == 0L) {
+                            // All of it on paper or only marked as finished, which nobody timed.
+                            pluralStringResource(R.plurals.calendar_summary_untimed, state.daysRead, state.daysRead)
                         } else {
                             pluralStringResource(
                                 R.plurals.calendar_summary,

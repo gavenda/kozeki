@@ -26,10 +26,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The reading states sort the books by where the user is with them. A book that is only wanted is
- * always Planned, so it is listed there as well as under its own filter. Purchased is every book
- * with a purchase on record, with or without an EPUB; an EPUB alone does not put a book there.
- * Favorites cut across all of that.
+ * The reading states sort the books the user has by where they are with them. A book that is only
+ * wanted is kept apart under its own filter, so Planning is what is already there to be read.
+ * Purchased is every book with a purchase on record, with or without an EPUB; an EPUB alone does
+ * not put a book there. Favorites cut across all of that.
  */
 enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<ReadingState>?) {
     ALL(R.string.filter_all, null),
@@ -50,7 +50,6 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
             FAVORITES -> book.isFavorite
             WISHLIST -> wished
             PURCHASED -> book.acquisition == Acquisition.PURCHASED
-            PLANNED -> wished || book.state == ReadingState.PLANNED
             else -> !wished && states != null && book.state in states
         }
     }
@@ -112,19 +111,22 @@ data class LibrarySection(val heading: LibraryFilter?, val books: List<Book>)
 
 /**
  * How [books], already filtered and sorted, are laid out: every book at once is grouped by reading
- * state, the ones being read first, while any narrower filter is a single run.
+ * state, the ones being read first and the ones only wanted in a group of their own, while any
+ * narrower filter is a single run.
  */
 fun librarySections(filter: LibraryFilter, books: List<Book>): List<LibrarySection> = when {
     books.isEmpty() -> emptyList()
     filter != LibraryFilter.ALL -> listOf(LibrarySection(null, books))
-    else -> STATE_FILTERS.mapNotNull { state ->
-        books.filter(state::matches).takeIf { it.isNotEmpty() }?.let { LibrarySection(state, it) }
+    else -> GROUP_FILTERS.mapNotNull { group ->
+        books.filter(group::matches).takeIf { it.isNotEmpty() }?.let { LibrarySection(group, it) }
     }
 }
 
-private val STATE_FILTERS = listOf(
+/** Between them these take in every book exactly once. The wishlist follows what is planned to be read. */
+private val GROUP_FILTERS = listOf(
     LibraryFilter.READING,
     LibraryFilter.PLANNED,
+    LibraryFilter.WISHLIST,
     LibraryFilter.COMPLETED,
     LibraryFilter.PAUSED,
     LibraryFilter.DROPPED,

@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.data
 
+import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadingSessionEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
 import dev.gavenda.kozeki.data.model.Book
@@ -18,6 +19,7 @@ class AllTimeStatsTest {
     private val today = LocalDate.of(2026, 10, 7)
     private val book = Book(id = "book", title = "The Dispossessed")
     private var sessions = 0
+    private var readings = 0
     private var readThroughs = 0
 
     private fun session(day: LocalDate, minutes: Long, pages: Int = 0) = ReadingSessionEntity(
@@ -31,6 +33,18 @@ class AllTimeStatsTest {
         startProgression = 0.0,
         endProgression = 0.0,
         pages = pages,
+        sync = SyncStamp.created(0L),
+    )
+
+    /** Pages read in the physical copy of a book that has no EPUB. */
+    private fun onPaper(day: LocalDate, pages: Int) = PhysicalReadingEntity(
+        id = "reading-${readings++}",
+        bookId = book.id,
+        readThroughId = null,
+        recordedAt = 0L,
+        day = day.toEpochDay(),
+        startPage = 0,
+        endPage = pages,
         sync = SyncStamp.created(0L),
     )
 
@@ -85,6 +99,42 @@ class AllTimeStatsTest {
         val stats = allTimeStats(listOf(session(today, minutes = 0)), emptyList(), listOf(book), today)
 
         assertEquals(0, stats.daysRead)
+    }
+
+    @Test
+    fun `reading on paper adds its pages and its days, but no time`() {
+        val stats = allTimeStats(
+            sessions = listOf(session(LocalDate.of(2026, 10, 1), minutes = 30, pages = 20)),
+            completed = emptyList(),
+            books = listOf(book),
+            today = today,
+            paper = listOf(
+                // The same day as the session, which stays one day read.
+                onPaper(LocalDate.of(2026, 10, 1), pages = 30),
+                onPaper(LocalDate.of(2026, 10, 3), pages = 34),
+            ),
+        )
+
+        assertEquals(30 * 60_000L, stats.durationMs)
+        assertEquals(84, stats.pages)
+        assertEquals(2, stats.daysRead)
+    }
+
+    @Test
+    fun `reading that began on paper is where it starts`() {
+        val stats = allTimeStats(
+            sessions = listOf(session(LocalDate.of(2026, 2, 1), minutes = 45)),
+            completed = emptyList(),
+            books = listOf(book),
+            today = today,
+            paper = listOf(onPaper(LocalDate.of(2024, 12, 30), pages = 40)),
+        )
+
+        assertEquals(LocalDate.of(2024, 12, 30), stats.since)
+        assertEquals(
+            listOf(YearReading(2024), YearReading(2025), YearReading(2026, durationMs = 45 * 60_000L)),
+            stats.years,
+        )
     }
 
     @Test

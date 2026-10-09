@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -41,6 +42,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -52,6 +54,8 @@ import androidx.compose.ui.window.DialogProperties
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Note
+import dev.gavenda.kozeki.data.model.PhysicalReading
+import dev.gavenda.kozeki.data.model.pagesUnread
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.defaultCurrency
 import dev.gavenda.kozeki.ui.formatDate
@@ -98,10 +102,14 @@ fun NoteDialog(
  * The page reached in a physical copy and how many pages that copy has. The total is optional:
  * without it the page is still kept, only no percentage can be worked out. [onSave] gets a null
  * page when the user stops tracking the physical copy.
+ *
+ * Going back to an earlier page, or stopping, unreads the [readings] on record past it. When there
+ * are any, the user is told so and asked before [onSave] is called.
  */
 @Composable
 fun PhysicalProgressDialog(
     book: Book,
+    readings: List<PhysicalReading>,
     onSave: (page: Int?, pageCount: Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -111,6 +119,9 @@ fun PhysicalProgressDialog(
         mutableStateOf(TextFieldValue(text, TextRange(0, text.length)))
     }
     var pageCount by rememberSaveable { mutableStateOf(book.physicalPageCount?.toString().orEmpty()) }
+    // Going back and stopping both unread pages that are on record, so each asks first.
+    var confirmingRewind by rememberSaveable { mutableStateOf(false) }
+    var confirmingStop by rememberSaveable { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -118,16 +129,20 @@ fun PhysicalProgressDialog(
     val total = pageCount.toIntOrNull()
     val pageCountValid = pageCount.isEmpty() || (total != null && total > 0)
     val pageValid = pageNumber != null && (total == null || pageNumber <= total)
+    // The page as it will be kept: a copy with no count of its own ends where the source says the book does.
+    val target = pageNumber?.coerceAtMost(total ?: book.pageCount?.takeIf { it > 0 } ?: Int.MAX_VALUE)
+    val unreadByPage = if (target != null) pagesUnread(readings, book.physicalPage, target) else 0
+    val unreadByStopping = pagesUnread(readings, book.physicalPage, null)
 
     FormDialog(
         title = stringResource(R.string.physical_dialog_title),
         saveLabel = stringResource(R.string.physical_save),
         saveEnabled = pageValid && pageCountValid,
-        onSave = { onSave(pageNumber, total) },
+        onSave = { if (unreadByPage > 0) confirmingRewind = true else onSave(pageNumber, total) },
         onDismiss = onDismiss,
         removeLabel = stringResource(R.string.physical_stop),
         onRemove = if (book.physicalPage != null) {
-            { onSave(null, total) }
+            { if (unreadByStopping > 0) confirmingStop = true else onSave(null, total) }
         } else {
             null
         },
@@ -153,6 +168,73 @@ fun PhysicalProgressDialog(
             )
         }
     }
+
+    // Shown over the form, so that turning it down leaves what was typed where it was.
+    if (confirmingRewind && target != null) {
+        RewindDialog(
+            page = target,
+            pagesLost = unreadByPage,
+            onConfirm = {
+                confirmingRewind = false
+                onSave(pageNumber, total)
+            },
+            onDismiss = { confirmingRewind = false },
+        )
+    }
+    if (confirmingStop) {
+        RewindDialog(
+            page = null,
+            pagesLost = unreadByStopping,
+            onConfirm = {
+                confirmingStop = false
+                onSave(null, total)
+            },
+            onDismiss = { confirmingStop = false },
+        )
+    }
+}
+
+/**
+ * Asks before a physical copy is taken back to [page], since the [pagesLost] that are on record
+ * past it leave the timeline with it. A null page is for no longer tracking the copy at all.
+ */
+@Composable
+private fun RewindDialog(page: Int?, pagesLost: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        // With an icon the dialog centres its headline, as Material 3 lays out a dialog that has one.
+        icon = { Icon(Icons.Rounded.History, contentDescription = null) },
+        iconContentColor = MaterialTheme.colorScheme.error,
+        title = {
+            Text(
+                if (page != null) {
+                    stringResource(R.string.physical_rewind_title, page)
+                } else {
+                    stringResource(R.string.physical_stop_title)
+                },
+            )
+        },
+        text = {
+            Text(
+                if (page != null) {
+                    pluralStringResource(R.plurals.physical_rewind_message, pagesLost, pagesLost, page)
+                } else {
+                    pluralStringResource(R.plurals.physical_stop_message, pagesLost, pagesLost)
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(
+                    stringResource(if (page != null) R.string.physical_rewind_confirm else R.string.physical_stop),
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
 }
 
 /**
@@ -382,5 +464,24 @@ private fun PurchaseDialogPreview() {
 @PreviewLightDark
 @Composable
 private fun PhysicalProgressDialogPreview() {
-    AppTheme { PhysicalProgressDialog(book = PreviewData.books[5], onSave = { _, _ -> }, onDismiss = {}) }
+    AppTheme {
+        PhysicalProgressDialog(
+            book = PreviewData.books[5],
+            readings = emptyList(),
+            onSave = { _, _ -> },
+            onDismiss = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RewindDialogPreview() {
+    AppTheme { RewindDialog(page = 150, pagesLost = 62, onConfirm = {}, onDismiss = {}) }
+}
+
+@PreviewLightDark
+@Composable
+private fun StopTrackingDialogPreview() {
+    AppTheme { RewindDialog(page = null, pagesLost = 212, onConfirm = {}, onDismiss = {}) }
 }

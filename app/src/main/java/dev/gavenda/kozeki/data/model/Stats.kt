@@ -18,18 +18,40 @@ data class BookReading(
     val endPosition: Int? = null,
     /** Share of the book covered, 0.0 to 1.0. */
     val progressGained: Double = 0.0,
+    /**
+     * Read in a physical copy, which is how a book without an EPUB is told. Nobody timed it, so
+     * there is no duration, and the pages and positions are pages of that copy.
+     */
+    val physical: Boolean = false,
 ) {
     /** Pages per hour, or null when too little was read to say. */
     val pagesPerHour: Double?
         get() = if (durationMs >= 60_000 && pages > 0) pages / (durationMs / 3_600_000.0) else null
 }
 
-data class TimelineEntry(
-    val book: Book,
-    val startedAt: Long,
-    val durationMs: Long,
-    val chapter: String?,
-)
+/** One line of a day's timeline. */
+sealed interface TimelineEntry {
+    val book: Book
+
+    /** When it happened, which is what the timeline is ordered by. */
+    val at: Long
+
+    /** A stretch of reading in the built-in reader, placed at when it started. */
+    data class Session(
+        override val book: Book,
+        override val at: Long,
+        val durationMs: Long,
+        val chapter: String?,
+    ) : TimelineEntry
+
+    /** Pages read in a physical copy, placed at when the page reached was entered. */
+    data class Pages(
+        override val book: Book,
+        override val at: Long,
+        val startPage: Int,
+        val endPage: Int,
+    ) : TimelineEntry
+}
 
 /** A read-through that ended with the book finished. */
 data class CompletedBook(
@@ -66,7 +88,8 @@ data class PeriodStats(
     val books: List<BookReading>,
     val completed: List<CompletedBook>,
 ) {
-    val daysRead: Int get() = days.count { it.durationMs > 0 }
+    /** A day read on paper took no time on record, so its pages are what tell it was read on. */
+    val daysRead: Int get() = days.count { it.durationMs > 0 || it.pages > 0 }
     val goalDaysMet: Int get() = days.count { goalMinutes > 0 && it.durationMs >= goalMinutes * 60_000L }
 }
 
@@ -138,4 +161,6 @@ data class CalendarBook(
     val durationMs: Long,
     /** The book was finished on this day. */
     val completed: Boolean,
+    /** The book was read in a physical copy on this day, which took no time on record. */
+    val onPaper: Boolean = false,
 )

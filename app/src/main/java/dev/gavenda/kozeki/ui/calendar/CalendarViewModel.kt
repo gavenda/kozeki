@@ -26,7 +26,11 @@ data class CalendarUiState(
     val days: Map<LocalDate, CalendarDay> = emptyMap(),
 ) {
     val canGoForward: Boolean get() = month < YearMonth.from(today)
-    val daysRead: Int get() = days.values.count { day -> day.books.any { it.durationMs > 0 } }
+    /**
+     * Every day with a book on it. A book finished without a page entered that day, which is how a
+     * physical copy is often marked, has neither time nor pages to show, and was read all the same.
+     */
+    val daysRead: Int get() = days.values.count { it.books.isNotEmpty() }
     val durationMs: Long get() = days.values.sumOf { day -> day.books.sumOf { it.durationMs } }
 }
 

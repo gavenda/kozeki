@@ -58,10 +58,12 @@
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_empty_message">Import an EPUB to start reading, or find a book online to keep on your wishlist. Kozeki keeps track of your chapter and progress as you go.</string>
     <string name="library_add">Add books</string>
+    <string name="library_scroll_to_top">Back to top</string>
     <string name="library_add_import">Import EPUB</string>
     <string name="library_add_find">Find a book online</string>
     <string name="library_add_manual">Add manually</string>
     <string name="library_owned_no_epub">Owned, no EPUB yet</string>
+    <string name="library_imported_epub">Imported EPUB</string>
     <string name="selection_select">Select</string>
     <plurals name="selection_count">
         <item quantity="one">%1$d selected</item>
@@ -119,6 +121,17 @@
     <string name="physical_page_count">Total pages</string>
     <string name="physical_stop">Stop tracking</string>
     <string name="physical_save">Save page</string>
+    <string name="physical_rewind_title">Go back to page %1$d?</string>
+    <plurals name="physical_rewind_message">
+        <item quantity="one">The %1$d page read after page %2$d will be removed from your timeline. This cannot be undone.</item>
+        <item quantity="other">The %1$d pages read after page %2$d will be removed from your timeline. This cannot be undone.</item>
+    </plurals>
+    <string name="physical_rewind_confirm">Go back</string>
+    <string name="physical_stop_title">Stop tracking this copy?</string>
+    <plurals name="physical_stop_message">
+        <item quantity="one">The %1$d page read in it will be removed from your timeline. This cannot be undone.</item>
+        <item quantity="other">The %1$d pages read in it will be removed from your timeline. This cannot be undone.</item>
+    </plurals>
     <string name="book_about">Synopsis</string>
     <string name="book_no_details">No details yet. Link this book to a metadata source to fill them in.</string>
     <string name="book_view_on_source">View on %1$s</string>
@@ -321,6 +334,10 @@
         <item quantity="one">Read on %1$d day · %2$s</item>
         <item quantity="other">Read on %1$d days · %2$s</item>
     </plurals>
+    <plurals name="calendar_summary_untimed">
+        <item quantity="one">Read on %1$d day</item>
+        <item quantity="other">Read on %1$d days</item>
+    </plurals>
     <string name="calendar_previous_month">Previous month</string>
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_day_description">%1$s: %2$s</string>
@@ -384,6 +401,10 @@
         <item quantity="other">%1$d stars</item>
     </plurals>
     <string name="stats_longest_books">Longest books finished, in pages</string>
+    <string name="stats_longest_physical">Physical books</string>
+    <string name="stats_longest_epub">EPUBs</string>
+    <string name="stats_longest_physical_empty">No physical book with a page count was finished.</string>
+    <string name="stats_longest_epub_empty">No EPUB with a page count was finished.</string>
     <string name="stats_spending">Spent on books</string>
     <string name="stats_since">Since %1$s</string>
     <string name="stats_books_per_year">Books finished per year</string>
