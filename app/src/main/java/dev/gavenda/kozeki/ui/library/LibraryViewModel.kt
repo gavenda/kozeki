@@ -5,6 +5,8 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.files.IncomingEpubs
+import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
@@ -141,6 +143,8 @@ data class LibraryUiState(
     val counts: Map<LibraryFilter, Int> = emptyMap(),
     val totalBooks: Int = 0,
     val importing: Boolean = false,
+    /** The books whose details are being looked up right now. */
+    val matching: Set<String> = emptySet(),
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
     val selection: LibrarySelection = LibrarySelection(),
@@ -159,14 +163,30 @@ sealed interface LibraryEvent {
     data class ImportFinished(val results: List<ImportResult>) : LibraryEvent
 }
 
+/**
+ * The book to open after importing the one file that was opened with the app, which [results] is
+ * the outcome of. That is the book the file is in the library as, whether it was new, completed
+ * an entry that was waiting for it, or was there already.
+ */
+internal fun bookToOpen(results: List<ImportResult>): String? = when (val result = results.singleOrNull()) {
+    is ImportResult.Imported -> result.bookId
+    is ImportResult.Attached -> result.bookId
+    is ImportResult.AlreadyInLibrary -> result.bookId
+    is ImportResult.Failed, null -> null
+}
+
 class LibraryViewModel(
     private val library: LibraryRepository,
     private val settings: SettingsRepository,
+    matchService: MatchService,
+    private val incoming: IncomingEpubs,
     private val scheduleMatching: () -> Unit,
 ) : ViewModel() {
 
     private val chosenFilter = MutableStateFlow(LibraryFilter.ALL)
-    private val importing = MutableStateFlow(false)
+
+    // A count, as an EPUB from another app can arrive while the files of an earlier import are still coming in.
+    private val importsRunning = MutableStateFlow(0)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
@@ -187,11 +207,14 @@ class LibraryViewModel(
 
     private val view = combine(chosenFilter, sort, display, ::Triple)
 
+    private val busy = combine(importsRunning, matchService.matching) { imports, matching -> (imports > 0) to matching }
+
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
     val uiState: StateFlow<LibraryUiState> =
-        combine(books, view, importing, selectedIds, purchaseDefaults) { books, view, busy, selected, defaults ->
+        combine(books, view, busy, selectedIds, purchaseDefaults) { books, view, busy, selected, defaults ->
             val (filter, sort, display) = view
+            val (importing, matching) = busy
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
             val shown = sort.sorted(books.filter(filter::matches))
@@ -203,7 +226,8 @@ class LibraryViewModel(
                 sections = librarySections(filter, shown),
                 counts = counts,
                 totalBooks = books.size,
-                importing = busy,
+                importing = importing,
+                matching = matching,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
@@ -237,10 +261,25 @@ class LibraryViewModel(
         selectedIds.value = emptySet()
     }
 
-    fun import(uris: List<Uri>) {
+    /**
+     * Takes in the EPUBs other apps hand over, for as long as the caller keeps this running. That
+     * is the library on screen, where an import shows. They are not simply watched for here,
+     * since a library further down the back stack has a view model of its own.
+     */
+    suspend fun importIncoming() {
+        incoming.waiting.collect {
+            while (true) {
+                val request = incoming.take() ?: break
+                import(request.uris, open = request.open)
+            }
+        }
+    }
+
+    /** @param open Whether the book is to be opened for reading once its file is in. */
+    fun import(uris: List<Uri>, open: Boolean = false) {
         if (uris.isEmpty()) return
         viewModelScope.launch {
-            importing.value = true
+            importsRunning.update { it + 1 }
             val results = uris.map { uri ->
                 try {
                     library.importEpub(uri)
@@ -250,7 +289,7 @@ class LibraryViewModel(
                     ImportResult.Failed(ImportResult.Failed.Reason.UNREADABLE, null)
                 }
             }
-            importing.value = false
+            importsRunning.update { it - 1 }
 
             val added = results.filter { it is ImportResult.Imported || it is ImportResult.Attached }
             if (added.isNotEmpty()) {
@@ -258,7 +297,9 @@ class LibraryViewModel(
                 // A fresh import is Planned; make sure it is visible rather than filtered away.
                 chosenFilter.value = LibraryFilter.ALL
             }
-            eventChannel.send(LibraryEvent.ImportFinished(results))
+            val toOpen = if (open) bookToOpen(results) else null
+            // A book that opens needs no message that it is in. Anything else gets one, a failure with its reason.
+            if (toOpen != null) incoming.open(toOpen) else eventChannel.send(LibraryEvent.ImportFinished(results))
         }
     }
 

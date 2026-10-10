@@ -34,6 +34,7 @@ import androidx.navigation.toRoute
 import dev.gavenda.kozeki.ui.addbook.AddBookScreen
 import dev.gavenda.kozeki.ui.addbook.BookFormScreen
 import dev.gavenda.kozeki.ui.author.AuthorScreen
+import dev.gavenda.kozeki.data.files.IncomingEpubs
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.ui.book.BookDetailScreen
 import dev.gavenda.kozeki.ui.book.FoundBookScreen
@@ -56,11 +57,13 @@ import dev.gavenda.kozeki.ui.settings.SettingsScreen
 import dev.gavenda.kozeki.ui.statistics.StatisticsScreen
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.LocalDate
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 /** The whole app: the navigation frame around a graph of screens. */
 @Composable
-fun KozekiApp() {
+fun KozekiApp(incomingEpubs: IncomingEpubs) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
@@ -78,6 +81,22 @@ fun KozekiApp() {
     }
     fun NavBackStackEntry.back() {
         if (isResumed) navController.popBackStack()
+    }
+
+    // EPUBs another app hands over are taken in by the library, so it is brought back whatever
+    // was showing. One that was opened rather than shared is then read, over its own page as if
+    // it had been picked there.
+    LaunchedEffect(navController, incomingEpubs) {
+        // Nothing can be navigated before the graph is up, which the first entry tells.
+        navController.currentBackStackEntryFlow.first()
+        launch {
+            incomingEpubs.waiting.collect { if (it.isNotEmpty()) navController.backToLibrary() }
+        }
+        incomingEpubs.toOpen.collect { bookId ->
+            navController.backToLibrary()
+            navController.navigate(BookRoute(bookId))
+            navController.navigate(ReaderRoute(bookId))
+        }
     }
 
     KozekiNavigationScaffold(current = topLevel, onSelect = navController::navigateToTopLevel) {
@@ -246,6 +265,11 @@ fun KozekiNavigationScaffold(
  */
 private fun NavController.navigateToTopLevel(destination: TopLevelDestination) {
     navigate(destination.route) { launchSingleTop = true }
+}
+
+/** Closes whatever was opened since the library was last showing. */
+private fun NavController.backToLibrary() {
+    popBackStack<LibraryRoute>(inclusive = false)
 }
 
 @ScreenPreviews

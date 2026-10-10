@@ -1,7 +1,9 @@
 package dev.gavenda.kozeki
 
 import android.app.UiModeManager
+import android.content.ContentResolver
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +12,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.gavenda.kozeki.data.files.IncomingEpubs
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.settings.SettingsRepository
@@ -22,13 +25,14 @@ class MainActivity : ComponentActivity() {
 
     private val hardcoverAuth: HardcoverAuth by inject()
     private val hardcoverSignIn: HardcoverSignIn by inject()
+    private val incomingEpubs: IncomingEpubs by inject()
     private val settings: SettingsRepository by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Only a fresh launch can be a redirect; a recreated activity would replay the old intent.
-        if (savedInstanceState == null) handleRedirect(intent)
+        // Only a fresh launch brings something new; a recreated activity would replay the old intent.
+        if (savedInstanceState == null) handleIntent(intent)
         setContent {
             // Nothing is drawn until the stored choice is read, so the other palette never flashes.
             val dynamicColor by settings.dynamicColor.collectAsStateWithLifecycle(initialValue = null)
@@ -42,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge()
             }
             AppTheme(dynamicColor = dynamicColor ?: return@setContent) {
-                KozekiApp()
+                KozekiApp(incomingEpubs)
             }
         }
     }
@@ -63,7 +67,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
         handleRedirect(intent)
+        receiveEpubs(intent)
     }
 
     /** Hardcover sends the browser back here once the user has approved or denied the sign-in. */
@@ -72,5 +81,28 @@ class MainActivity : ComponentActivity() {
         if (intent.action == Intent.ACTION_VIEW && hardcoverAuth.isRedirect(uri)) {
             hardcoverSignIn.complete(uri)
         }
+    }
+
+    /**
+     * Another app opened an EPUB with Kozeki, or shared some to it. One that was opened is there
+     * to be read, while sharing only adds to the library.
+     */
+    private fun receiveEpubs(intent: Intent?) {
+        intent ?: return
+        // Coming back through the recents screen can start the app with the intent it was first
+        // started with, long after those files were taken in and the permission to read them ended.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val request = when (intent.action) {
+            // Anything else the app is opened with is a link, such as the redirect above.
+            Intent.ACTION_VIEW -> intent.data?.takeIf { it.scheme == ContentResolver.SCHEME_CONTENT }
+                ?.let { IncomingEpubs.Request(listOf(it), open = true) }
+            Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                ?.let { IncomingEpubs.Request(listOf(it), open = false) }
+            Intent.ACTION_SEND_MULTIPLE -> intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { IncomingEpubs.Request(it, open = false) }
+            else -> null
+        }
+        request?.let(incomingEpubs::add)
     }
 }

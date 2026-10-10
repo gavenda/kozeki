@@ -69,6 +69,8 @@ data class BookDetailUiState(
     /** What is on record of reading the physical copy, which going back to an earlier page takes from. */
     val physicalReadings: List<PhysicalReading> = emptyList(),
     val match: MatchUiState = MatchUiState(),
+    /** Whether the book's details are being looked up right now, by the lookup that runs by itself. */
+    val matching: Boolean = false,
     /** Null while the book is not linked to a source that has reviews, which leaves nothing to ask for. */
     val reviews: ReviewsUiState? = null,
     val importing: Boolean = false,
@@ -135,10 +137,10 @@ class BookDetailViewModel(
         combine(
             bookData,
             combine(match, reviews, ::Pair),
-            importing,
+            combine(importing, matchService.matching.map { bookId in it }, ::Pair),
             settings.lastCurrency,
             library.observePurchaseLocations(),
-        ) { data, (matchState, reviewsState), busy, currency, locations ->
+        ) { data, (matchState, reviewsState), (busy, matching), currency, locations ->
             BookDetailUiState(
                 loading = false,
                 book = data.book,
@@ -147,6 +149,7 @@ class BookDetailViewModel(
                 readingTimeMs = data.readingTimeMs,
                 physicalReadings = data.physicalReadings,
                 match = matchState,
+                matching = matching,
                 reviews = reviewsState,
                 importing = busy,
                 lastCurrency = currency,

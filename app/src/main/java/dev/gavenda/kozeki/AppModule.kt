@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.epub.Readium
 import dev.gavenda.kozeki.data.files.BookStorage
+import dev.gavenda.kozeki.data.files.IncomingEpubs
 import dev.gavenda.kozeki.data.metadata.CoverDownloader
 import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -58,6 +59,8 @@ val appModule = module {
 
     single { BookStorage(androidContext()) }
 
+    single { IncomingEpubs() }
+
     single { Readium(androidApplication()) }
 
     single {
@@ -104,7 +107,7 @@ val appModule = module {
 
     single { MatchService(get(), get()) }
 
-    viewModel { LibraryViewModel(get(), get(), scheduleMatching()) }
+    viewModel { LibraryViewModel(get(), get(), get(), get(), scheduleMatching()) }
 
     viewModel { AddBookViewModel(get(), get(), get()) }
 

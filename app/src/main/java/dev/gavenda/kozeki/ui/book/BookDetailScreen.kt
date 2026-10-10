@@ -419,7 +419,7 @@ fun BookDetailContent(
                     }
                 }
                 matchNotice(book)?.let { notice ->
-                    item(key = "match") { MatchNoticeCard(notice, actions) }
+                    item(key = "match") { MatchNoticeCard(notice, state.matching, actions) }
                 }
                 item(key = "about") { AboutSection(book) }
                 if (owned) {
@@ -800,23 +800,30 @@ private fun matchNotice(book: Book): MatchNotice? = when (book.matchStatus) {
 }
 
 @Composable
-private fun MatchNoticeCard(notice: MatchNotice, actions: BookDetailActions) {
+private fun MatchNoticeCard(notice: MatchNotice, matching: Boolean, actions: BookDetailActions) {
+    // Only a book still waiting is looked up by itself, so only its notice has a lookup to show.
+    val lookingUp = matching && notice == MatchNotice.PENDING
     OutlinedCard {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = stringResource(
-                    when (notice) {
-                        MatchNotice.PENDING -> R.string.match_pending_title
-                        MatchNotice.NEEDS_REVIEW -> R.string.match_review_title
-                        MatchNotice.NOT_FOUND -> R.string.match_not_found_title
-                    },
-                ),
-                style = MaterialTheme.typography.titleMediumEmphasized,
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (lookingUp) LoadingIndicator(Modifier.size(24.dp))
+                Text(
+                    text = stringResource(
+                        when (notice) {
+                            MatchNotice.PENDING ->
+                                if (lookingUp) R.string.match_in_progress_title else R.string.match_pending_title
+                            MatchNotice.NEEDS_REVIEW -> R.string.match_review_title
+                            MatchNotice.NOT_FOUND -> R.string.match_not_found_title
+                        },
+                    ),
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                )
+            }
             MutedText(
                 stringResource(
                     when (notice) {
-                        MatchNotice.PENDING -> R.string.match_pending_message
+                        MatchNotice.PENDING ->
+                            if (lookingUp) R.string.match_in_progress_message else R.string.match_pending_message
                         MatchNotice.NEEDS_REVIEW -> R.string.match_review_message
                         MatchNotice.NOT_FOUND -> R.string.match_not_found_message
                     },

@@ -77,6 +77,7 @@
 
     <!-- Import -->
     <string name="import_epub">Import</string>
+    <string name="share_import_epub">Import EPUB</string>
     <string name="importing">Importing…</string>
     <string name="import_done">Imported “%1$s”</string>
     <string name="import_attached">Added the EPUB to “%1$s”</string>
@@ -210,6 +211,8 @@
     <string name="match_search">Search</string>
     <string name="match_pending_title">Details not looked up yet</string>
     <string name="match_pending_message">Kozeki will look this book up when it is online and signed in to Hardcover. Until then, it uses what the EPUB says about itself.</string>
+    <string name="match_in_progress_title">Looking up details…</string>
+    <string name="match_in_progress_message">Kozeki is finding this book on Hardcover. Until it has, it uses what the EPUB says about itself.</string>
     <string name="match_review_title">Confirm the match</string>
     <string name="match_review_message">Several books could be this one. Pick the right one to fill in its details.</string>
     <string name="match_not_found_title">No match found</string>

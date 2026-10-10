@@ -48,6 +48,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import org.readium.r2.shared.util.use
 
@@ -65,6 +67,7 @@ class LibraryRepository(
     private val sessions = db.readingSessionDao()
     private val physicalReadings = db.physicalReadingDao()
     private val notes = db.noteDao()
+    private val importLock = Mutex()
 
     init {
         appScope.launch {
@@ -128,7 +131,12 @@ class LibraryRepository(
      * @param attachTo A book the user explicitly picked to receive the file. Without it, a wishlist
      *   or purchased entry for the same book is found automatically.
      */
-    suspend fun importEpub(uri: Uri, attachTo: String? = null): ImportResult {
+    suspend fun importEpub(uri: Uri, attachTo: String? = null): ImportResult =
+        // One at a time. Of two imports of the same file under way at once, as when it is opened
+        // with the app twice in a row, neither would find the other's book and both would add one.
+        importLock.withLock { importOne(uri, attachTo) }
+
+    private suspend fun importOne(uri: Uri, attachTo: String?): ImportResult {
         val staged = try {
             storage.copyToStaging(uri)
         } catch (e: CancellationException) {

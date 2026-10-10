@@ -18,6 +18,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
@@ -106,6 +107,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -178,6 +180,8 @@ fun LibraryScreen(
             }
         }
     }
+    // EPUBs opened with the app or shared to it come in here, where the import and its outcome show.
+    LaunchedEffect(viewModel) { viewModel.importIncoming() }
 
     LibraryContent(
         state = state,
@@ -409,6 +413,7 @@ fun LibraryContent(
                                 if (list) {
                                     LibraryBookRow(
                                         book = book,
+                                        matching = book.id in state.matching,
                                         selecting = state.selecting,
                                         selected = book.id in selection.ids,
                                         actions = selectionActions,
@@ -419,6 +424,7 @@ fun LibraryContent(
                                 } else {
                                     LibraryBookItem(
                                         book = book,
+                                        matching = book.id in state.matching,
                                         selecting = state.selecting,
                                         selected = book.id in selection.ids,
                                         actions = selectionActions,
@@ -715,6 +721,7 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LibraryBookItem(
     book: Book,
+    matching: Boolean,
     selecting: Boolean,
     selected: Boolean,
     actions: SelectionActions,
@@ -742,6 +749,7 @@ private fun LibraryBookItem(
     ) {
         Box(Modifier.padding(inset)) {
             BookCover(book, Modifier.fillMaxWidth())
+            if (matching) MatchingOverlay(MaterialTheme.shapes.medium, Modifier.matchParentSize())
             if (selected) {
                 Surface(
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
@@ -830,6 +838,7 @@ private fun LibraryBookItem(
 @Composable
 private fun LibraryBookRow(
     book: Book,
+    matching: Boolean,
     selecting: Boolean,
     selected: Boolean,
     actions: SelectionActions,
@@ -858,6 +867,9 @@ private fun LibraryBookRow(
     ) {
         Box {
             BookCover(book, Modifier.width(56.dp), MaterialTheme.shapes.small, showTitleOnPlaceholder = false)
+            if (matching) {
+                MatchingOverlay(MaterialTheme.shapes.small, Modifier.matchParentSize(), indicatorSize = 32.dp)
+            }
             if (selected) {
                 Surface(
                     modifier = Modifier.align(Alignment.Center),
@@ -935,6 +947,21 @@ private fun LibraryBookRow(
 private fun statusLine(book: Book): String = when (book.state) {
     ReadingState.READING -> formatPercent(book.overallProgression)
     else -> stringResource(book.state.labelRes)
+}
+
+/** Dims a cover and turns over it while the book's details are being looked up. */
+@Composable
+private fun MatchingOverlay(shape: Shape, modifier: Modifier = Modifier, indicatorSize: Dp = 48.dp) {
+    val description = stringResource(R.string.match_in_progress_title)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        LoadingIndicator(Modifier.size(indicatorSize), color = MaterialTheme.colorScheme.inversePrimary)
+    }
 }
 
 @Composable

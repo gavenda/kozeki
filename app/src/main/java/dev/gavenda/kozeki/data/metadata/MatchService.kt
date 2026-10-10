@@ -4,6 +4,10 @@ import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /** Maps imported EPUBs to records in the metadata source. */
 class MatchService(
@@ -12,6 +16,14 @@ class MatchService(
 ) {
     /** Where books are matched by themselves. The source the user picks is for their own searches alone. */
     private val source = MetadataSource.HARDCOVER
+
+    private val lookingUp = MutableStateFlow<Set<String>>(emptySet())
+
+    /**
+     * The books a lookup is under way for right now: the one being asked about and the ones in
+     * line behind it. A book that is merely waiting, for a connection say, is not among them.
+     */
+    val matching: StateFlow<Set<String>> = lookingUp.asStateFlow()
 
     enum class Outcome {
         MATCHED,
@@ -85,13 +97,22 @@ class MatchService(
      */
     suspend fun matchPending(): Boolean {
         var retry = false
-        for (book in library.pendingMatches()) {
-            when (match(book.id)) {
-                Outcome.RETRY -> retry = true
-                // No point hammering a source that cannot answer; the rest would fail the same way.
-                Outcome.UNAVAILABLE -> return retry
-                else -> Unit
+        val pending = library.pendingMatches().map { it.id }
+        lookingUp.update { it + pending }
+        try {
+            for (bookId in pending) {
+                val outcome = match(bookId)
+                lookingUp.update { it - bookId }
+                when (outcome) {
+                    Outcome.RETRY -> retry = true
+                    // No point hammering a source that cannot answer; the rest would fail the same way.
+                    Outcome.UNAVAILABLE -> return retry
+                    else -> Unit
+                }
             }
+        } finally {
+            // Also when the run is cut short, so nothing is left looking busy with no lookup behind it.
+            lookingUp.update { it - pending.toSet() }
         }
         library.downloadMissingCovers()
         return linkAuthors() || retry

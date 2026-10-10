@@ -37,6 +37,52 @@
                     android:path="${hardcoverRedirectPath}"
                     android:scheme="${hardcoverRedirectScheme}" />
             </intent-filter>
+
+            <!-- Opening an EPUB from another app, such as a file manager or a browser's downloads. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="application/epub+zip" />
+            </intent-filter>
+
+            <!--
+               Some apps hand an EPUB over as generic binary data, or as some other type they took
+               it for. Its name then tells what it is. The path is only looked at when a host is
+               given, which is all the wildcard is for.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:pathSuffix=".epub" />
+                <data android:pathSuffix=".EPUB" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+
+            <!-- The same for one handed over with no type at all, which a filter that names types leaves out. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:pathSuffix=".epub" />
+                <data android:pathSuffix=".EPUB" />
+            </intent-filter>
+
+            <!--
+               Sharing EPUBs to the app, which adds them to the library. The label is what the
+               share sheet shows under the app's name. A shared file has no name to go by, so the
+               generic binary type is taken as well, as it is when picking a file to import.
+            -->
+            <intent-filter android:label="@string/share_import_epub">
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/epub+zip" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
         </activity>
 
     </application>
