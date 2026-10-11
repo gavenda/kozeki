@@ -37,6 +37,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilledTonalToggleButtonDefaults
@@ -474,16 +475,17 @@ private val ThemeMode.icon: Int
 private fun DailyGoalSetting(minutes: Int, onSet: (Int) -> Unit) {
     // The slider moves freely; the setting is only written when the finger lifts.
     var dragged by remember(minutes) { mutableFloatStateOf(minutes.toFloat()) }
+    val sliderState = remember { SliderState(dragged, trackRange = MIN_DAILY_GOAL.toFloat()..MAX_DAILY_GOAL.toFloat()) }
+    sliderState.value = dragged
     SettingRow(
         icon = painterResource(R.drawable.timer_fill_48px),
         title = stringResource(R.string.settings_daily_goal),
         subtitle = stringResource(R.string.settings_daily_goal_value, dragged.roundToInt()),
     )
     Slider(
-        value = dragged,
+        state = sliderState,
         onValueChange = { dragged = (it / DAILY_GOAL_STEP).roundToInt() * DAILY_GOAL_STEP.toFloat() },
         onValueChangeFinished = { onSet(dragged.roundToInt()) },
-        valueRange = MIN_DAILY_GOAL.toFloat()..MAX_DAILY_GOAL.toFloat(),
         modifier = Modifier.padding(horizontal = 20.dp),
     )
 }

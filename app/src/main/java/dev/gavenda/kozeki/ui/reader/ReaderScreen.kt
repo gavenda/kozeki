@@ -30,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -445,6 +446,8 @@ private fun ReaderControls(
             // While dragging, the thumb follows the finger rather than the page actually shown.
             var dragged by remember { mutableStateOf<Float?>(null) }
             val shown = dragged ?: (progress.position ?: 1).toFloat()
+            val sliderState = remember(positionCount) { SliderState(shown, trackRange = 1f..positionCount.toFloat()) }
+            sliderState.value = shown
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -458,13 +461,12 @@ private fun ReaderControls(
                 ) {
                     Text(shown.roundToInt().toString(), style = MaterialTheme.typography.labelLarge)
                     Slider(
-                        value = shown,
+                        state = sliderState,
                         onValueChange = { dragged = it },
                         onValueChangeFinished = {
                             dragged?.let { onSeek(it.roundToInt()) }
                             dragged = null
                         },
-                        valueRange = 1f..positionCount.toFloat(),
                         modifier = Modifier.weight(1f),
                     )
                     Text(positionCount.toString(), style = MaterialTheme.typography.labelLarge)
