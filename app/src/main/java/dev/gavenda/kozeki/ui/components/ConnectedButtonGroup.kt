@@ -20,7 +20,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -38,7 +38,7 @@ private val LabelSidePadding = 4.dp
 
 /**
  * A single-choice row of connected toggle buttons, the Material 3 Expressive replacement for
- * segmented buttons. Options share the width equally. [icons], when given, has one per option.
+ * segmented buttons. Options share the width equally. [icons], when given, has one drawable per option.
  */
 @Composable
 fun ConnectedButtonGroup(
@@ -47,7 +47,7 @@ fun ConnectedButtonGroup(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     colors: ToggleButtonColors = ToggleButtonDefaults.colors(),
-    icons: List<ImageVector>? = null,
+    icons: List<Int>? = null,
 ) {
     val defaultPadding = ToggleButtonDefaults.contentPaddingFor(ToggleButtonDefaults.size)
     val contentPadding = PaddingValues(
@@ -76,7 +76,7 @@ fun ConnectedButtonGroup(
                 contentPadding = contentPadding,
             ) {
                 if (icons != null) {
-                    Icon(icons[index], contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
+                    Icon(painterResource(icons[index]), contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
                     Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
                 }
                 Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)

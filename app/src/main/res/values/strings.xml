@@ -52,17 +52,18 @@
     <string name="display_as_covers">Show as covers</string>
     <string name="sort_recent">Recently read</string>
     <string name="sort_title">Title</string>
+    <string name="sort_author">Author</string>
     <string name="sort_date_added">Date added</string>
     <string name="sort_rating">My rating</string>
     <string name="library_favorites">Favorites</string>
-    <string name="library_empty_title">Your library is empty</string>
-    <string name="library_empty_message">Import an EPUB to start reading, or find a book online to keep on your wishlist. Kozeki keeps track of your chapter and progress as you go.</string>
+    <string name="library_empty_title">The shelves are empty</string>
+    <string name="library_empty_message">W-Welcome. Hand me an EPUB to start reading, or ask for a book and I\'ll put it on your wishlist. I\'ll keep your place from there.</string>
     <string name="library_add">Add books</string>
     <string name="library_scroll_to_top">Back to top</string>
     <string name="library_add_import">Import EPUB</string>
     <string name="library_add_find">Find a book online</string>
     <string name="library_add_manual">Add manually</string>
-    <string name="library_owned_no_epub">Owned, no EPUB yet</string>
+    <string name="library_owned">Owned</string>
     <string name="library_imported_epub">Imported EPUB</string>
     <string name="selection_select">Select</string>
     <plurals name="selection_count">
@@ -72,12 +73,12 @@
     <string name="selection_clear">Clear selection</string>
     <string name="selection_select_all">Select all</string>
     <string name="selection_change_state">Change reading state</string>
-    <string name="library_filter_empty_title">Nothing here</string>
-    <string name="library_filter_empty_message">No books match this filter. Pick another one above.</string>
+    <string name="library_filter_empty_title">Nothing on this shelf</string>
+    <string name="library_filter_empty_message">I have nothing filed under this one. Try another above.</string>
 
     <!-- Import -->
     <string name="import_epub">Import</string>
-    <string name="share_import_epub">Import EPUB</string>
+    <string name="share_import_epub">Import</string>
     <string name="importing">Importing…</string>
     <string name="import_done">Imported “%1$s”</string>
     <string name="import_attached">Added the EPUB to “%1$s”</string>
@@ -102,7 +103,7 @@
     <string name="book_mark_as">Mark as %1$s</string>
     <string name="book_not_found">This book is no longer in Kozeki.</string>
     <string name="book_file_missing">EPUB not on this device</string>
-    <string name="book_file_missing_message">The EPUB for this book is not on this device. Import it again to keep reading; your progress is kept.</string>
+    <string name="book_file_missing_message">Ui cannot find this book\'s EPUB on this device. Add it again to keep reading; your progress is kept.</string>
     <string name="book_start">Start reading</string>
     <string name="book_continue">Continue reading</string>
     <string name="book_open">Open</string>
@@ -113,9 +114,9 @@
     <string name="book_page">Page</string>
     <string name="book_time_read">Time read</string>
     <string name="progress_epub">EPUB</string>
-    <string name="progress_physical">Physical book</string>
-    <string name="physical_prompt">Reading a physical copy? Keep track of the page you are on.</string>
-    <string name="physical_set">Set page</string>
+    <string name="progress_physical">Physical</string>
+    <string name="physical_prompt">Reading a physical copy? Tell Ui the page you are on, so no corner needs folding.</string>
+    <string name="physical_track">Track progress</string>
     <string name="physical_update">Update page</string>
     <string name="physical_dialog_title">Physical book progress</string>
     <string name="physical_page">Current page</string>
@@ -134,7 +135,7 @@
         <item quantity="other">The %1$d pages read in it will be removed from your timeline. This cannot be undone.</item>
     </plurals>
     <string name="book_about">Synopsis</string>
-    <string name="book_no_details">No details yet. Link this book to a metadata source to fill them in.</string>
+    <string name="book_no_details">No details yet. Have Ui look this book up in the catalogue to fill them in.</string>
     <string name="book_view_on_source">View on %1$s</string>
     <string name="detail_publisher">Publisher</string>
     <string name="detail_published">Published</string>
@@ -178,6 +179,7 @@
     <string name="purchase_currency">Currency</string>
     <string name="purchase_date">Bought on</string>
     <string name="purchase_location">Bought at</string>
+    <string name="purchase_memo">Memo</string>
     <string name="purchase_bought_on">Bought on %1$s</string>
     <string name="purchase_no_price">No price recorded</string>
 
@@ -204,25 +206,25 @@
     <string name="source_hardcover">Hardcover</string>
     <string name="source_google_books">Google Books</string>
     <string name="attribution_google">Powered by Google</string>
-    <string name="match_find">Find metadata match</string>
-    <string name="match_unlink">Unlink from source</string>
+    <string name="match_find">Look up in the catalogue</string>
+    <string name="match_unlink">Unlink from the catalogue</string>
     <string name="match_sheet_title">Choose the matching book</string>
     <string name="match_choose">Choose match</string>
     <string name="match_search">Search</string>
     <string name="match_pending_title">Details not looked up yet</string>
-    <string name="match_pending_message">Kozeki will look this book up when it is online and signed in to Hardcover. Until then, it uses what the EPUB says about itself.</string>
+    <string name="match_pending_message">Ui will look this book up once you are online and signed in to Hardcover. Until then, the book goes by what the EPUB says about itself.</string>
     <string name="match_in_progress_title">Looking up details…</string>
-    <string name="match_in_progress_message">Kozeki is finding this book on Hardcover. Until it has, it uses what the EPUB says about itself.</string>
+    <string name="match_in_progress_message">Ui is finding this book on Hardcover. Until then, the book goes by what the EPUB says about itself.</string>
     <string name="match_review_title">Confirm the match</string>
     <string name="match_review_message">Several books could be this one. Pick the right one to fill in its details.</string>
     <string name="match_not_found_title">No match found</string>
-    <string name="match_not_found_message">The metadata source has no book with this title and author. You can search with different words.</string>
+    <string name="match_not_found_message">The catalogue has no book with this title and author. You can search with different words.</string>
     <string name="search_hint">Title, author or ISBN</string>
     <string name="search_no_results">No books found.</string>
-    <string name="lookup_error_offline">You appear to be offline. Results you looked up before are still available.</string>
-    <string name="lookup_error_rate_limited">The metadata source\'s request limit has been reached. Try again later.</string>
-    <string name="lookup_error_signed_out">Sign in to this metadata source in Settings first.</string>
-    <string name="lookup_error_unauthorized">The metadata source rejected the request. Sign in again in Settings.</string>
+    <string name="lookup_error_offline">The catalogue cannot be reached while you are offline. What was looked up before is still here.</string>
+    <string name="lookup_error_rate_limited">The catalogue\'s request limit has been reached. Try again later.</string>
+    <string name="lookup_error_signed_out">Sign in to this catalogue in Settings first.</string>
+    <string name="lookup_error_unauthorized">The catalogue rejected the request. Sign in again in Settings.</string>
     <string name="lookup_error_not_configured">Google Books needs an API key, and this build of Kozeki was made without one.</string>
     <string name="lookup_error_key_rejected">Google Books refused the API key this build of Kozeki was made with.</string>
     <string name="lookup_error_missing_permission">Kozeki has not been given access to this yet. Sign out of Hardcover in Settings and sign in again to allow it.</string>
@@ -278,8 +280,9 @@
     <string name="reader_footer_position">%1$d / %2$d · %3$s</string>
     <string name="reader_completed">Marked as completed</string>
     <string name="reader_failed_title">Cannot open this book</string>
+    <string name="reader_failed_file_missing">I can\'t find this book\'s EPUB on this device. Add it again to keep reading; your progress is kept.</string>
     <string name="reader_failed_unsupported">This EPUB uses a layout the reader does not support.</string>
-    <string name="reader_failed_unreadable">The EPUB could not be opened. It may be damaged.</string>
+    <string name="reader_failed_unreadable">Wh-What happened to this one? I can\'t make it out. The EPUB may be damaged.</string>
 
     <!-- Wishlist and purchased -->
     <string name="wishlist_mark_purchased">Mark as purchased</string>
@@ -289,17 +292,19 @@
 
     <!-- Search -->
     <string name="search_books_hint">Search your books</string>
-    <string name="search_books_prompt">Find a book in your library, on your wishlist or among your purchases by its title or author.</string>
-    <string name="search_books_no_results">Nothing in your library, wishlist or purchases matches “%1$s”.</string>
+    <string name="search_books_prompt">Which one are you after? Give me a title or an author and I\'ll look through your library, wishlist and purchases.</string>
+    <string name="search_books_no_results_title">Not on your shelves</string>
+    <string name="search_books_no_results">I looked through your library, wishlist and purchases. Nothing matches “%1$s”.</string>
     <string name="search_clear">Clear search</string>
     <string name="search_group_count">%1$s · %2$d</string>
 
     <!-- Add book -->
     <string name="add_book_title">Add book</string>
-    <string name="add_book_prompt_title">Find a book</string>
-    <string name="add_book_prompt_message">Search by title, author or ISBN. Results are kept on this device, so repeating a search costs nothing.</string>
-    <string name="add_book_no_results_message">Try fewer or different words, or the ISBN.</string>
-    <string name="add_book_error_title">Search unavailable</string>
+    <string name="add_book_prompt_title">Ask for a book</string>
+    <string name="add_book_prompt_message">Was there something you needed? Give me a title, an author or an ISBN and I\'ll look it up. I keep what I find on this device, so asking twice costs nothing.</string>
+    <string name="add_book_no_results_title">Not in the catalogue</string>
+    <string name="add_book_no_results_message">I couldn\'t find it… Try fewer or different words, or the ISBN.</string>
+    <string name="add_book_error_title">S-Sorry. I can\'t search right now.</string>
     <string name="add_book_to_wishlist">I want this</string>
     <string name="add_book_as_purchased">I own this</string>
     <string name="manual_book_title">Add manually</string>
@@ -321,17 +326,18 @@
     <string name="cover_remove">Remove cover photo</string>
     <string name="cover_failed">That picture could not be used as a cover</string>
 
-    <string name="author_error_title">Author unavailable</string>
-    <string name="author_not_found">Hardcover has no page for this author any more.</string>
+    <string name="author_error_title">S-Sorry. I can\'t fetch this author right now.</string>
+    <string name="author_not_found_title">Author unavailable</string>
+    <string name="author_not_found">Huh…? Hardcover has no page for this author any more.</string>
     <string name="author_no_books_title">No books listed</string>
-    <string name="author_no_books_message">Hardcover lists no books written by this author.</string>
+    <string name="author_no_books_message">I found no books by this author on Hardcover.</string>
     <string name="author_books">Books</string>
     <string name="author_years">%1$d–%2$d</string>
     <string name="author_born">Born %1$d</string>
     <string name="author_photo">Photo of %1$s</string>
 
     <!-- Calendar -->
-    <string name="calendar_title">Book calendar</string>
+    <string name="calendar_title">Book Calendar</string>
     <string name="calendar_nothing_read">Nothing read this month</string>
     <plurals name="calendar_summary">
         <item quantity="one">Read on %1$d day · %2$s</item>
@@ -367,8 +373,8 @@
     <string name="stats_goal_reached">Goal reached</string>
     <string name="stats_time_per_day">Reading time per day</string>
     <string name="stats_day_description">%1$s, %2$s</string>
-    <string name="stats_day_empty_title">Nothing read</string>
-    <string name="stats_day_empty_message">No reading was recorded on this day.</string>
+    <string name="stats_day_empty_title">A quiet day</string>
+    <string name="stats_day_empty_message">Nothing was read, so Ui got some sleep.</string>
     <string name="stats_page_span">p. %1$d – %2$d</string>
     <plurals name="stats_pages_gained">
         <item quantity="one">+%1$d page (%2$d%%)</item>
@@ -412,12 +418,12 @@
     <string name="stats_since">Since %1$s</string>
     <string name="stats_books_per_year">Books finished per year</string>
     <string name="stats_time_per_year">Reading time per year</string>
-    <string name="stats_all_time_empty_title">Nothing read yet</string>
-    <string name="stats_all_time_empty_message">Reading time, pages and finished books add up here as you go.</string>
+    <string name="stats_all_time_empty_title">The guest book is empty</string>
+    <string name="stats_all_time_empty_message">I\'ll write an entry every time you read: your time, your pages, the books you finish.</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_source_title">Metadata</string>
+    <string name="settings_source_title">Catalogue</string>
     <string name="settings_hardcover_signed_out">Tap to sign in with your Hardcover account</string>
     <string name="settings_hardcover_signed_in">Signed in</string>
     <string name="settings_hardcover_signed_in_as">Signed in as %1$s</string>
@@ -428,11 +434,11 @@
     <string name="settings_hardcover_denied">Access was declined on Hardcover, so nothing was connected.</string>
     <string name="settings_hardcover_rejected">Hardcover did not accept the sign-in. Contact the developer.</string>
     <string name="settings_appearance_title">Appearance</string>
+    <string name="settings_display_mode">Display mode</string>
+    <string name="settings_display_mode_description">Change how the application looks</string>
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="settings_dynamic_color">Wallpaper colors</string>
-    <string name="settings_dynamic_color_description">Match system wallpaper colors</string>
     <string name="settings_goals_title">Goals</string>
     <string name="settings_daily_goal">Daily reading goal</string>
     <string name="settings_daily_goal_value">%1$d min</string>
@@ -440,14 +446,54 @@
     <string name="settings_goal_not_set">Not set</string>
     <string name="settings_goal_decrease">One fewer</string>
     <string name="settings_goal_increase">One more</string>
-    <string name="settings_cache_title">Lookup cache</string>
-    <string name="settings_cache_description">Cached search results</string>
+    <string name="settings_backup_title">Backup</string>
+    <string name="settings_drive">Google Drive</string>
+    <string name="settings_drive_signed_out">Tap to sign in and keep a copy of your library there</string>
+    <string name="settings_drive_sign_in">Sign in</string>
+    <string name="settings_drive_sign_out">Sign out</string>
+    <string name="settings_drive_sign_out_title">Sign out of Google Drive?</string>
+    <string name="settings_drive_sign_out_message">Backing up from this device stops until you sign in again. The backup already on Google Drive stays there.</string>
+    <string name="settings_backup_none">No backup yet</string>
+    <string name="settings_backup_latest">Backed up %1$s</string>
+    <string name="settings_backup_unknown_device">another device</string>
+    <string name="settings_backup_contents">Your library, reading history, notes and goals. EPUBs and cover photos you chose stay on this device.</string>
+    <string name="settings_backup_working">Backing up…</string>
+    <string name="settings_backup_fetching">Getting the backup…</string>
+    <string name="settings_backup_restoring">Restoring…</string>
+    <string name="settings_backup_now">Back up now</string>
+    <string name="settings_backup_restore">Restore</string>
+    <string name="settings_backup_replace_title">Replace the backup?</string>
+    <string name="settings_backup_replace_message">Google Drive already holds a backup this device has not seen: %1$s, made %2$s on %3$s. Backing up now replaces it with what is here.</string>
+    <string name="settings_backup_replace_confirm">Replace</string>
+    <string name="settings_backup_restore_title">Restore this backup?</string>
+    <string name="settings_backup_restore_message">The backup made %1$s on %2$s holds %3$s with their notes and reading history. It replaces everything in your library on this device.</string>
+    <plurals name="settings_backup_restore_removed">
+        <item quantity="one">%1$d book here is not in the backup and will be removed, its EPUB with it.</item>
+        <item quantity="other">%1$d books here are not in the backup and will be removed, their EPUBs with them.</item>
+    </plurals>
+    <plurals name="settings_backup_restore_without_file">
+        <item quantity="one">%1$d book will be without its EPUB until it is imported again.</item>
+        <item quantity="other">%1$d books will be without their EPUBs until those are imported again.</item>
+    </plurals>
+    <string name="settings_backup_restored">Restored %1$s.</string>
+    <plurals name="settings_backup_restored_without_file">
+        <item quantity="one">%1$d of them is without its EPUB. Import the file again and it goes back to its book.</item>
+        <item quantity="other">%1$d of them are without their EPUBs. Import the files again and each goes back to its book.</item>
+    </plurals>
+    <string name="settings_backup_error_offline">Google Drive cannot be reached. Check the connection and try again.</string>
+    <string name="settings_backup_error_sign_in">Google did not accept the sign-in (code %1$s). Contact the developer.</string>
+    <string name="settings_backup_error_refused">Google Drive refused the request (%1$s). Contact the developer.</string>
+    <string name="settings_backup_error_none">There is no backup on this account.</string>
+    <string name="settings_backup_error_unreadable">The backup on Google Drive cannot be read.</string>
+    <string name="settings_backup_error_too_new">The backup was made by a newer version of Kozeki. Update the app to restore it.</string>
+    <string name="settings_backup_error_other">That did not work. Try again later.</string>
+    <string name="settings_cache_title">Looked up before</string>
+    <string name="settings_cache_description">So nothing is looked up twice</string>
     <plurals name="settings_cache_entries">
         <item quantity="one">%1$d stored lookup</item>
         <item quantity="other">%1$d stored lookups</item>
     </plurals>
     <string name="settings_cache_clear">Clear</string>
-    <string name="settings_about_title">About</string>
     <string name="settings_about_version">Kozeki %1$s</string>
-    <string name="settings_about_credits">A personal epub and library companion</string>
+    <string name="settings_about_credits">I\'ll keep your books in order and your reading on record.</string>
 </resources>

@@ -33,6 +33,7 @@ data class Book(
     val purchaseCurrency: String? = null,
     val purchasedOn: LocalDate? = null,
     val purchaseLocation: String? = null,
+    val purchaseMemo: String? = null,
     val source: MetadataSource? = null,
     /** The book's ID on [source]. */
     val sourceId: String? = null,

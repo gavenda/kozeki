@@ -1,0 +1,183 @@
+{
+  "format": 1,
+  "schemaVersion": 6,
+  "createdAt": 1791234840000,
+  "appVersion": "1.7",
+  "device": "Pixel 9",
+  "books": [
+    {
+      "id": "book-1",
+      "title": "The Dispossessed",
+      "subtitle": "An Ambiguous Utopia",
+      "authors": [
+        "Ursula K. Le Guin"
+      ],
+      "authorRefs": [
+        {
+          "id": "204",
+          "name": "Ursula K. Le Guin"
+        }
+      ],
+      "description": "There was a wall.",
+      "publisher": "Harper & Row",
+      "publishedDate": "1974-05",
+      "language": "en",
+      "pageCount": 387,
+      "isbn10": "0061054887",
+      "isbn13": "9780061054884",
+      "categories": [
+        "Science fiction"
+      ],
+      "coverFile": "book-1-1790000000000.jpg",
+      "coverUrl": "https://example.com/cover.jpg",
+      "customCover": true,
+      "state": "READING",
+      "acquisition": "PURCHASED",
+      "isFavorite": true,
+      "rating": 4.5,
+      "purchasePriceMinor": 1299,
+      "purchaseCurrency": "EUR",
+      "purchasedOn": 20700,
+      "purchaseLocation": "Hodges Figgis",
+      "purchaseMemo": "Second-hand",
+      "source": "HARDCOVER",
+      "sourceId": "1234",
+      "sourceUrl": "https://hardcover.app/books/the-dispossessed",
+      "matchStatus": "MATCHED",
+      "fileHash": "abc123",
+      "fileSize": 512000,
+      "originalFileName": "dispossessed.epub",
+      "locator": "{\"href\":\"ch3.xhtml\"}",
+      "progression": 0.42,
+      "position": 120,
+      "positionCount": 286,
+      "chapterTitle": "Chapter 3",
+      "chapterIndex": 3,
+      "chapterCount": 13,
+      "lastReadAt": 1790000400000,
+      "physicalPage": 150,
+      "physicalPageCount": 400,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    },
+    {
+      "id": "book-2",
+      "title": "Piranesi",
+      "authors": [],
+      "authorRefs": [],
+      "categories": [],
+      "customCover": false,
+      "state": "PLANNED",
+      "acquisition": "WISHLIST",
+      "isFavorite": false,
+      "matchStatus": "NONE",
+      "progression": 0.0,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    }
+  ],
+  "readThroughs": [
+    {
+      "id": "rt-1",
+      "bookId": "book-1",
+      "number": 1,
+      "startedAt": 1790000000000,
+      "finishedAt": 1790000300000,
+      "outcome": "COMPLETED",
+      "finishedOn": 20718,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    },
+    {
+      "id": "rt-2",
+      "bookId": "book-1",
+      "number": 2,
+      "startedAt": 1790000350000,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    }
+  ],
+  "readingSessions": [
+    {
+      "id": "s-1",
+      "bookId": "book-1",
+      "readThroughId": "rt-2",
+      "startedAt": 1790000360000,
+      "endedAt": 1790000400000,
+      "durationMs": 38000,
+      "day": 20718,
+      "startProgression": 0.4,
+      "endProgression": 0.42,
+      "startPosition": 114,
+      "endPosition": 120,
+      "pages": 6,
+      "startChapter": "Chapter 2",
+      "endChapter": "Chapter 3",
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    }
+  ],
+  "physicalReadings": [
+    {
+      "id": "p-1",
+      "bookId": "book-1",
+      "readThroughId": "rt-2",
+      "recordedAt": 1790000450000,
+      "day": 20718,
+      "startPage": 120,
+      "endPage": 150,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "n-1",
+      "bookId": "book-1",
+      "text": "True journey is return.",
+      "chapterTitle": "Chapter 3",
+      "progression": 0.42,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    }
+  ],
+  "yearlyGoals": [
+    {
+      "year": 2026,
+      "books": 24,
+      "sync": {
+        "createdAt": 1790000000000,
+        "updatedAt": 1790000500000
+      }
+    }
+  ],
+  "settings": {
+    "dailyGoalMinutes": 30,
+    "themeMode": "DARK",
+    "readerPreferences": {
+      "fontScale": 1.2,
+      "theme": "SEPIA",
+      "font": "PUBLISHER",
+      "scroll": false,
+      "justify": true
+    },
+    "lastCurrency": "EUR",
+    "librarySort": "TITLE",
+    "libraryDisplay": "LIST",
+    "searchSource": "GOOGLE_BOOKS"
+  }
+}

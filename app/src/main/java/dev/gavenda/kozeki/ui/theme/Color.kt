@@ -6,3 +6,8 @@ package dev.gavenda.kozeki.ui.theme
 import androidx.compose.ui.graphics.Color
 
 val SeedColor = Color(0xFF665EC2)
+
+// Measured off the character sheet and added to the builder's theme by hand: the gold of her
+// pendant, and the leather of her trunk.
+val GoldColor = Color(0xFFDBBC95)
+val LeatherColor = Color(0xFF998584)

@@ -1,8 +1,11 @@
 package dev.gavenda.kozeki.ui.settings
 
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.gavenda.kozeki.data.backup.drive.DriveBackup
+import dev.gavenda.kozeki.data.backup.drive.DriveBackupState
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
@@ -26,8 +29,8 @@ data class SettingsUiState(
     val signIn: HardcoverSignIn.Status = HardcoverSignIn.Status.IDLE,
     /** Shown so a mismatch with what is registered on Hardcover is easy to spot. */
     val hardcoverRedirectUri: String = "",
+    val backup: DriveBackupState = DriveBackupState(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val dynamicColor: Boolean = true,
     val dailyGoalMinutes: Int = SettingsRepository.DEFAULT_DAILY_GOAL_MINUTES,
     val year: Int = 0,
     val yearlyGoalBooks: Int? = null,
@@ -46,6 +49,7 @@ class SettingsViewModel(
     private val stats: StatsRepository,
     private val hardcoverAuth: HardcoverAuth,
     private val hardcoverSignIn: HardcoverSignIn,
+    private val driveBackup: DriveBackup,
     versionName: String,
     clock: Clock,
 ) : ViewModel() {
@@ -55,23 +59,21 @@ class SettingsViewModel(
     private val eventChannel = Channel<SettingsEvent>(Channel.BUFFERED)
     val events: Flow<SettingsEvent> = eventChannel.receiveAsFlow()
 
-    private val account = combine(hardcoverAuth.account, hardcoverSignIn.status, ::Pair)
-
-    private val appearance = combine(settings.themeMode, settings.dynamicColor, ::Pair)
+    private val accounts = combine(hardcoverAuth.account, hardcoverSignIn.status, driveBackup.state, ::Triple)
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        account,
-        appearance,
+        accounts,
+        settings.themeMode,
         settings.dailyGoalMinutes,
         stats.observeYearlyGoal(today.year),
         metadata.observeCacheSize(),
-    ) { (hardcover, signIn), (themeMode, dynamicColor), dailyGoal, yearlyGoal, cached ->
+    ) { (hardcover, signIn, backup), themeMode, dailyGoal, yearlyGoal, cached ->
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
             hardcoverRedirectUri = hardcoverAuth.redirectUri,
+            backup = backup,
             themeMode = themeMode,
-            dynamicColor = dynamicColor,
             dailyGoalMinutes = dailyGoal,
             year = today.year,
             yearlyGoalBooks = yearlyGoal,
@@ -83,6 +85,7 @@ class SettingsViewModel(
         SharingStarted.WhileSubscribed(5_000),
         SettingsUiState(
             hardcoverRedirectUri = hardcoverAuth.redirectUri,
+            backup = driveBackup.state.value,
             year = today.year,
             versionName = versionName,
         ),
@@ -101,12 +104,28 @@ class SettingsViewModel(
         viewModelScope.launch { hardcoverAuth.signOut() }
     }
 
+    fun signInToDrive() = driveBackup.signIn()
+
+    fun signOutOfDrive() = driveBackup.signOut()
+
+    /** Google's consent screen is being opened. */
+    fun onDriveConsentShown() = driveBackup.consentShown()
+
+    /** Google's consent screen closed. [result] is null when the user left it without allowing anything. */
+    fun onDriveConsent(result: Intent?) = driveBackup.consentAnswered(result)
+
+    /** @param replace The user has agreed to replace a backup made elsewhere. */
+    fun backUp(replace: Boolean = false) = driveBackup.backUp(replace)
+
+    /** Gets the backup, after which the user is asked whether to put it back. */
+    fun fetchBackup() = driveBackup.fetchBackup()
+
+    fun restoreBackup() = driveBackup.restore()
+
+    fun dismissBackupNotice() = driveBackup.dismiss()
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }
-    }
-
-    fun setDynamicColor(enabled: Boolean) {
-        viewModelScope.launch { settings.setDynamicColor(enabled) }
     }
 
     fun setDailyGoal(minutes: Int) {

@@ -1,14 +1,7 @@
 package dev.gavenda.kozeki.ui.navigation
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
-import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
-import androidx.compose.material.icons.outlined.BarChart
-import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.rounded.BarChart
-import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.ui.graphics.vector.ImageVector
 import dev.gavenda.kozeki.R
 import kotlinx.serialization.Serializable
 
@@ -56,25 +49,25 @@ data class DayRoute(val epochDay: Long)
 enum class TopLevelDestination(
     val route: Any,
     @param:StringRes val label: Int,
-    val icon: ImageVector,
-    val selectedIcon: ImageVector,
+    @param:DrawableRes val icon: Int,
+    @param:DrawableRes val selectedIcon: Int,
 ) {
     LIBRARY(
         route = LibraryRoute,
         label = R.string.nav_library,
-        icon = Icons.AutoMirrored.Outlined.LibraryBooks,
-        selectedIcon = Icons.AutoMirrored.Rounded.LibraryBooks,
+        icon = R.drawable.shelves_48px,
+        selectedIcon = R.drawable.shelves_fill_48px,
     ),
     CALENDAR(
         route = CalendarRoute,
         label = R.string.nav_calendar,
-        icon = Icons.Outlined.CalendarMonth,
-        selectedIcon = Icons.Rounded.CalendarMonth,
+        icon = R.drawable.calendar_month_48px,
+        selectedIcon = R.drawable.calendar_month_fill_48px,
     ),
     STATISTICS(
         route = StatisticsRoute,
         label = R.string.nav_statistics,
-        icon = Icons.Outlined.BarChart,
-        selectedIcon = Icons.Rounded.BarChart,
+        icon = R.drawable.leaderboard_48px,
+        selectedIcon = R.drawable.leaderboard_fill_48px,
     ),
 }

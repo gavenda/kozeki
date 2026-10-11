@@ -92,6 +92,15 @@ class LibraryRepository(
     /** Places typed in for earlier purchases, most recent first. */
     fun observePurchaseLocations(): Flow<List<String>> = books.observePurchaseLocations().distinctUntilChanged()
 
+    /** Everyone who wrote a book that is here, the ones on the book changed last first. */
+    fun observeAuthorNames(): Flow<List<String>> = books.observeAuthors()
+        .map { rows -> rows.flatMap { it.authors }.map(String::trim).filter(String::isNotEmpty).distinctBy(String::lowercase) }
+        .distinctUntilChanged()
+        .flowOn(Dispatchers.IO)
+
+    /** The publishers of the books that are here, the one used last first. */
+    fun observePublishers(): Flow<List<String>> = books.observePublishers().distinctUntilChanged()
+
     suspend fun getBook(id: String): Book? = books.get(id)?.toBook()
 
     fun observeNotes(bookId: String): Flow<List<Note>> = notes.observeForBook(bookId).map { list ->
@@ -151,8 +160,22 @@ class LibraryRepository(
                     ImportResult.AlreadyInLibrary(existing.id, existing.title)
                 } else {
                     // The record survived a restore or came from another device; give it its file back.
+                    // Its cover did not come along either, so unless the user chose one since, the
+                    // EPUB's own is taken again, as it is when an entry gets its first EPUB.
+                    val cover = if (existing.customCover) {
+                        null
+                    } else {
+                        runCatching { readium.open(staged.file).use { it.extractInfo().cover } }.getOrNull()
+                            ?.let { storage.saveCover(existing.id, it) }
+                    }
                     storage.adopt(staged, existing.id)
-                    books.upsert(existing.copy(sync = existing.sync.touched(clock.millis())))
+                    if (cover != null) storage.deleteCover(existing.coverFile)
+                    books.upsert(
+                        existing.copy(
+                            coverFile = cover ?: existing.coverFile,
+                            sync = existing.sync.touched(clock.millis()),
+                        ),
+                    )
                     ImportResult.Attached(existing.id, existing.title)
                 }
             }
@@ -482,6 +505,7 @@ class LibraryRepository(
                     purchaseCurrency = book.purchaseCurrency ?: other.purchaseCurrency,
                     purchasedOn = book.purchasedOn ?: other.purchasedOn,
                     purchaseLocation = book.purchaseLocation ?: other.purchaseLocation,
+                    purchaseMemo = book.purchaseMemo ?: other.purchaseMemo,
                     physicalPage = book.physicalPage ?: other.physicalPage,
                     physicalPageCount = book.physicalPageCount ?: other.physicalPageCount,
                     sync = book.sync.touched(now),
@@ -703,6 +727,7 @@ class LibraryRepository(
         currency: String?,
         purchasedOn: LocalDate?,
         location: String?,
+        memo: String?,
     ) {
         db.withTransaction {
             val book = books.get(bookId) ?: return@withTransaction
@@ -723,6 +748,7 @@ class LibraryRepository(
                         purchaseCurrency = null,
                         purchasedOn = null,
                         purchaseLocation = null,
+                        purchaseMemo = null,
                     )
                 } else {
                     it.copy(
@@ -731,6 +757,7 @@ class LibraryRepository(
                         purchaseCurrency = currency.takeIf { priceMinor != null },
                         purchasedOn = (purchasedOn ?: today()).toEpochDay(),
                         purchaseLocation = location?.trim()?.ifEmpty { null },
+                        purchaseMemo = memo?.trim()?.ifEmpty { null },
                     )
                 }
             }
@@ -872,6 +899,7 @@ class LibraryRepository(
         purchaseCurrency = purchaseCurrency,
         purchasedOn = purchasedOn?.let(LocalDate::ofEpochDay),
         purchaseLocation = purchaseLocation,
+        purchaseMemo = purchaseMemo,
         source = source,
         sourceId = sourceId,
         sourceUrl = sourceUrl,

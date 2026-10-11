@@ -20,20 +20,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.NoteAdd
-import androidx.compose.material.icons.automirrored.rounded.Toc
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.FormatSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarDuration
@@ -64,6 +58,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -75,6 +70,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.formatPercent
 import dev.gavenda.kozeki.ui.book.NoteDialog
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -368,8 +365,9 @@ fun ReaderScaffold(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            painterResource(R.drawable.arrow_back_48px),
                             contentDescription = stringResource(R.string.action_back),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 },
@@ -478,13 +476,13 @@ private fun ReaderControls(
             colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
         ) {
             IconButton(onClick = onOpenContents) {
-                Icon(Icons.AutoMirrored.Rounded.Toc, contentDescription = stringResource(R.string.reader_contents))
+                Icon(painterResource(R.drawable.toc_48px), contentDescription = stringResource(R.string.reader_contents), modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = onOpenAppearance) {
-                Icon(Icons.Rounded.FormatSize, contentDescription = stringResource(R.string.reader_appearance))
+                Icon(painterResource(R.drawable.format_size_48px), contentDescription = stringResource(R.string.reader_appearance), modifier = Modifier.size(24.dp))
             }
             IconButton(onClick = onAddNote) {
-                Icon(Icons.AutoMirrored.Rounded.NoteAdd, contentDescription = stringResource(R.string.note_add))
+                Icon(painterResource(R.drawable.note_add_fill_48px), contentDescription = stringResource(R.string.note_add), modifier = Modifier.size(24.dp))
             }
         }
     }
@@ -498,7 +496,7 @@ private fun ReaderLoading() {
             .background(MaterialTheme.colorScheme.surface),
         contentAlignment = Alignment.Center,
     ) {
-        LoadingIndicator()
+        HaloLoadingIndicator()
     }
 }
 
@@ -507,12 +505,13 @@ private fun ReaderFailed(reason: ReaderFailure, onBack: () -> Unit) {
     Surface(Modifier.fillMaxSize()) {
         Box(contentAlignment = Alignment.Center) {
             EmptyState(
-                icon = Icons.Rounded.ErrorOutline,
+                expression = Expression.SHOCKED,
+                icon = painterResource(R.drawable.error_fill_48px),
                 title = stringResource(R.string.reader_failed_title),
                 message = stringResource(
                     when (reason) {
                         ReaderFailure.NOT_FOUND -> R.string.book_not_found
-                        ReaderFailure.FILE_MISSING -> R.string.book_file_missing_message
+                        ReaderFailure.FILE_MISSING -> R.string.reader_failed_file_missing
                         ReaderFailure.UNSUPPORTED -> R.string.reader_failed_unsupported
                         ReaderFailure.UNREADABLE -> R.string.reader_failed_unreadable
                     },

@@ -5,16 +5,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.PreviewLightDark
@@ -34,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.MetadataSource
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.SourcePicker
@@ -89,7 +89,7 @@ private fun MatchSheetContent(
             singleLine = true,
             trailingIcon = {
                 IconButton(onClick = onSearch) {
-                    Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.action_search))
+                    Icon(painterResource(R.drawable.search_48px), contentDescription = stringResource(R.string.action_search), modifier = Modifier.size(24.dp))
                 }
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -107,7 +107,7 @@ private fun MatchSheetContent(
         )
         when {
             state.loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
+                HaloLoadingIndicator()
             }
 
             state.error != null -> SheetMessage(stringResource(state.error.message))

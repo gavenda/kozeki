@@ -8,14 +8,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
@@ -32,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -112,7 +109,7 @@ fun StatisticsContent(
                     title = { Text(stringResource(R.string.nav_statistics)) },
                     actions = {
                         IconButton(onClick = onSettingsClick) {
-                            Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings_title))
+                            Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -123,8 +120,9 @@ fun StatisticsContent(
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
-                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                painterResource(R.drawable.arrow_back_48px),
                                 contentDescription = stringResource(R.string.action_back),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     },
@@ -190,8 +188,9 @@ private fun PeriodNavigator(label: String, canGoForward: Boolean, onPrevious: ()
     Row(verticalAlignment = Alignment.CenterVertically) {
         FilledTonalIconButton(onClick = onPrevious) {
             Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                painterResource(R.drawable.keyboard_arrow_left_48px),
                 contentDescription = stringResource(R.string.stats_previous),
+                modifier = Modifier.size(24.dp),
             )
         }
         Text(
@@ -201,7 +200,7 @@ private fun PeriodNavigator(label: String, canGoForward: Boolean, onPrevious: ()
             modifier = Modifier.weight(1f),
         )
         FilledTonalIconButton(onClick = onNext, enabled = canGoForward) {
-            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = stringResource(R.string.stats_next))
+            Icon(painterResource(R.drawable.keyboard_arrow_right_48px), contentDescription = stringResource(R.string.stats_next), modifier = Modifier.size(24.dp))
         }
     }
 }

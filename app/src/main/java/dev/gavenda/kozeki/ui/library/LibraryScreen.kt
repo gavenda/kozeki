@@ -20,7 +20,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +28,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
@@ -42,29 +42,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
-import androidx.compose.material.icons.automirrored.rounded.Sort
-import androidx.compose.material.icons.automirrored.rounded.ViewList
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.Bookmarks
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.FilterAlt
-import androidx.compose.material.icons.rounded.FilterListOff
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.RemoveShoppingCart
-import androidx.compose.material.icons.rounded.SelectAll
-import androidx.compose.material.icons.rounded.ShoppingBag
-import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.TravelExplore
-import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -89,7 +66,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
-import androidx.compose.material3.nonInteractiveScrollbar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -103,16 +79,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -136,7 +113,10 @@ import dev.gavenda.kozeki.ui.book.PurchaseDialog
 import dev.gavenda.kozeki.ui.components.AdaptiveColumns
 import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
+import dev.gavenda.kozeki.ui.components.DraggableScrollbar
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.ReadingProgressRing
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.icon
@@ -338,26 +318,27 @@ fun LibraryContent(
         }
         when {
             state.loading -> Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                LoadingIndicator()
+                HaloLoadingIndicator()
             }
 
             // Scrolls, because on a short window it does not all fit, and a column that cannot
             // scroll squashes its last buttons into whatever height is left.
             state.isLibraryEmpty -> Box(Modifier.padding(innerPadding).verticalScroll(rememberScrollState())) {
                 EmptyState(
-                    icon = Icons.AutoMirrored.Rounded.LibraryBooks,
+                    expression = Expression.HAPPY,
+                    icon = painterResource(R.drawable.shelves_fill_48px),
                     title = stringResource(R.string.library_empty_title),
                     message = stringResource(R.string.library_empty_message),
                     action = {
                         // The same three ways in, with the same icons, as the menu that takes over once there are books.
                         Button(onClick = onImportClick) {
-                            AddButtonContent(Icons.Rounded.UploadFile, R.string.library_add_import)
+                            AddButtonContent(painterResource(R.drawable.upload_file_fill_48px), R.string.library_add_import)
                         }
                         OutlinedButton(onClick = onAddBook) {
-                            AddButtonContent(Icons.Rounded.TravelExplore, R.string.library_add_find)
+                            AddButtonContent(painterResource(R.drawable.travel_explore_48px), R.string.library_add_find)
                         }
                         OutlinedButton(onClick = onAddManually) {
-                            AddButtonContent(Icons.Rounded.EditNote, R.string.library_add_manual)
+                            AddButtonContent(painterResource(R.drawable.edit_note_fill_48px), R.string.library_add_manual)
                         }
                     },
                 )
@@ -367,7 +348,8 @@ fun LibraryContent(
                 FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected)
                 if (state.isFilterEmpty) {
                     EmptyState(
-                        icon = Icons.Rounded.FilterListOff,
+                        expression = Expression.NEUTRAL,
+                        icon = painterResource(R.drawable.filter_alt_off_fill_48px),
                         title = stringResource(R.string.library_filter_empty_title),
                         message = stringResource(R.string.library_filter_empty_message),
                     )
@@ -377,64 +359,71 @@ fun LibraryContent(
                     val list = state.display == LibraryDisplay.LIST
                     // A row brings its own margins, which the tint of a picked one fills.
                     val edge = if (list) 8.dp else 16.dp
-                    // Shows how far down a long library is while it moves, then fades away.
-                    val scrollbar = gridState.scrollIndicatorState
-                        ?.let { Modifier.nonInteractiveScrollbar(it, Orientation.Vertical) }
-                        ?: Modifier
-                    LazyVerticalGrid(
-                        columns = if (list) {
-                            AdaptiveColumns(minColumns = 1, minCellWidth = 360.dp)
-                        } else {
-                            AdaptiveColumns(minColumns = 3, minCellWidth = 112.dp)
-                        },
-                        state = gridState,
-                        contentPadding = PaddingValues(
-                            start = edge,
-                            end = edge,
-                            top = 8.dp,
-                            // Room for the floating action button to clear the last row.
-                            bottom = innerPadding.calculateBottomPadding() + 96.dp,
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(if (list) 8.dp else 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(if (list) 0.dp else 16.dp),
-                        modifier = Modifier.fillMaxSize().nestedScroll(scrollTurn).then(scrollbar),
-                    ) {
-                        state.sections.forEach { section ->
-                            section.heading?.let { heading ->
-                                item(key = "header-${heading.name}", span = { GridItemSpan(maxLineSpan) }) {
-                                    SectionHeader(
-                                        text = stringResource(heading.label),
-                                        // In line with the text of the rows under it.
-                                        modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier,
-                                    )
+                    Box(Modifier.fillMaxSize()) {
+                        LazyVerticalGrid(
+                            columns = if (list) {
+                                AdaptiveColumns(minColumns = 1, minCellWidth = 360.dp)
+                            } else {
+                                AdaptiveColumns(minColumns = 3, minCellWidth = 112.dp)
+                            },
+                            state = gridState,
+                            contentPadding = PaddingValues(
+                                start = edge,
+                                end = edge,
+                                top = 8.dp,
+                                // Room for the floating action button to clear the last row.
+                                bottom = innerPadding.calculateBottomPadding() + 96.dp,
+                            ),
+                            horizontalArrangement = Arrangement.spacedBy(if (list) 8.dp else 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(if (list) 0.dp else 16.dp),
+                            modifier = Modifier.fillMaxSize().nestedScroll(scrollTurn),
+                        ) {
+                            state.sections.forEach { section ->
+                                section.heading?.let { heading ->
+                                    item(key = "header-${heading.name}", span = { GridItemSpan(maxLineSpan) }) {
+                                        SectionHeader(
+                                            text = stringResource(heading.label),
+                                            // In line with the text of the rows under it.
+                                            modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier,
+                                        )
+                                    }
                                 }
-                            }
-                            items(section.books, key = { it.id }, contentType = { state.display }) { book ->
-                                if (list) {
-                                    LibraryBookRow(
-                                        book = book,
-                                        matching = book.id in state.matching,
-                                        selecting = state.selecting,
-                                        selected = book.id in selection.ids,
-                                        actions = selectionActions,
-                                        onOpen = onBookClick,
-                                        onOpenAuthor = onAuthorClick,
-                                        modifier = Modifier.animateItem(),
-                                    )
-                                } else {
-                                    LibraryBookItem(
-                                        book = book,
-                                        matching = book.id in state.matching,
-                                        selecting = state.selecting,
-                                        selected = book.id in selection.ids,
-                                        actions = selectionActions,
-                                        onOpen = onBookClick,
-                                        onOpenAuthor = onAuthorClick,
-                                        modifier = Modifier.animateItem(),
-                                    )
+                                items(section.books, key = { it.id }, contentType = { state.display }) { book ->
+                                    if (list) {
+                                        LibraryBookRow(
+                                            book = book,
+                                            matching = book.id in state.matching,
+                                            selecting = state.selecting,
+                                            selected = book.id in selection.ids,
+                                            actions = selectionActions,
+                                            onOpen = onBookClick,
+                                            onOpenAuthor = onAuthorClick,
+                                            modifier = Modifier.animateItem(),
+                                        )
+                                    } else {
+                                        LibraryBookItem(
+                                            book = book,
+                                            matching = book.id in state.matching,
+                                            selecting = state.selecting,
+                                            selected = book.id in selection.ids,
+                                            actions = selectionActions,
+                                            onOpen = onBookClick,
+                                            onOpenAuthor = onAuthorClick,
+                                            modifier = Modifier.animateItem(),
+                                        )
+                                    }
                                 }
                             }
                         }
+                        // Shows how far down a long library is while it moves, and takes it there
+                        // when dragged. Stops short of the corner the floating action button has.
+                        DraggableScrollbar(
+                            state = gridState,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .fillMaxHeight()
+                                .padding(top = 8.dp, bottom = innerPadding.calculateBottomPadding() + 96.dp),
+                        )
                     }
                 }
             }
@@ -447,9 +436,9 @@ fun LibraryContent(
             book = single,
             lastCurrency = state.lastCurrency,
             locationHistory = state.purchaseLocations,
-            onSave = { price, currency, date, location ->
+            onSave = { price, currency, date, location, memo ->
                 editingPurchase = false
-                selectionActions.onMarkPurchased(price, currency, date, location)
+                selectionActions.onMarkPurchased(price, currency, date, location, memo)
             },
             onDismiss = { editingPurchase = false },
         )
@@ -470,14 +459,19 @@ class SelectionActions(
     val onClear: () -> Unit = {},
     val onSetFavorite: (Boolean) -> Unit = {},
     val onSetState: (ReadingState) -> Unit = {},
-    val onMarkPurchased: (priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) -> Unit =
-        { _, _, _, _ -> },
+    val onMarkPurchased: (
+        priceMinor: Long?,
+        currency: String?,
+        purchasedOn: LocalDate,
+        location: String?,
+        memo: String?,
+    ) -> Unit = { _, _, _, _, _ -> },
     val onUnmarkPurchased: () -> Unit = {},
     val onDelete: () -> Unit = {},
 )
 
 @Composable
-private fun AddButtonContent(icon: ImageVector, @StringRes label: Int) {
+private fun AddButtonContent(icon: Painter, @StringRes label: Int) {
     Icon(icon, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
     Text(stringResource(label))
@@ -551,12 +545,12 @@ private fun AddBooksMenu(
                         label = "add or to top",
                     ) { top ->
                         if (top) {
-                            Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = null)
+                            Icon(painterResource(R.drawable.keyboard_arrow_up_48px), contentDescription = null, modifier = Modifier.size(24.dp))
                         } else {
                             Icon(
-                                imageVector = if (checkedProgress > 0.5f) Icons.Rounded.Close else Icons.Rounded.Add,
+                                painter = if (checkedProgress > 0.5f) painterResource(R.drawable.close_48px) else painterResource(R.drawable.add_48px),
                                 contentDescription = null,
-                                modifier = Modifier.animateIcon({ checkedProgress }),
+                                modifier = Modifier.size(24.dp).animateIcon({ checkedProgress }),
                             )
                         }
                     }
@@ -572,7 +566,7 @@ private fun AddBooksMenu(
                 onImportClick()
             },
             text = { Text(stringResource(R.string.library_add_import)) },
-            icon = { Icon(Icons.Rounded.UploadFile, contentDescription = null) },
+            icon = { Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         )
         FloatingActionButtonMenuItem(
             onClick = {
@@ -580,7 +574,7 @@ private fun AddBooksMenu(
                 onAddBook()
             },
             text = { Text(stringResource(R.string.library_add_find)) },
-            icon = { Icon(Icons.Rounded.TravelExplore, contentDescription = null) },
+            icon = { Icon(painterResource(R.drawable.travel_explore_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         )
         FloatingActionButtonMenuItem(
             onClick = {
@@ -588,7 +582,7 @@ private fun AddBooksMenu(
                 onAddManually()
             },
             text = { Text(stringResource(R.string.library_add_manual)) },
-            icon = { Icon(Icons.Rounded.EditNote, contentDescription = null) },
+            icon = { Icon(painterResource(R.drawable.edit_note_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         )
     }
 }
@@ -620,7 +614,7 @@ private fun FilterRow(
                     },
                 ),
             ) {
-                Icon(Icons.Rounded.FilterAlt, contentDescription = stringResource(R.string.filter_books))
+                Icon(painterResource(R.drawable.filter_alt_fill_48px), contentDescription = stringResource(R.string.filter_books), modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = stringResource(state.filter.label),
@@ -651,7 +645,7 @@ private fun FilterRow(
                         onClick = { onFilterSelected(filter) },
                         label = { Text(stringResource(filter.label)) },
                         leadingIcon = if (selected) {
-                            { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            { Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.size(18.dp)) }
                         } else {
                             null
                         },
@@ -674,10 +668,11 @@ private fun DisplayToggle(display: LibraryDisplay, onDisplaySelected: (LibraryDi
     val other = if (display == LibraryDisplay.LIST) LibraryDisplay.COVERS else LibraryDisplay.LIST
     IconButton(onClick = { onDisplaySelected(other) }) {
         Icon(
-            imageVector = if (other == LibraryDisplay.LIST) Icons.AutoMirrored.Rounded.ViewList else Icons.Rounded.GridView,
+            painter = if (other == LibraryDisplay.LIST) painterResource(R.drawable.view_list_fill_48px) else painterResource(R.drawable.grid_view_fill_48px),
             contentDescription = stringResource(
                 if (other == LibraryDisplay.LIST) R.string.display_as_list else R.string.display_as_covers,
             ),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -687,7 +682,7 @@ private fun SortMenu(sort: LibrarySort, onSortSelected: (LibrarySort) -> Unit, m
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = stringResource(R.string.sort_books))
+            Icon(painterResource(R.drawable.sort_48px), contentDescription = stringResource(R.string.sort_books), modifier = Modifier.size(24.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             LibrarySort.entries.forEach { option ->
@@ -699,7 +694,7 @@ private fun SortMenu(sort: LibrarySort, onSortSelected: (LibrarySort) -> Unit, m
                     },
                     leadingIcon = {
                         // An empty slot keeps the labels of the other orders in line.
-                        if (option == sort) Icon(Icons.Rounded.Check, contentDescription = null)
+                        if (option == sort) Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.size(24.dp))
                     },
                 )
             }
@@ -757,7 +752,7 @@ private fun LibraryBookItem(
                     color = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
-                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
+                    Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
             }
             val (badgeIcon, badgeLabel) = ownershipBadge(book)
@@ -769,7 +764,7 @@ private fun LibraryBookItem(
                 if (book.isFavorite) {
                     CoverBadge {
                         Icon(
-                            Icons.Rounded.Favorite,
+                            painterResource(R.drawable.favorite_fill_48px),
                             contentDescription = stringResource(R.string.favorite),
                             modifier = Modifier.size(14.dp),
                         )
@@ -792,7 +787,7 @@ private fun LibraryBookItem(
                     } else {
                         // As large as the ring, so the states read alike across the grid.
                         Icon(
-                            imageVector = book.state.outlinedIcon,
+                            painter = painterResource(book.state.outlinedIcon),
                             contentDescription = statusLine(book),
                             modifier = Modifier.size(32.dp),
                         )
@@ -877,7 +872,7 @@ private fun LibraryBookRow(
                     color = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ) {
-                    Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
+                    Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
             }
         }
@@ -913,7 +908,7 @@ private fun LibraryBookRow(
                 val tint = MaterialTheme.colorScheme.onSurfaceVariant
                 if (book.isFavorite) {
                     Icon(
-                        Icons.Rounded.Favorite,
+                        painterResource(R.drawable.favorite_fill_48px),
                         contentDescription = stringResource(R.string.favorite),
                         modifier = Modifier.size(14.dp),
                         tint = tint,
@@ -921,11 +916,15 @@ private fun LibraryBookRow(
                 }
                 // Described only where the words beside it are about something else.
                 Icon(
-                    imageVector = badgeIcon,
+                    painter = badgeIcon,
                     contentDescription = if (book.canRead) stringResource(badgeLabel) else null,
                     modifier = Modifier.size(14.dp),
                     tint = tint,
                 )
+                // Those words get the icon of what they say, or the one before would be taken for theirs.
+                if (book.canRead) {
+                    Icon(painterResource(book.state.icon), contentDescription = null, modifier = Modifier.size(14.dp), tint = tint)
+                }
                 // There is room here to say why the book cannot be opened, rather than only hint at it.
                 Text(
                     text = stringResource(if (book.canRead) book.state.labelRes else badgeLabel),
@@ -960,7 +959,7 @@ private fun MatchingOverlay(shape: Shape, modifier: Modifier = Modifier, indicat
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
-        LoadingIndicator(Modifier.size(indicatorSize), color = MaterialTheme.colorScheme.inversePrimary)
+        HaloLoadingIndicator(Modifier.size(indicatorSize), glow = true)
     }
 }
 
@@ -1001,7 +1000,7 @@ private fun SelectionToolbar(
         colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
     ) {
         IconButton(onClick = actions.onClear) {
-            Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.selection_clear))
+            Icon(painterResource(R.drawable.close_48px), contentDescription = stringResource(R.string.selection_clear), modifier = Modifier.size(24.dp))
         }
         Text(
             text = selection.size.toString(),
@@ -1012,16 +1011,17 @@ private fun SelectionToolbar(
                 .semantics { contentDescription = countLabel },
         )
         IconButton(onClick = actions.onSelectAll, enabled = !allSelected) {
-            Icon(Icons.Rounded.SelectAll, contentDescription = stringResource(R.string.selection_select_all))
+            Icon(painterResource(R.drawable.select_all_48px), contentDescription = stringResource(R.string.selection_select_all), modifier = Modifier.size(24.dp))
         }
         if (selection.favoritable.isNotEmpty()) {
             val favorites = selection.allFavorite
             IconButton(onClick = { actions.onSetFavorite(!favorites) }) {
                 Icon(
-                    if (favorites) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                    if (favorites) painterResource(R.drawable.favorite_fill_48px) else painterResource(R.drawable.favorite_48px),
                     contentDescription = stringResource(
                         if (favorites) R.string.favorite_remove else R.string.favorite_add,
                     ),
+                    modifier = Modifier.size(24.dp),
                 )
             }
         }
@@ -1029,15 +1029,16 @@ private fun SelectionToolbar(
             Box {
                 IconButton(onClick = { stateMenuOpen = true }) {
                     Icon(
-                        Icons.Rounded.Bookmarks,
+                        painterResource(R.drawable.label_fill_48px),
                         contentDescription = stringResource(R.string.selection_change_state),
+                        modifier = Modifier.size(24.dp),
                     )
                 }
                 DropdownMenu(expanded = stateMenuOpen, onDismissRequest = { stateMenuOpen = false }) {
                     ReadingStateOrder.filter { it != selection.sharedState }.forEach { state ->
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.book_mark_as, stringResource(state.labelRes))) },
-                            leadingIcon = { Icon(state.icon, contentDescription = null) },
+                            leadingIcon = { Icon(painterResource(state.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
                             onClick = {
                                 stateMenuOpen = false
                                 actions.onSetState(state)
@@ -1049,7 +1050,7 @@ private fun SelectionToolbar(
         }
         Box {
             IconButton(onClick = { moreOpen = true }) {
-                Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.book_more_actions))
+                Icon(painterResource(R.drawable.more_vert_48px), contentDescription = stringResource(R.string.book_more_actions), modifier = Modifier.size(24.dp))
             }
             DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                 val single = selection.books.singleOrNull()
@@ -1064,13 +1065,13 @@ private fun SelectionToolbar(
                                 ),
                             )
                         },
-                        leadingIcon = { Icon(Icons.Rounded.ShoppingBag, contentDescription = null) },
+                        leadingIcon = { Icon(painterResource(R.drawable.purchased_book_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
                         onClick = {
                             moreOpen = false
                             if (single != null) {
                                 onEditPurchase()
                             } else {
-                                actions.onMarkPurchased(null, null, LocalDate.now(), null)
+                                actions.onMarkPurchased(null, null, LocalDate.now(), null, null)
                             }
                         },
                     )
@@ -1088,8 +1089,9 @@ private fun SelectionToolbar(
                         },
                         leadingIcon = {
                             Icon(
-                                if (toWishlist) Icons.Rounded.Bookmark else Icons.Rounded.RemoveShoppingCart,
+                                if (toWishlist) painterResource(R.drawable.kid_star_48px) else painterResource(R.drawable.purchased_book_off_fill_48px),
                                 contentDescription = null,
+                                modifier = Modifier.size(24.dp),
                             )
                         },
                         onClick = {
@@ -1101,7 +1103,7 @@ private fun SelectionToolbar(
                 HorizontalDivider()
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.action_remove)) },
-                    leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                    leadingIcon = { Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
                     onClick = {
                         moreOpen = false
                         onDelete()

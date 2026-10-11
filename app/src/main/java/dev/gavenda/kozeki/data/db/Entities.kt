@@ -11,11 +11,15 @@ import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadingState
+import kotlinx.serialization.Serializable
 
 /**
  * A book the user tracks. It may or may not have an EPUB attached: [fileHash] identifies the
  * imported file, but the file itself lives outside the database and is never synced, so a row
  * can legitimately exist without its file (after a restore, or on another device).
+ *
+ * This and the other rows the user's reading is made of are written to a backup as they are, so a
+ * new column needs a default for the backups made before it to still be read.
  */
 @Entity(
     tableName = "books",
@@ -25,6 +29,7 @@ import dev.gavenda.kozeki.data.model.ReadingState
         Index("source", "sourceId"),
     ],
 )
+@Serializable
 data class BookEntity(
     @PrimaryKey val id: String,
     val title: String,
@@ -60,6 +65,8 @@ data class BookEntity(
     val purchasedOn: Long? = null,
     /** Where the book was bought, as the user typed it: a shop, a site, a city. */
     val purchaseLocation: String? = null,
+    /** Anything else worth keeping about the purchase, as the user typed it. */
+    val purchaseMemo: String? = null,
 
     val source: MetadataSource? = null,
     val sourceId: String? = null,
@@ -98,6 +105,7 @@ data class BookEntity(
     tableName = "read_throughs",
     indices = [Index("bookId"), Index("finishedAt")],
 )
+@Serializable
 data class ReadThroughEntity(
     @PrimaryKey val id: String,
     val bookId: String,
@@ -116,6 +124,7 @@ data class ReadThroughEntity(
     tableName = "reading_sessions",
     indices = [Index("bookId"), Index("day")],
 )
+@Serializable
 data class ReadingSessionEntity(
     @PrimaryKey val id: String,
     val bookId: String,
@@ -146,6 +155,7 @@ data class ReadingSessionEntity(
     tableName = "physical_readings",
     indices = [Index("bookId"), Index("day")],
 )
+@Serializable
 data class PhysicalReadingEntity(
     @PrimaryKey val id: String,
     val bookId: String,
@@ -164,6 +174,7 @@ data class PhysicalReadingEntity(
     tableName = "notes",
     indices = [Index("bookId")],
 )
+@Serializable
 data class NoteEntity(
     @PrimaryKey val id: String,
     val bookId: String,
@@ -175,6 +186,7 @@ data class NoteEntity(
 )
 
 @Entity(tableName = "yearly_goals")
+@Serializable
 data class YearlyGoalEntity(
     @PrimaryKey val year: Int,
     val books: Int,

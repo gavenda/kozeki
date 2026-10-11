@@ -43,6 +43,11 @@ fun formatTime(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
 
+/** A moment as its date and the time of day, such as "11 Oct 2026, 21:14". */
+fun formatDateTime(epochMillis: Long): String =
+    Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+        .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
+
 fun formatMonth(month: YearMonth): String = month.format(DateTimeFormatter.ofPattern("LLLL yyyy"))
 
 /** A price stored in minor units, such as cents, in the conventions of its currency. */

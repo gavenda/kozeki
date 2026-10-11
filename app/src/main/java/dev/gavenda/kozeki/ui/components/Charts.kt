@@ -1,5 +1,7 @@
 package dev.gavenda.kozeki.ui.components
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -34,7 +36,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -226,7 +230,13 @@ fun RankedBars(
     }
 }
 
-/** A ratio against a goal, with the figure in the middle. The ring stops at full; the figure does not. */
+/**
+ * A ratio against a goal, with the figure in the middle. The ring stops at full; the figure does not.
+ *
+ * At the size it is made for, a full ring is the outer ring of the app's halo to within a hair. A
+ * goal that is met becomes the halo: it takes the halo's colour, and is given the ring inside and
+ * the ties between the two.
+ */
 @Composable
 fun GoalRing(
     progress: Float,
@@ -234,6 +244,7 @@ fun GoalRing(
     modifier: Modifier = Modifier,
     size: Dp = 96.dp,
 ) {
+    val haloAlpha = animateFloatAsState(if (progress >= 1f) 1f else 0f, tween(durationMillis = 400), label = "halo")
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         CircularWavyProgressIndicator(
             progress = { progress.coerceIn(0f, 1f) },
@@ -241,23 +252,36 @@ fun GoalRing(
             trackColor = MaterialTheme.colorScheme.tertiaryContainer,
             modifier = Modifier.fillMaxSize(),
         )
+        // Its outer ring lands on the full one and covers it, so the ring is seen to change colour
+        // as what lies inside arrives.
+        HaloMark(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = haloAlpha.value },
+            dial = false,
+        )
         Text(label, style = MaterialTheme.typography.titleMediumEmphasized)
     }
 }
 
-/** A small ring for a strip of days, with [content] in the middle. */
+/**
+ * A small ring for a strip of days, with [content] in the middle. Its own colours are for a plain
+ * background; a ring that sits on a tint is given ones that show on it.
+ */
 @Composable
 fun MiniRing(
     progress: Float,
     modifier: Modifier = Modifier,
     size: Dp = 36.dp,
+    color: Color = MaterialTheme.colorScheme.tertiary,
+    trackColor: Color = MaterialTheme.colorScheme.tertiaryContainer,
     content: @Composable () -> Unit,
 ) {
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         CircularProgressIndicator(
             progress = { progress.coerceIn(0f, 1f) },
-            color = MaterialTheme.colorScheme.tertiary,
-            trackColor = MaterialTheme.colorScheme.tertiaryContainer,
+            color = color,
+            trackColor = trackColor,
             strokeWidth = 3.dp,
             gapSize = 0.dp,
             modifier = Modifier.fillMaxSize(),

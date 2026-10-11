@@ -4,15 +4,17 @@ import android.net.Uri
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.ui.PreviewData
+import dev.gavenda.kozeki.ui.components.HistoryTextField
 import dev.gavenda.kozeki.ui.formatDate
 import java.time.Instant
 import java.time.LocalDate
@@ -40,10 +42,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AddPhotoAlternate
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.EditOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +75,7 @@ import dev.gavenda.kozeki.data.model.BookDraft
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -127,10 +126,10 @@ fun BookFormContent(
 ) {
     // The fields start from the book, so they are only laid out once it is there.
     if (!editing || state.book != null) {
-        BookForm(state.book, state.saving, onBack, onAdd, onSave, modifier)
+        BookForm(state, onBack, onAdd, onSave, modifier)
     } else {
         BookFormScaffold(editing, onClose = onBack, modifier = modifier) {
-            if (state.loading) LoadingIndicator(Modifier.padding(48.dp))
+            if (state.loading) HaloLoadingIndicator(Modifier.padding(48.dp))
         }
     }
 }
@@ -153,7 +152,7 @@ private fun BookFormScaffold(
                 },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.action_close))
+                        Icon(painterResource(R.drawable.close_48px), contentDescription = stringResource(R.string.action_close), modifier = Modifier.size(24.dp))
                     }
                 },
                 actions = actions,
@@ -192,13 +191,14 @@ private data class FormText(
 
 @Composable
 private fun BookForm(
-    book: Book?,
-    saving: Boolean,
+    state: BookFormUiState,
     onBack: () -> Unit,
     onAdd: (BookDraft, Uri?) -> Unit,
     onSave: (BookDraft, cover: Uri?, removeCover: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val book = state.book
+    val saving = state.saving
     val initial = remember(book) { FormText(book) }
     // A picture picked here, and whether the one the book had was taken off.
     var cover by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -248,9 +248,11 @@ private fun BookForm(
         onClose = { if (changed && !saving) confirmingDiscard = true else onBack() },
         modifier = modifier,
         actions = {
-            TextButton(
+            Button(
                 onClick = { if (book != null) onSave(draft(), cover, coverRemoved) else onAdd(draft(), cover) },
                 enabled = canSubmit,
+                shapes = ButtonDefaults.shapes(),
+                modifier = Modifier.padding(end = 12.dp),
             ) {
                 Text(stringResource(R.string.action_save))
             }
@@ -286,13 +288,15 @@ private fun BookForm(
                         maxLines = 3,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    OutlinedTextField(
+                    HistoryTextField(
                         value = authors,
                         onValueChange = { authors = it },
-                        label = { Text(stringResource(R.string.manual_book_field_authors)) },
-                        supportingText = { Text(stringResource(R.string.manual_book_authors_hint)) },
+                        history = state.authorHistory,
+                        label = stringResource(R.string.manual_book_field_authors),
+                        supportingText = stringResource(R.string.manual_book_authors_hint),
                         keyboardOptions = words,
                         maxLines = 3,
+                        multiple = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -308,10 +312,11 @@ private fun BookForm(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
+            HistoryTextField(
                 value = publisher,
                 onValueChange = { publisher = it },
-                label = { Text(stringResource(R.string.detail_publisher)) },
+                history = state.publisherHistory,
+                label = stringResource(R.string.detail_publisher),
                 keyboardOptions = words,
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -323,7 +328,7 @@ private fun BookForm(
                     label = { Text(stringResource(R.string.detail_published)) },
                     readOnly = true,
                     singleLine = true,
-                    trailingIcon = { Icon(Icons.Rounded.CalendarMonth, contentDescription = null) },
+                    trailingIcon = { Icon(painterResource(R.drawable.calendar_month_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
                     // A read-only field swallows clicks, so the tap that opens the calendar is caught on the way down.
                     modifier = Modifier.weight(1.4f).pointerInput(Unit) {
                         awaitEachGesture {
@@ -371,7 +376,7 @@ private fun BookForm(
         AlertDialog(
             onDismissRequest = { confirmingDiscard = false },
             // With an icon the dialog centres its headline, as Material 3 lays out a dialog that has one.
-            icon = { Icon(Icons.Rounded.EditOff, contentDescription = null) },
+            icon = { Icon(painterResource(R.drawable.edit_off_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
             iconContentColor = MaterialTheme.colorScheme.error,
             title = { Text(stringResource(R.string.book_form_discard_changes)) },
             text = {
@@ -386,13 +391,18 @@ private fun BookForm(
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         confirmingDiscard = false
                         onBack()
                     },
+                    shapes = ButtonDefaults.shapes(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError,
+                    ),
                 ) {
-                    Text(stringResource(R.string.book_form_discard), color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.book_form_discard))
                 }
             },
             dismissButton = {
@@ -435,7 +445,7 @@ private fun PublishedDateDialog(published: String, onPick: (LocalDate?) -> Unit,
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = {
                     val millis = pickerState.selectedDateMillis
                     if (millis == null) {
@@ -444,6 +454,7 @@ private fun PublishedDateDialog(published: String, onPick: (LocalDate?) -> Unit,
                         onPick(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate())
                     }
                 },
+                shapes = ButtonDefaults.shapes(),
             ) {
                 Text(stringResource(R.string.action_ok))
             }
@@ -481,7 +492,7 @@ private fun CoverPicker(cover: Any?, onClick: () -> Unit, modifier: Modifier = M
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(
-                Icons.Rounded.AddPhotoAlternate,
+                painterResource(R.drawable.add_photo_alternate_fill_48px),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(32.dp),

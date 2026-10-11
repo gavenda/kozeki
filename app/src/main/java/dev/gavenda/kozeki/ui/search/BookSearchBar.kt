@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,11 +19,6 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.delete
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.ExpandedDockedSearchBar
 import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.Icon
@@ -51,9 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
@@ -68,6 +65,7 @@ import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.ReadingProgressRing
 import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -125,18 +123,19 @@ fun BookSearchBar(
                 if (expanded) {
                     IconButton(onClick = { scope.launch { searchBarState.animateToCollapsed() } }) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            painterResource(R.drawable.arrow_back_48px),
                             contentDescription = stringResource(R.string.action_back),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 } else {
-                    Icon(Icons.Rounded.Search, contentDescription = null)
+                    Icon(painterResource(R.drawable.search_48px), contentDescription = null, modifier = Modifier.size(24.dp))
                 }
             },
             trailingIcon = if (expanded && hasQuery) {
                 {
                     IconButton(onClick = { textFieldState.clearText() }) {
-                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.search_clear))
+                        Icon(painterResource(R.drawable.close_48px), contentDescription = stringResource(R.string.search_clear), modifier = Modifier.size(24.dp))
                     }
                 }
             } else {
@@ -200,15 +199,17 @@ fun BookSearchBar(
 private fun SearchResults(state: SearchUiState, onBookClick: (Book) -> Unit, modifier: Modifier = Modifier) {
     when {
         state.query.isEmpty() -> SearchMessage(
-            icon = Icons.Rounded.Search,
+            expression = Expression.CURIOUS,
+            icon = painterResource(R.drawable.search_48px),
             title = stringResource(R.string.search_books_hint),
             message = stringResource(R.string.search_books_prompt),
             modifier = modifier,
         )
 
         state.isEmpty -> SearchMessage(
-            icon = Icons.Rounded.SearchOff,
-            title = stringResource(R.string.search_no_results),
+            expression = Expression.DOWNCAST,
+            icon = painterResource(R.drawable.search_off_48px),
+            title = stringResource(R.string.search_books_no_results_title),
             message = stringResource(R.string.search_books_no_results, state.query),
             modifier = modifier,
         )
@@ -276,9 +277,15 @@ private fun SearchResultItem(book: Book, onClick: () -> Unit, modifier: Modifier
 
 /** What the open search shows instead of results. It scrolls, since the keyboard leaves it little room. */
 @Composable
-private fun SearchMessage(icon: ImageVector, title: String, message: String, modifier: Modifier = Modifier) {
+private fun SearchMessage(
+    expression: Expression,
+    icon: Painter,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+) {
     Box(modifier.verticalScroll(rememberScrollState())) {
-        EmptyState(icon = icon, title = title, message = message)
+        EmptyState(expression = expression, icon = icon, title = title, message = message)
     }
 }
 

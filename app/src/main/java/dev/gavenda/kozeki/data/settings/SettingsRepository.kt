@@ -4,14 +4,16 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.gavenda.kozeki.data.backup.DriveLink
+import dev.gavenda.kozeki.data.backup.drive.DriveLinkStore
 import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -38,7 +40,22 @@ enum class ReaderTheme { SYSTEM, LIGHT, SEPIA, DARK }
 
 enum class ReaderFont { PUBLISHER, SERIF, SANS_SERIF, MONOSPACE }
 
-class SettingsRepository(context: Context) {
+/**
+ * The settings as they go into a backup. One that was never changed is null, and putting the
+ * backup back leaves it as it is on the device.
+ */
+@Serializable
+data class SettingsSnapshot(
+    val dailyGoalMinutes: Int? = null,
+    val themeMode: ThemeMode? = null,
+    val readerPreferences: ReaderPreferences? = null,
+    val lastCurrency: String? = null,
+    val librarySort: String? = null,
+    val libraryDisplay: String? = null,
+    val searchSource: MetadataSource? = null,
+)
+
+class SettingsRepository(context: Context) : DriveLinkStore {
 
     private val store = context.applicationContext.dataStore
     private val json = Json { ignoreUnknownKeys = true }
@@ -49,11 +66,6 @@ class SettingsRepository(context: Context) {
 
     val themeMode: Flow<ThemeMode> = store.data
         .map { prefs -> ThemeMode.entries.find { it.name == prefs[Keys.ThemeMode] } ?: ThemeMode.SYSTEM }
-        .distinctUntilChanged()
-
-    /** Whether the theme follows the wallpaper instead of the app's own seed colour. */
-    val dynamicColor: Flow<Boolean> = store.data
-        .map { it[Keys.DynamicColor] ?: true }
         .distinctUntilChanged()
 
     val readerPreferences: Flow<ReaderPreferences> = store.data
@@ -88,16 +100,53 @@ class SettingsRepository(context: Context) {
         }
         set(value) = searchPreferences.edit { putString(SEARCH_SOURCE, value.name) }
 
+    /**
+     * The Google account backups go to, or null while nobody is signed in. It says where the
+     * backup is, not what is in the library, so it is no part of a [SettingsSnapshot].
+     */
+    override val driveLink: Flow<DriveLink?> = store.data
+        .map { prefs -> prefs[Keys.DriveLink]?.let { runCatching { json.decodeFromString<DriveLink>(it) }.getOrNull() } }
+        .distinctUntilChanged()
+
+    override suspend fun setDriveLink(link: DriveLink?) {
+        store.edit { prefs ->
+            if (link == null) prefs.remove(Keys.DriveLink) else prefs[Keys.DriveLink] = json.encodeToString(link)
+        }
+    }
+
+    suspend fun snapshot(): SettingsSnapshot {
+        val prefs = store.data.first()
+        return SettingsSnapshot(
+            dailyGoalMinutes = prefs[Keys.DailyGoalMinutes],
+            themeMode = ThemeMode.entries.find { it.name == prefs[Keys.ThemeMode] },
+            readerPreferences = prefs[Keys.ReaderPreferences]
+                ?.let { runCatching { json.decodeFromString<ReaderPreferences>(it) }.getOrNull() },
+            lastCurrency = prefs[Keys.LastCurrency],
+            librarySort = prefs[Keys.LibrarySort],
+            libraryDisplay = prefs[Keys.LibraryDisplay],
+            searchSource = MetadataSource.entries.find { it.name == searchPreferences.getString(SEARCH_SOURCE, null) },
+        )
+    }
+
+    /** Takes over what [snapshot] holds, in one write. */
+    suspend fun restore(snapshot: SettingsSnapshot) {
+        store.edit { prefs ->
+            snapshot.dailyGoalMinutes?.let { prefs[Keys.DailyGoalMinutes] = it.coerceIn(1, 24 * 60) }
+            snapshot.themeMode?.let { prefs[Keys.ThemeMode] = it.name }
+            snapshot.readerPreferences?.let { prefs[Keys.ReaderPreferences] = json.encodeToString(it) }
+            snapshot.lastCurrency?.let { prefs[Keys.LastCurrency] = it }
+            snapshot.librarySort?.let { prefs[Keys.LibrarySort] = it }
+            snapshot.libraryDisplay?.let { prefs[Keys.LibraryDisplay] = it }
+        }
+        snapshot.searchSource?.let { searchSource = it }
+    }
+
     suspend fun setDailyGoalMinutes(minutes: Int) {
         store.edit { it[Keys.DailyGoalMinutes] = minutes.coerceIn(1, 24 * 60) }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         store.edit { it[Keys.ThemeMode] = mode.name }
-    }
-
-    suspend fun setDynamicColor(enabled: Boolean) {
-        store.edit { it[Keys.DynamicColor] = enabled }
     }
 
     suspend fun setReaderPreferences(preferences: ReaderPreferences) {
@@ -119,11 +168,11 @@ class SettingsRepository(context: Context) {
     private object Keys {
         val DailyGoalMinutes = intPreferencesKey("daily_goal_minutes")
         val ThemeMode = stringPreferencesKey("theme_mode")
-        val DynamicColor = booleanPreferencesKey("dynamic_color")
         val ReaderPreferences = stringPreferencesKey("reader_preferences")
         val LastCurrency = stringPreferencesKey("last_currency")
         val LibrarySort = stringPreferencesKey("library_sort")
         val LibraryDisplay = stringPreferencesKey("library_display")
+        val DriveLink = stringPreferencesKey("drive_link")
     }
 
     companion object {

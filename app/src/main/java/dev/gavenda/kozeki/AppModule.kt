@@ -2,6 +2,11 @@ package dev.gavenda.kozeki
 
 import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Build
+import dev.gavenda.kozeki.data.backup.BackupRepository
+import dev.gavenda.kozeki.data.backup.drive.DriveApi
+import dev.gavenda.kozeki.data.backup.drive.DriveBackup
+import dev.gavenda.kozeki.data.backup.drive.PlayServicesDriveAuthorizer
 import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.epub.Readium
 import dev.gavenda.kozeki.data.files.BookStorage
@@ -36,6 +41,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidApplication
 import org.koin.android.ext.koin.androidContext
@@ -107,6 +113,26 @@ val appModule = module {
 
     single { MatchService(get(), get()) }
 
+    single { BackupRepository(get(), get(), get(), get(), BuildConfig.VERSION_NAME, Build.MODEL) }
+
+    single {
+        val library = get<LibraryRepository>()
+        val scope = get<CoroutineScope>()
+        val matchPending = scheduleMatching()
+        DriveBackup(
+            auth = PlayServicesDriveAuthorizer(androidContext()),
+            drive = DriveApi(get()),
+            library = get<BackupRepository>(),
+            links = get<SettingsRepository>(),
+            scope = scope,
+            // The books come back without their cover pictures, and some still waiting for a lookup.
+            onRestored = {
+                matchPending()
+                scope.launch { library.downloadMissingCovers() }
+            },
+        )
+    }
+
     viewModel { LibraryViewModel(get(), get(), get(), get(), scheduleMatching()) }
 
     viewModel { AddBookViewModel(get(), get(), get()) }
@@ -136,6 +162,7 @@ val appModule = module {
             stats = get(),
             hardcoverAuth = get(),
             hardcoverSignIn = get(),
+            driveBackup = get(),
             versionName = BuildConfig.VERSION_NAME,
             clock = get(),
         )

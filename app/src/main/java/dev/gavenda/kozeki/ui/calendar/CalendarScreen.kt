@@ -13,11 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -114,7 +110,7 @@ fun CalendarContent(
                 },
                 actions = {
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Rounded.Settings, contentDescription = stringResource(R.string.settings_title))
+                        Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
                     }
                 },
                 scrollBehavior = scrollBehavior,
@@ -163,14 +159,16 @@ private fun MonthNavigator(
         }
         FilledTonalIconButton(onClick = onPrevious) {
             Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowLeft,
+                painterResource(R.drawable.keyboard_arrow_left_48px),
                 contentDescription = stringResource(R.string.calendar_previous_month),
+                modifier = Modifier.size(24.dp),
             )
         }
         FilledTonalIconButton(onClick = onNext, enabled = state.canGoForward) {
             Icon(
-                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                painterResource(R.drawable.keyboard_arrow_right_48px),
                 contentDescription = stringResource(R.string.calendar_next_month),
+                modifier = Modifier.size(24.dp),
             )
         }
     }
@@ -268,7 +266,7 @@ private fun DayCell(
                     RatingBar(rating = rating, starSize = 8.dp)
                 } else {
                     Icon(
-                        Icons.Rounded.CheckCircle,
+                        painterResource(R.drawable.check_circle_fill_48px),
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(10.dp),

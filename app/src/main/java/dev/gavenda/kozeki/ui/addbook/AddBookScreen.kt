@@ -5,22 +5,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SearchOff
-import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
@@ -40,6 +35,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -54,6 +50,8 @@ import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
@@ -118,8 +116,9 @@ fun AddBookContent(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            painterResource(R.drawable.arrow_back_48px),
                             contentDescription = stringResource(R.string.action_back),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 },
@@ -159,7 +158,7 @@ fun AddBookContent(
                                 disabledContentColor = MaterialTheme.colorScheme.onSurface,
                             ),
                         ) {
-                            Icon(Icons.Rounded.Search, contentDescription = stringResource(R.string.action_search))
+                            Icon(painterResource(R.drawable.search_48px), contentDescription = stringResource(R.string.action_search), modifier = Modifier.size(24.dp))
                         }
                     },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -181,11 +180,12 @@ fun AddBookContent(
                 val results = state.results
                 when {
                     state.loading -> Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                        LoadingIndicator()
+                        HaloLoadingIndicator()
                     }
 
                     state.error != null -> EmptyState(
-                        icon = Icons.Rounded.SearchOff,
+                        expression = Expression.DISMAYED,
+                        icon = painterResource(R.drawable.error_fill_48px),
                         title = stringResource(R.string.add_book_error_title),
                         message = stringResource(state.error.message),
                         action = if (state.error in SetupErrors) {
@@ -196,14 +196,16 @@ fun AddBookContent(
                     )
 
                     results == null -> EmptyState(
-                        icon = Icons.Rounded.TravelExplore,
+                        expression = Expression.STUDIOUS,
+                        icon = painterResource(R.drawable.travel_explore_48px),
                         title = stringResource(R.string.add_book_prompt_title),
                         message = stringResource(R.string.add_book_prompt_message),
                     )
 
                     results.isEmpty() -> EmptyState(
-                        icon = Icons.Rounded.SearchOff,
-                        title = stringResource(R.string.search_no_results),
+                        expression = Expression.WORRIED,
+                        icon = painterResource(R.drawable.search_off_48px),
+                        title = stringResource(R.string.add_book_no_results_title),
                         message = stringResource(R.string.add_book_no_results_message),
                     )
 

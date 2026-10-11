@@ -61,7 +61,7 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
 
-            <!-- The same for one handed over with no type at all, which a filter that names types leaves out. -->
+            <!-- The same for one-handed over with no type at all, which a filter that names types leaves out. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

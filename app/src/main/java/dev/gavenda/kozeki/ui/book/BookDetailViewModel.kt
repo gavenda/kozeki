@@ -182,8 +182,9 @@ class BookDetailViewModel(
         currency: String?,
         purchasedOn: LocalDate?,
         location: String?,
+        memo: String?,
     ) = launch {
-        library.setPurchase(bookId, acquisition, priceMinor, currency, purchasedOn, location)
+        library.setPurchase(bookId, acquisition, priceMinor, currency, purchasedOn, location, memo)
         if (priceMinor != null && currency != null) settings.setLastCurrency(currency)
     }
 

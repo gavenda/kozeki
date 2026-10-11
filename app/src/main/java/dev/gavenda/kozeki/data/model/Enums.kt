@@ -13,7 +13,6 @@ enum class ReadingState {
 enum class Acquisition {
     WISHLIST,
     PURCHASED,
-
     /** An EPUB was imported but no purchase is on record. Having the file says nothing about buying it. */
     DOWNLOADED,
 }

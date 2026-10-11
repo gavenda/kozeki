@@ -63,6 +63,9 @@ enum class LibrarySort(@param:StringRes val label: Int) {
     RECENT(R.string.sort_recent),
     TITLE(R.string.sort_title),
 
+    /** By the first author as their name is written, with the books that name nobody at the end. */
+    AUTHOR(R.string.sort_author),
+
     /** Newest first. */
     DATE_ADDED(R.string.sort_date_added),
 
@@ -74,6 +77,10 @@ enum class LibrarySort(@param:StringRes val label: Int) {
     fun sorted(books: List<Book>): List<Book> = when (this) {
         RECENT -> books
         TITLE -> books.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
+        AUTHOR -> books.sortedWith(
+            compareBy<Book> { it.authors.isEmpty() }
+                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.authors.firstOrNull().orEmpty() },
+        )
         DATE_ADDED -> books.sortedByDescending { it.addedAt }
         RATING -> books.sortedByDescending { it.rating ?: -1f }
     }
@@ -322,11 +329,17 @@ class LibraryViewModel(
      * A single book takes the details as given, which also edits a purchase already on record.
      * With several picked, only those without a purchase get one, so no recorded price is lost.
      */
-    fun markPurchased(priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) =
+    fun markPurchased(
+        priceMinor: Long?,
+        currency: String?,
+        purchasedOn: LocalDate,
+        location: String?,
+        memo: String?,
+    ) =
         withSelection { selection ->
             val books = selection.books.singleOrNull()?.let(::listOf) ?: selection.notPurchased
             books.forEach {
-                library.setPurchase(it.id, Acquisition.PURCHASED, priceMinor, currency, purchasedOn, location)
+                library.setPurchase(it.id, Acquisition.PURCHASED, priceMinor, currency, purchasedOn, location, memo)
             }
             if (priceMinor != null && currency != null) settings.setLastCurrency(currency)
         }
@@ -335,7 +348,7 @@ class LibraryViewModel(
     fun unmarkPurchased() = withSelection { selection ->
         selection.purchased.forEach { book ->
             val unbought = if (book.inLibrary) Acquisition.DOWNLOADED else Acquisition.WISHLIST
-            library.setPurchase(book.id, unbought, null, null, null, null)
+            library.setPurchase(book.id, unbought, null, null, null, null, null)
         }
     }
 

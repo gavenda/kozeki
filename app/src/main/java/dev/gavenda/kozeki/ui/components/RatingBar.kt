@@ -7,16 +7,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.StarHalf
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -53,9 +50,9 @@ fun RatingBar(
     ) {
         for (star in 1..5) {
             val icon = when {
-                value >= star -> Icons.Rounded.Star
-                value >= star - 0.5f -> Icons.AutoMirrored.Rounded.StarHalf
-                else -> Icons.Rounded.StarBorder
+                value >= star -> painterResource(R.drawable.star_fill_48px)
+                value >= star - 0.5f -> painterResource(R.drawable.star_half_48px)
+                else -> painterResource(R.drawable.star_48px)
             }
             val tint = if (value >= star - 0.5f) {
                 MaterialTheme.colorScheme.primary
@@ -64,7 +61,7 @@ fun RatingBar(
             }
             val label = pluralStringResource(R.plurals.rating_stars, star, star)
             Icon(
-                imageVector = icon,
+                painter = icon,
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier

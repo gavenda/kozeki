@@ -21,15 +21,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.PersonOff
-import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -46,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +57,8 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
@@ -136,8 +133,9 @@ fun AuthorContent(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            painterResource(R.drawable.arrow_back_48px),
                             contentDescription = stringResource(R.string.action_back),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 },
@@ -147,19 +145,21 @@ fun AuthorContent(
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
             when {
                 state.loading -> Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                    LoadingIndicator()
+                    HaloLoadingIndicator()
                 }
 
                 state.error != null -> EmptyState(
-                    icon = Icons.Rounded.SearchOff,
+                    expression = Expression.DISMAYED,
+                    icon = painterResource(R.drawable.error_fill_48px),
                     title = stringResource(R.string.author_error_title),
                     message = stringResource(state.error.message),
                     action = { Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) } },
                 )
 
                 state.notFound || author == null -> EmptyState(
-                    icon = Icons.Rounded.PersonOff,
-                    title = stringResource(R.string.author_error_title),
+                    expression = Expression.DUMBFOUNDED,
+                    icon = painterResource(R.drawable.person_off_fill_48px),
+                    title = stringResource(R.string.author_not_found_title),
                     message = stringResource(R.string.author_not_found),
                 )
 
@@ -170,7 +170,8 @@ fun AuthorContent(
                         if (state.books.isEmpty() && !state.canLoadMore) {
                             item(key = "no-books", contentType = "no-books") {
                                 EmptyState(
-                                    icon = Icons.Rounded.SearchOff,
+                                    expression = Expression.DOWNCAST,
+                                    icon = painterResource(R.drawable.search_off_48px),
                                     title = stringResource(R.string.author_no_books_title),
                                     message = stringResource(R.string.author_no_books_message),
                                 )
@@ -217,7 +218,7 @@ private fun AuthorHeader(author: Author, modifier: Modifier = Modifier) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Rounded.Person,
+                    painterResource(R.drawable.person_fill_48px),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(40.dp),

@@ -34,8 +34,6 @@ class MainActivity : ComponentActivity() {
         // Only a fresh launch brings something new; a recreated activity would replay the old intent.
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
-            // Nothing is drawn until the stored choice is read, so the other palette never flashes.
-            val dynamicColor by settings.dynamicColor.collectAsStateWithLifecycle(initialValue = null)
             val themeMode by settings.themeMode.collectAsStateWithLifecycle(initialValue = null)
             LaunchedEffect(themeMode) { applyThemeMode(themeMode ?: return@LaunchedEffect) }
             // Light and dark switch in place rather than by recreating the activity, which would
@@ -45,7 +43,7 @@ class MainActivity : ComponentActivity() {
                 window.setBackgroundDrawableResource(R.color.window_background)
                 enableEdgeToEdge()
             }
-            AppTheme(dynamicColor = dynamicColor ?: return@setContent) {
+            AppTheme {
                 KozekiApp(incomingEpubs)
             }
         }

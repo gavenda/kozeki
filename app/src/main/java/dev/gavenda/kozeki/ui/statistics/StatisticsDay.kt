@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +22,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -37,6 +36,7 @@ import dev.gavenda.kozeki.data.model.DailyStats
 import dev.gavenda.kozeki.data.model.DayReading
 import dev.gavenda.kozeki.data.model.TimelineEntry
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.GoalRing
 import dev.gavenda.kozeki.ui.components.MiniRing
 import dev.gavenda.kozeki.ui.formatDate
@@ -60,7 +60,8 @@ internal fun LazyListScope.dayItems(
     if (day.timeline.isEmpty() && day.completed.isEmpty()) {
         item(key = "day-empty") {
             EmptyState(
-                icon = Icons.Rounded.AutoStories,
+                expression = Expression.ASLEEP,
+                icon = painterResource(R.drawable.auto_stories_off_48px),
                 title = stringResource(R.string.stats_day_empty_title),
                 message = stringResource(R.string.stats_day_empty_message),
             )
@@ -117,13 +118,24 @@ private fun WeekStrip(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                // The selected day's tint is too deep for what reads on the background around it,
+                // so everything on it takes the colour the theme pairs with that tint.
+                val onTint = MaterialTheme.colorScheme.onSecondaryContainer
                 Text(
                     text = reading.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isSelected) onTint else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                MiniRing(progress = progress) {
-                    Text(reading.date.dayOfMonth.toString(), style = MaterialTheme.typography.labelMedium)
+                MiniRing(
+                    progress = progress,
+                    color = if (isSelected) onTint else MaterialTheme.colorScheme.tertiary,
+                    trackColor = if (isSelected) onTint.copy(alpha = 0.3f) else MaterialTheme.colorScheme.tertiaryContainer,
+                ) {
+                    Text(
+                        text = reading.date.dayOfMonth.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isSelected) onTint else Color.Unspecified,
+                    )
                 }
             }
         }

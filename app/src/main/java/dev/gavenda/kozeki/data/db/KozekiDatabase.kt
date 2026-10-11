@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         YearlyGoalEntity::class,
         MetadataCacheEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -31,11 +31,12 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun yearlyGoalDao(): YearlyGoalDao
     abstract fun metadataCacheDao(): MetadataCacheDao
+    abstract fun backupDao(): BackupDao
 
     companion object {
         fun create(context: Context): KozekiDatabase =
             Room.databaseBuilder(context, KozekiDatabase::class.java, "kozeki.db")
-                .addMigrations(DropGoogleBooks, AddAuthorRefs, AddCustomCover, AddPhysicalReadings)
+                .addMigrations(DropGoogleBooks, AddAuthorRefs, AddCustomCover, AddPhysicalReadings, AddPurchaseMemo)
                 .build()
 
         /**
@@ -101,6 +102,13 @@ abstract class KozekiDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_physical_readings_bookId` ON `physical_readings` (`bookId`)",
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_physical_readings_day` ON `physical_readings` (`day`)")
+            }
+        }
+
+        /** A purchase can carry a memo. None of the ones already on record has one. */
+        private val AddPurchaseMemo = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN purchaseMemo TEXT")
             }
         }
     }

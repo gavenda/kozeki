@@ -8,21 +8,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,13 +37,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import dev.gavenda.kozeki.R
@@ -56,7 +51,9 @@ import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.PhysicalReading
 import dev.gavenda.kozeki.data.model.pagesUnread
+import dev.gavenda.kozeki.ui.DialogPreviews
 import dev.gavenda.kozeki.ui.PreviewData
+import dev.gavenda.kozeki.ui.components.HistoryTextField
 import dev.gavenda.kozeki.ui.defaultCurrency
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.parsePrice
@@ -203,7 +200,7 @@ private fun RewindDialog(page: Int?, pagesLost: Int, onConfirm: () -> Unit, onDi
     AlertDialog(
         onDismissRequest = onDismiss,
         // With an icon the dialog centres its headline, as Material 3 lays out a dialog that has one.
-        icon = { Icon(Icons.Rounded.History, contentDescription = null) },
+        icon = { Icon(painterResource(R.drawable.history_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         iconContentColor = MaterialTheme.colorScheme.error,
         title = {
             Text(
@@ -224,11 +221,15 @@ private fun RewindDialog(page: Int?, pagesLost: Int, onConfirm: () -> Unit, onDi
             )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    stringResource(if (page != null) R.string.physical_rewind_confirm else R.string.physical_stop),
-                    color = MaterialTheme.colorScheme.error,
-                )
+            Button(
+                onClick = onConfirm,
+                shapes = ButtonDefaults.shapes(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Text(stringResource(if (page != null) R.string.physical_rewind_confirm else R.string.physical_stop))
             }
         },
         dismissButton = {
@@ -238,7 +239,7 @@ private fun RewindDialog(page: Int?, pagesLost: Int, onConfirm: () -> Unit, onDi
 }
 
 /**
- * Price, currency, date and place of a purchase. A blank price is allowed: the book is owned, cost
+ * Price, currency, date, place and memo of a purchase. A blank price is allowed: the book is owned, cost
  * unknown. [locationHistory] holds the places entered before, which are suggested while typing.
  */
 @Composable
@@ -246,7 +247,7 @@ fun PurchaseDialog(
     book: Book,
     lastCurrency: String?,
     locationHistory: List<String>,
-    onSave: (priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?) -> Unit,
+    onSave: (priceMinor: Long?, currency: String?, purchasedOn: LocalDate, location: String?, memo: String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val initialCurrency = book.purchaseCurrency ?: lastCurrency ?: defaultCurrency().currencyCode
@@ -256,6 +257,7 @@ fun PurchaseDialog(
     var currency by rememberSaveable { mutableStateOf(initialCurrency) }
     var epochDay by rememberSaveable { mutableLongStateOf((book.purchasedOn ?: LocalDate.now()).toEpochDay()) }
     var location by rememberSaveable { mutableStateOf(book.purchaseLocation.orEmpty()) }
+    var memo by rememberSaveable { mutableStateOf(book.purchaseMemo.orEmpty()) }
     var pickingDate by rememberSaveable { mutableStateOf(false) }
 
     val currencyValid = currency.length == 3 &&
@@ -273,6 +275,7 @@ fun PurchaseDialog(
                 currency.takeIf { priceMinor != null },
                 LocalDate.ofEpochDay(epochDay),
                 location.trim().ifEmpty { null },
+                memo.trim().ifEmpty { null },
             )
         },
         onDismiss = onDismiss,
@@ -303,7 +306,7 @@ fun PurchaseDialog(
             label = { Text(stringResource(R.string.purchase_date)) },
             readOnly = true,
             singleLine = true,
-            trailingIcon = { Icon(Icons.Rounded.CalendarMonth, contentDescription = null) },
+            trailingIcon = { Icon(painterResource(R.drawable.calendar_month_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
             // A read-only field swallows clicks, so the tap that opens the calendar is caught on the way down.
             modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
                 awaitEachGesture {
@@ -312,7 +315,23 @@ fun PurchaseDialog(
                 }
             },
         )
-        LocationField(location, onValueChange = { location = it }, history = locationHistory)
+        HistoryTextField(
+            value = location,
+            onValueChange = { location = it },
+            history = locationHistory,
+            label = stringResource(R.string.purchase_location),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+        )
+        OutlinedTextField(
+            value = memo,
+            onValueChange = { memo = it },
+            label = { Text(stringResource(R.string.purchase_memo)) },
+            minLines = 2,
+            maxLines = 5,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 
     if (pickingDate) {
@@ -323,13 +342,14 @@ fun PurchaseDialog(
         DatePickerDialog(
             onDismissRequest = { pickingDate = false },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         pickerState.selectedDateMillis?.let { millis ->
                             epochDay = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
                         }
                         pickingDate = false
                     },
+                    shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(stringResource(R.string.action_ok))
                 }
@@ -339,64 +359,6 @@ fun PurchaseDialog(
             },
         ) {
             DatePicker(state = pickerState)
-        }
-    }
-}
-
-/** Free text. Opening the menu lists the places typed for earlier purchases; typing narrows them down. */
-@Composable
-private fun LocationField(value: String, onValueChange: (String) -> Unit, history: List<String>) {
-    var expanded by remember { mutableStateOf(false) }
-    // Only what was typed since the menu opened filters it, so a saved place does not hide the others.
-    var filtering by remember { mutableStateOf(false) }
-    val typed = value.trim()
-    val suggestions = if (filtering) {
-        history.filter { it.contains(typed, ignoreCase = true) && !it.equals(typed, ignoreCase = true) }
-    } else {
-        history
-    }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = {
-            expanded = it
-            filtering = false
-        },
-    ) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = {
-                onValueChange(it)
-                expanded = true
-                filtering = true
-            },
-            label = { Text(stringResource(R.string.purchase_location)) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
-            trailingIcon = {
-                if (history.isNotEmpty()) {
-                    ExposedDropdownMenuDefaults.TrailingIcon(
-                        expanded = expanded,
-                        modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.SecondaryEditable),
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-        )
-        ExposedDropdownMenu(
-            expanded = expanded && suggestions.isNotEmpty(),
-            onDismissRequest = { expanded = false },
-        ) {
-            suggestions.forEach { suggestion ->
-                DropdownMenuItem(
-                    text = { Text(suggestion) },
-                    onClick = {
-                        onValueChange(suggestion)
-                        expanded = false
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                )
-            }
         }
     }
 }
@@ -419,7 +381,9 @@ private fun FormDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onSave, enabled = saveEnabled) { Text(saveLabel) } },
+        confirmButton = {
+            Button(onClick = onSave, enabled = saveEnabled, shapes = ButtonDefaults.shapes()) { Text(saveLabel) }
+        },
         dismissButton = {
             // The dialog lays these out from the end, so the one written last comes first.
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
@@ -441,13 +405,13 @@ private fun FormDialog(
     )
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun NoteDialogPreview() {
     AppTheme { NoteDialog(note = PreviewData.notes.first(), onSave = {}, onDelete = {}, onDismiss = {}) }
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun PurchaseDialogPreview() {
     AppTheme {
@@ -455,13 +419,13 @@ private fun PurchaseDialogPreview() {
             book = PreviewData.books.first(),
             lastCurrency = "USD",
             locationHistory = listOf("Kobo", "Kinokuniya"),
-            onSave = { _, _, _, _ -> },
+            onSave = { _, _, _, _, _ -> },
             onDismiss = {},
         )
     }
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun PhysicalProgressDialogPreview() {
     AppTheme {
@@ -474,13 +438,13 @@ private fun PhysicalProgressDialogPreview() {
     }
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun RewindDialogPreview() {
     AppTheme { RewindDialog(page = 150, pagesLost = 62, onConfirm = {}, onDismiss = {}) }
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun StopTrackingDialogPreview() {
     AppTheme { RewindDialog(page = null, pagesLost = 212, onConfirm = {}, onDismiss = {}) }

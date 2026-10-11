@@ -23,6 +23,10 @@ data class BookFormUiState(
     val book: Book? = null,
     /** True from the moment the form is submitted, so it cannot be submitted twice. */
     val saving: Boolean = false,
+    /** Authors of the books already here, offered again while typing. */
+    val authorHistory: List<String> = emptyList(),
+    /** Publishers of the books already here, offered again while typing. */
+    val publisherHistory: List<String> = emptyList(),
 )
 
 sealed interface BookFormEvent {
@@ -48,6 +52,12 @@ class BookFormViewModel(
     val events: Flow<BookFormEvent> = eventChannel.receiveAsFlow()
 
     init {
+        viewModelScope.launch {
+            library.observeAuthorNames().collect { names -> _uiState.update { it.copy(authorHistory = names) } }
+        }
+        viewModelScope.launch {
+            library.observePublishers().collect { names -> _uiState.update { it.copy(publisherHistory = names) } }
+        }
         if (bookId != null) {
             viewModelScope.launch {
                 val book = library.getBook(bookId)

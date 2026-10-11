@@ -1,21 +1,27 @@
 package dev.gavenda.kozeki.ui.statistics
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -23,6 +29,8 @@ import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.AllTimeStats
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.Expression
+import dev.gavenda.kozeki.ui.components.HaloMark
 import dev.gavenda.kozeki.ui.components.StatTile
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
@@ -36,7 +44,8 @@ internal fun LazyListScope.allTimeItems(stats: AllTimeStats, onBookClick: (Book)
     if (stats.isEmpty) {
         item(key = "all-time-empty") {
             EmptyState(
-                icon = Icons.Rounded.AutoStories,
+                expression = Expression.CONTENT,
+                icon = painterResource(R.drawable.auto_stories_48px),
                 title = stringResource(R.string.stats_all_time_empty_title),
                 message = stringResource(R.string.stats_all_time_empty_message),
             )
@@ -93,23 +102,37 @@ internal fun LazyListScope.allTimeItems(stats: AllTimeStats, onBookClick: (Book)
 @Composable
 private fun AllTimeSummary(stats: AllTimeStats) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-        ) {
-            // Only purchases may be on record, and those say nothing about when reading began.
-            stats.since?.let { since ->
+        Box {
+            // Far taller than the card, which cuts it off: what shows is its hub and hands, and the
+            // rings coming in from the trailing edge.
+            HaloMark(
+                Modifier
+                    .matchParentSize()
+                    .wrapContentSize(Alignment.CenterEnd, unbounded = true)
+                    .offset(x = 64.dp)
+                    .size(200.dp)
+                    // Faded as one piece. Line by line, it would be darker wherever two of them cross.
+                    // Its colour is a pale one, so it is left more of it on a light card to show as much.
+                    .alpha(if (MaterialTheme.colorScheme.surfaceContainerLow.luminance() > 0.5f) 1.0f else 0.5f),
+            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            ) {
+                // Only purchases may be on record, and those say nothing about when reading began.
+                stats.since?.let { since ->
+                    Text(
+                        text = stringResource(R.string.stats_since, formatDate(since)),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
-                    text = stringResource(R.string.stats_since, formatDate(since)),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = pluralStringResource(R.plurals.stats_books_finished, stats.completed.size, stats.completed.size),
+                    style = MaterialTheme.typography.headlineMediumEmphasized,
                 )
             }
-            Text(
-                text = pluralStringResource(R.plurals.stats_books_finished, stats.completed.size, stats.completed.size),
-                style = MaterialTheme.typography.headlineMediumEmphasized,
-            )
         }
     }
 }

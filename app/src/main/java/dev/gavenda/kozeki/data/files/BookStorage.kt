@@ -31,7 +31,7 @@ class BookStorage(context: Context) {
     private val importDir = File(context.cacheDir, "import")
     private val resolver: ContentResolver = context.contentResolver
 
-    fun epubFile(bookId: String): File = File(booksDir, "$bookId.epub")
+    fun epubFile(bookId: String): File = File(booksDir, "$bookId$EPUB")
 
     fun hasEpub(bookId: String): Boolean = epubFile(bookId).isFile
 
@@ -126,6 +126,29 @@ class BookStorage(context: Context) {
         if (coverName != null) coverFile(coverName).delete()
     }
 
+    /**
+     * Brings the files in line with a library that was just replaced by another. [epubs] maps the
+     * book each EPUB worth keeping was filed under onto the book it belongs to now, and [covers]
+     * names the covers still in use. Every other EPUB and cover is deleted.
+     */
+    suspend fun keepOnly(epubs: Map<String, String>, covers: Set<String>): Unit = withContext(Dispatchers.IO) {
+        // Set aside first, so that a file moving to an ID another file is moving away from is not lost.
+        val moving = epubs.filter { (from, to) -> from != to }
+            .mapNotNull { (from, to) ->
+                val aside = File(booksDir, "$to$EPUB.moving")
+                if (epubFile(from).renameTo(aside)) aside to epubFile(to) else null
+            }
+        val kept = epubs.values.toSet()
+        booksDir.listFiles().orEmpty()
+            .filter { it.name.endsWith(EPUB) && it.name.removeSuffix(EPUB) !in kept }
+            .forEach { it.delete() }
+        moving.forEach { (aside, target) ->
+            target.delete()
+            aside.renameTo(target)
+        }
+        coversDir.listFiles().orEmpty().filter { it.name !in covers }.forEach { it.delete() }
+    }
+
     // A fresh name per save, so image caches keyed by path never show a stale cover.
     private fun coverName(bookId: String): String = "$bookId-${System.currentTimeMillis()}.jpg"
 
@@ -151,5 +174,6 @@ class BookStorage(context: Context) {
 
     private companion object {
         const val MAX_COVER_EDGE = 1200
+        const val EPUB = ".epub"
     }
 }

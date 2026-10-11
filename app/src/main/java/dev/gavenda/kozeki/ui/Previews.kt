@@ -8,3 +8,11 @@ import androidx.compose.ui.tooling.preview.Preview
 @Preview(name = "Phone, dark", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Preview(name = "Tablet", showBackground = true, device = "spec:width=1280dp,height=800dp,dpi=240")
 annotation class ScreenPreviews
+
+/**
+ * Previews a dialog in both themes. A dialog is drawn in a window of its own and leaves the preview
+ * itself empty, which Android Studio sizes to nothing and shows blank, so the whole screen is asked for.
+ */
+@Preview(name = "Light", showSystemUi = true)
+@Preview(name = "Dark", showSystemUi = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+annotation class DialogPreviews

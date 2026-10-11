@@ -66,6 +66,7 @@ object PreviewData {
             purchaseCurrency = "USD",
             purchasedOn = Today.minusDays(40),
             purchaseLocation = "Kobo",
+            purchaseMemo = "Bundle with the sequel, 20% off",
         ),
         Book(
             id = "2",

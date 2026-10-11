@@ -5,12 +5,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -19,12 +20,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.ui.DialogPreviews
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -39,7 +41,7 @@ fun DeleteBooksDialog(books: List<Book>, onConfirm: () -> Unit, onDismiss: () ->
     AlertDialog(
         onDismissRequest = onDismiss,
         // With an icon the dialog centres its headline, as Material 3 lays out a dialog that has one.
-        icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+        icon = { Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         iconContentColor = MaterialTheme.colorScheme.error,
         title = { Text(pluralStringResource(R.plurals.delete_books_title, count, count)) },
         text = {
@@ -88,11 +90,15 @@ fun DeleteBooksDialog(books: List<Book>, onConfirm: () -> Unit, onDismiss: () ->
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(
-                    pluralStringResource(R.plurals.delete_books_confirm, count),
-                    color = MaterialTheme.colorScheme.error,
-                )
+            Button(
+                onClick = onConfirm,
+                shapes = ButtonDefaults.shapes(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Text(pluralStringResource(R.plurals.delete_books_confirm, count))
             }
         },
         dismissButton = {
@@ -101,13 +107,13 @@ fun DeleteBooksDialog(books: List<Book>, onConfirm: () -> Unit, onDismiss: () ->
     )
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun DeleteBookDialogPreview() {
     AppTheme { DeleteBooksDialog(books = PreviewData.books.take(1), onConfirm = {}, onDismiss = {}) }
 }
 
-@PreviewLightDark
+@DialogPreviews
 @Composable
 private fun DeleteBooksDialogPreview() {
     AppTheme { DeleteBooksDialog(books = PreviewData.books, onConfirm = {}, onDismiss = {}) }

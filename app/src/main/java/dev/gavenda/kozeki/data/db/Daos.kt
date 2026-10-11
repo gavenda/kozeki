@@ -7,6 +7,9 @@ import androidx.room.Upsert
 import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
 
+/** The authors column on its own, which Room reads as the list it holds. */
+data class BookAuthors(val authors: List<String>)
+
 @Dao
 interface BookDao {
 
@@ -52,6 +55,17 @@ interface BookDao {
             "GROUP BY purchaseLocation COLLATE NOCASE ORDER BY MAX(purchasedOn) DESC, MAX(updatedAt) DESC",
     )
     fun observePurchaseLocations(): Flow<List<String>>
+
+    /** The authors of every book, the one changed last first, as suggestions for the next one. */
+    @Query("SELECT authors FROM books WHERE deletedAt IS NULL ORDER BY updatedAt DESC")
+    fun observeAuthors(): Flow<List<BookAuthors>>
+
+    /** Every publisher a book has, the one used last first, as suggestions for the next one. */
+    @Query(
+        "SELECT publisher FROM books WHERE deletedAt IS NULL AND publisher IS NOT NULL AND publisher != '' " +
+            "GROUP BY publisher COLLATE NOCASE ORDER BY MAX(updatedAt) DESC",
+    )
+    fun observePublishers(): Flow<List<String>>
 
     @Upsert
     suspend fun upsert(book: BookEntity)
@@ -272,4 +286,67 @@ interface MetadataCacheDao {
 
     @Query("SELECT COUNT(*) FROM metadata_cache")
     fun observeCount(): Flow<Int>
+}
+
+/**
+ * The library as a whole, for copying it into a backup and putting one back. Rows that were
+ * removed are left out of a copy, and putting one back leaves none of what was here before.
+ */
+@Dao
+interface BackupDao {
+
+    @Query("SELECT * FROM books WHERE deletedAt IS NULL")
+    suspend fun books(): List<BookEntity>
+
+    @Query("SELECT * FROM read_throughs WHERE deletedAt IS NULL")
+    suspend fun readThroughs(): List<ReadThroughEntity>
+
+    @Query("SELECT * FROM reading_sessions WHERE deletedAt IS NULL")
+    suspend fun readingSessions(): List<ReadingSessionEntity>
+
+    @Query("SELECT * FROM physical_readings WHERE deletedAt IS NULL")
+    suspend fun physicalReadings(): List<PhysicalReadingEntity>
+
+    @Query("SELECT * FROM notes WHERE deletedAt IS NULL")
+    suspend fun notes(): List<NoteEntity>
+
+    @Query("SELECT * FROM yearly_goals WHERE deletedAt IS NULL")
+    suspend fun yearlyGoals(): List<YearlyGoalEntity>
+
+    @Query("DELETE FROM books")
+    suspend fun clearBooks()
+
+    @Query("DELETE FROM read_throughs")
+    suspend fun clearReadThroughs()
+
+    @Query("DELETE FROM reading_sessions")
+    suspend fun clearReadingSessions()
+
+    @Query("DELETE FROM physical_readings")
+    suspend fun clearPhysicalReadings()
+
+    @Query("DELETE FROM notes")
+    suspend fun clearNotes()
+
+    @Query("DELETE FROM yearly_goals")
+    suspend fun clearYearlyGoals()
+
+    // Upserts, so a backup that names a row twice still goes in.
+    @Upsert
+    suspend fun putBooks(rows: List<BookEntity>)
+
+    @Upsert
+    suspend fun putReadThroughs(rows: List<ReadThroughEntity>)
+
+    @Upsert
+    suspend fun putReadingSessions(rows: List<ReadingSessionEntity>)
+
+    @Upsert
+    suspend fun putPhysicalReadings(rows: List<PhysicalReadingEntity>)
+
+    @Upsert
+    suspend fun putNotes(rows: List<NoteEntity>)
+
+    @Upsert
+    suspend fun putYearlyGoals(rows: List<YearlyGoalEntity>)
 }

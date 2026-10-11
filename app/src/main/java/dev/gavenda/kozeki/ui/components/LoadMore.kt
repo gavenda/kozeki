@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -41,7 +40,7 @@ fun LazyListScope.loadingMoreItem(visible: Boolean) {
     if (!visible) return
     item(key = "loading-more", contentType = "loading-more") {
         Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-            LoadingIndicator()
+            HaloLoadingIndicator()
         }
     }
 }

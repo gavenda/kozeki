@@ -45,8 +45,8 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.6"
+        versionCode = 8
+        versionName = "2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -130,7 +130,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material3.adaptive.navigation.suite)
     implementation(libs.androidx.compose.material3.adaptive)
-    implementation(libs.androidx.compose.material.icons.extended)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.materialKolor.material3)
@@ -141,11 +140,15 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.okhttp)
+
+    // Asks Google for access to the user's Drive, which is where backups go.
+    implementation(libs.play.services.auth)
 
     implementation(libs.readium.shared)
     implementation(libs.readium.streamer)

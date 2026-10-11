@@ -1,22 +1,12 @@
 package dev.gavenda.kozeki.ui.components
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.MenuBook
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.Cancel
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PauseCircle
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,8 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -49,23 +39,25 @@ val ReadingState.labelRes: Int
         ReadingState.PAUSED -> R.string.state_paused
     }
 
-val ReadingState.icon: ImageVector
+@get:DrawableRes
+val ReadingState.icon: Int
     get() = when (this) {
-        ReadingState.PLANNED -> Icons.Rounded.Bookmark
-        ReadingState.READING -> Icons.AutoMirrored.Rounded.MenuBook
-        ReadingState.COMPLETED -> Icons.Rounded.CheckCircle
-        ReadingState.DROPPED -> Icons.Rounded.Cancel
-        ReadingState.PAUSED -> Icons.Rounded.PauseCircle
+        ReadingState.PLANNED -> R.drawable.schedule_fill_48px
+        ReadingState.READING -> R.drawable.menu_book_fill_48px
+        ReadingState.COMPLETED -> R.drawable.check_circle_fill_48px
+        ReadingState.DROPPED -> R.drawable.stop_circle_fill_48px
+        ReadingState.PAUSED -> R.drawable.pause_circle_fill_48px
     }
 
 /** The [icon] as a bare glyph, without the disc around it, light enough to lie over a cover. */
-val ReadingState.outlinedIcon: ImageVector
+@get:DrawableRes
+val ReadingState.outlinedIcon: Int
     get() = when (this) {
-        ReadingState.PLANNED -> Icons.Outlined.BookmarkBorder
-        ReadingState.READING -> Icons.AutoMirrored.Outlined.MenuBook
-        ReadingState.COMPLETED -> Icons.Rounded.Check
-        ReadingState.DROPPED -> Icons.Rounded.Close
-        ReadingState.PAUSED -> Icons.Rounded.Pause
+        ReadingState.PLANNED -> R.drawable.schedule_48px
+        ReadingState.READING -> R.drawable.menu_book_48px
+        ReadingState.COMPLETED -> R.drawable.done_all_48px
+        ReadingState.DROPPED -> R.drawable.stop_fill_48px
+        ReadingState.PAUSED -> R.drawable.pause_fill_48px
     }
 
 /** The order states are offered in: the path a book usually takes, then the ways it can stall. */
@@ -91,7 +83,7 @@ fun ReadingStateBadge(state: ReadingState, modifier: Modifier = Modifier) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(state.icon, contentDescription = null, modifier = Modifier.size(14.dp))
+            Icon(painterResource(state.icon), contentDescription = null, modifier = Modifier.size(14.dp))
             Text(stringResource(state.labelRes), style = MaterialTheme.typography.labelMedium)
         }
     }

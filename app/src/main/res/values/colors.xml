@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="window_background">#FFF9FAEF</color>
+    <!-- The halo's own colour, measured off the character sheet. It alone keeps its colour whatever the theme. -->
+    <color name="halo">#FFDACBBD</color>
 </resources>

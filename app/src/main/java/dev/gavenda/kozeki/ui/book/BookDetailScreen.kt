@@ -27,17 +27,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.BookmarkAdd
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Favorite
-import androidx.compose.material.icons.rounded.FavoriteBorder
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -72,9 +61,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -100,6 +91,7 @@ import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.icon
@@ -131,7 +123,7 @@ class BookDetailActions(
     val onReadAgain: () -> Unit = {},
     val onSetFavorite: (Boolean) -> Unit = {},
     val onSetRating: (Float?) -> Unit = {},
-    val onSetPurchase: (Acquisition, Long?, String?, LocalDate?, String?) -> Unit = { _, _, _, _, _ -> },
+    val onSetPurchase: (Acquisition, Long?, String?, LocalDate?, String?, String?) -> Unit = { _, _, _, _, _, _ -> },
     val onSetPhysicalProgress: (Int?, Int?) -> Unit = { _, _ -> },
     val onSaveNote: (String?, String) -> Unit = { _, _ -> },
     val onDeleteNote: (String) -> Unit = {},
@@ -298,8 +290,9 @@ fun BookDetailContent(
                 navigationIcon = {
                     IconButton(onClick = actions.onBack) {
                         Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            painterResource(R.drawable.arrow_back_48px),
                             contentDescription = stringResource(R.string.action_back),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 },
@@ -308,18 +301,20 @@ fun BookDetailContent(
                         if (book.canFavorite) {
                             IconToggleButton(checked = book.isFavorite, onCheckedChange = actions.onSetFavorite) {
                                 Icon(
-                                    if (book.isFavorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                                    if (book.isFavorite) painterResource(R.drawable.favorite_fill_48px) else painterResource(R.drawable.favorite_48px),
                                     contentDescription = stringResource(
                                         if (book.isFavorite) R.string.favorite_remove else R.string.favorite_add,
                                     ),
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
                         }
                         Box {
                             IconButton(onClick = { menuOpen = true }) {
                                 Icon(
-                                    Icons.Rounded.MoreVert,
+                                    painterResource(R.drawable.more_vert_48px),
                                     contentDescription = stringResource(R.string.book_more_actions),
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -379,7 +374,7 @@ fun BookDetailContent(
     ) { innerPadding ->
         if (book == null) {
             Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-                if (state.loading) LoadingIndicator() else Text(stringResource(R.string.book_not_found))
+                if (state.loading) HaloLoadingIndicator() else Text(stringResource(R.string.book_not_found))
             }
             return@Scaffold
         }
@@ -429,7 +424,7 @@ fun BookDetailContent(
                     item(key = "notes-header") {
                         SectionTitle(stringResource(R.string.notes_title)) {
                             TextButton(onClick = { editingNoteId = "" }) {
-                                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(painterResource(R.drawable.add_48px), contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text(stringResource(R.string.note_add))
                             }
@@ -497,9 +492,9 @@ fun BookDetailContent(
                 book = book,
                 lastCurrency = state.lastCurrency,
                 locationHistory = state.purchaseLocations,
-                onSave = { price, currency, date, location ->
+                onSave = { price, currency, date, location, memo ->
                     editingPurchase = false
-                    actions.onSetPurchase(Acquisition.PURCHASED, price, currency, date, location)
+                    actions.onSetPurchase(Acquisition.PURCHASED, price, currency, date, location, memo)
                 },
                 onDismiss = { editingPurchase = false },
             )
@@ -597,7 +592,7 @@ private fun AddActions(onAdd: (Acquisition) -> Unit) {
             shapes = ButtonDefaults.shapes(),
             modifier = Modifier.weight(1f),
         ) {
-            Icon(Icons.Rounded.BookmarkAdd, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            Icon(painterResource(R.drawable.kid_star_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
             Text(stringResource(R.string.add_book_to_wishlist))
         }
@@ -606,7 +601,7 @@ private fun AddActions(onAdd: (Acquisition) -> Unit) {
             shapes = ButtonDefaults.shapes(),
             modifier = Modifier.weight(1f),
         ) {
-            Icon(Icons.Rounded.Check, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            Icon(painterResource(R.drawable.purchased_book_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
             Text(stringResource(R.string.add_book_as_purchased))
         }
@@ -623,7 +618,7 @@ private fun PrimaryAction(book: Book, importing: Boolean, actions: BookDetailAct
                     shapes = ButtonDefaults.shapes(),
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.AutoMirrored.Rounded.MenuBook, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                    Icon(painterResource(R.drawable.menu_book_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(
                         stringResource(
@@ -653,7 +648,7 @@ private fun PrimaryAction(book: Book, importing: Boolean, actions: BookDetailAct
                     if (importing) {
                         LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
                     } else {
-                        Icon(Icons.Rounded.UploadFile, contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                        Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
                     }
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(R.string.import_epub))
@@ -677,7 +672,7 @@ private fun StateSelector(current: ReadingState, onSetState: (ReadingState) -> U
                     label = { Text(stringResource(state.labelRes)) },
                     leadingIcon = {
                         Icon(
-                            if (selected) Icons.Rounded.Check else state.icon,
+                            painterResource(if (selected) R.drawable.check_48px else state.icon),
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )
@@ -737,17 +732,19 @@ private fun ProgressCard(book: Book, readingTimeMs: Long, readThroughs: List<Rea
  */
 @Composable
 private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit) {
+    // The paper copy is told from the EPUB by its colour as well: the theme's leather.
+    val leather = MaterialTheme.colorScheme.tertiary
     val page = book.physicalPage
     if (page == null) {
         OutlinedCard {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    ProgressLabel(stringResource(R.string.progress_physical))
+                    ProgressLabel(stringResource(R.string.progress_physical), leather)
                     MutedText(stringResource(R.string.physical_prompt))
                 }
                 Spacer(Modifier.width(8.dp))
                 FilledTonalButton(onClick = onEdit, shapes = ButtonDefaults.shapes()) {
-                    Text(stringResource(R.string.physical_set))
+                    Text(stringResource(R.string.physical_track))
                 }
             }
         }
@@ -755,11 +752,16 @@ private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit) {
     }
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ProgressLabel(stringResource(R.string.progress_physical))
+            ProgressLabel(stringResource(R.string.progress_physical), leather)
             val progression = book.physicalProgression
             if (progression != null) {
                 Text(formatPercent(progression), style = MaterialTheme.typography.displaySmallEmphasized)
-                LinearWavyProgressIndicator(progress = { progression.toFloat() }, modifier = Modifier.fillMaxWidth())
+                LinearWavyProgressIndicator(
+                    progress = { progression.toFloat() },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = leather,
+                    trackColor = MaterialTheme.colorScheme.tertiaryContainer,
+                )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val pageCount = book.physicalPageCount
@@ -778,8 +780,8 @@ private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit) {
 
 /** Names which copy of the book a progress card is about. */
 @Composable
-private fun ProgressLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+private fun ProgressLabel(text: String, color: Color = MaterialTheme.colorScheme.primary) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = color)
 }
 
 @Composable
@@ -895,7 +897,7 @@ private fun AboutSection(book: Book) {
             TextButton(onClick = { uriHandler.openUri(url) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
                 Text(stringResource(R.string.book_view_on_source, stringResource(source.nameRes)))
                 Spacer(Modifier.width(4.dp))
-                Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(painterResource(R.drawable.open_in_new_48px), contentDescription = null, modifier = Modifier.size(16.dp))
             }
         }
     }
@@ -905,7 +907,7 @@ private fun AboutSection(book: Book) {
 private fun OwnershipSection(
     book: Book,
     onEdit: () -> Unit,
-    onSetPurchase: (Acquisition, Long?, String?, LocalDate?, String?) -> Unit,
+    onSetPurchase: (Acquisition, Long?, String?, LocalDate?, String?, String?) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.purchase_title))
@@ -919,7 +921,7 @@ private fun OwnershipSection(
             selectedIndex = if (book.acquisition == Acquisition.PURCHASED) 1 else 0,
             onSelect = { index ->
                 if (index == 0) {
-                    onSetPurchase(unbought, null, null, null, null)
+                    onSetPurchase(unbought, null, null, null, null, null)
                 } else {
                     onSetPurchase(
                         Acquisition.PURCHASED,
@@ -927,6 +929,7 @@ private fun OwnershipSection(
                         book.purchaseCurrency,
                         book.purchasedOn,
                         book.purchaseLocation,
+                        book.purchaseMemo,
                     )
                 }
             },
@@ -944,6 +947,7 @@ private fun OwnershipSection(
                         MutedText(stringResource(R.string.purchase_bought_on, formatDate(date)))
                     }
                     book.purchaseLocation?.let { MutedText(it) }
+                    book.purchaseMemo?.let { MutedText(it) }
                 }
                 TextButton(onClick = onEdit) { Text(stringResource(R.string.action_edit)) }
             }
@@ -1036,7 +1040,7 @@ private fun ReviewsStatus(state: ReviewsUiState, onRetry: () -> Unit) {
     val error = state.error
     if (error == null) {
         Box(Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
-            LoadingIndicator()
+            HaloLoadingIndicator()
         }
         return
     }

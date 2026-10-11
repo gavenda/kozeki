@@ -1,10 +1,13 @@
 package dev.gavenda.kozeki.data.db
 
+import kotlinx.serialization.Serializable
+
 /**
  * Bookkeeping every syncable row carries so records can be synced later without a schema change:
  * rows are never hard-deleted ([deletedAt] is a tombstone) and a row is dirty when
  * [updatedAt] is newer than [syncedAt].
  */
+@Serializable
 data class SyncStamp(
     val createdAt: Long,
     val updatedAt: Long,

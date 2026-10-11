@@ -5,48 +5,28 @@ package dev.gavenda.kozeki.ui.theme
 
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.movableContentOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.platform.LocalContext
 import com.materialkolor.PaletteStyle
 import com.materialkolor.material3.DynamicMaterialExpressiveTheme
 
+/** The app's own colours, the same on every device: the wallpaper's are not taken up. */
 @Composable
 fun AppTheme(
     isDark: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val context = LocalContext.current
-    // The two palettes are separate branches, so switching between them would otherwise throw the
-    // whole app away and rebuild it, navigation history included. Movable content is carried over.
-    val currentContent by rememberUpdatedState(content)
-    val movableContent = remember { movableContentOf { currentContent() } }
-
-    // Every supported Android version has wallpaper colours, so the seed is only the opt-out.
-    if (dynamicColor) {
-        MaterialExpressiveTheme(
-            colorScheme = if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context),
-            motionScheme = MotionScheme.expressive(),
-            content = movableContent,
-        )
-    } else {
-        DynamicMaterialExpressiveTheme(
-            seedColor = SeedColor,
-            motionScheme = MotionScheme.expressive(),
-            isDark = isDark,
-            style = PaletteStyle.Cmf(),
-            contrastLevel = 0.5,
-            animate = true,
-            animationSpec = tween(durationMillis = 300),
-            content = movableContent,
-        )
-    }
+    DynamicMaterialExpressiveTheme(
+        seedColor = SeedColor,
+        // In place of the two the seed would give. Each sets the hue; how light it comes out is the style's doing.
+        secondary = GoldColor,
+        tertiary = LeatherColor,
+        motionScheme = MotionScheme.expressive(),
+        isDark = isDark,
+        style = PaletteStyle.Cmf(),
+        contrastLevel = 0.5,
+        animate = true,
+        animationSpec = tween(durationMillis = 300),
+        content = content,
+    )
 }
