@@ -180,7 +180,6 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
                     onBack = { entry.back() },
                     onOpenBook = { entry.open(BookRoute(it)) },
                     onOpenResult = { entry.open(FoundBookRoute(Json.encodeToString(it))) },
-                    onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
             }
             composable<SettingsRoute> { entry -> SettingsScreen(onBack = { entry.back() }) }

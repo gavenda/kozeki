@@ -95,7 +95,7 @@ class GoogleBooksProvider(
         client.newCall(request).await().use { response ->
             val body = response.body.string()
             if (response.code == 404) return null
-            if (!response.isSuccessful) throw failure(response.code, response.header("Retry-After"), body)
+            if (!response.isSuccessful) throw failure(response.code, body)
             return body
         }
     }
@@ -104,13 +104,13 @@ class GoogleBooksProvider(
         runCatching { json.decodeFromString<T>(body) }
             .getOrElse { throw MetadataException.Server(200, "Unreadable response") }
 
-    private fun failure(code: Int, retryAfter: String?, body: String): MetadataException {
+    private fun failure(code: Int, body: String): MetadataException {
         val error = runCatching { json.decodeFromString<ErrorResponse>(body).error }.getOrNull()
         val reasons = error?.errors.orEmpty().map { it.reason } + error?.details.orEmpty().map { it.reason }
         val message = error?.message ?: "Request failed"
         return when {
             code == 429 || error?.status == "RESOURCE_EXHAUSTED" || reasons.any { it in QUOTA_REASONS } ->
-                MetadataException.RateLimited(retryAfter?.toLongOrNull())
+                MetadataException.RateLimited()
             // A key that is wrong altogether is a bad request to Google, not a forbidden one.
             code == 401 || code == 403 || API_KEY_INVALID in reasons -> MetadataException.KeyRejected(message)
             else -> MetadataException.Server(code, message)

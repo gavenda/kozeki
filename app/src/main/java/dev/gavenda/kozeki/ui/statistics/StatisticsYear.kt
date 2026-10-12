@@ -61,7 +61,6 @@ internal fun LazyListScope.yearItems(
             values = year.completedPerMonth.map { it.toFloat() },
             valueText = { pluralStringResource(R.plurals.book_count, it.roundToInt(), it.roundToInt()) },
             axisValue = { it.roundToInt().toString() },
-            wholeNumbers = true,
         )
     }
     item(key = "year-time-chart") {
@@ -71,7 +70,6 @@ internal fun LazyListScope.yearItems(
             values = year.durationPerMonth.map { it / 3_600_000f },
             valueText = { formatDuration((it * 3_600_000f).toLong()) },
             axisValue = { resources.getString(R.string.duration_hours, it.roundToInt()) },
-            wholeNumbers = true,
         )
     }
     if (year.ratingAverage != null) {
@@ -166,7 +164,6 @@ private fun MonthlyChart(
     values: List<Float>,
     valueText: @Composable (Float) -> String,
     axisValue: (Float) -> String,
-    wholeNumbers: Boolean,
 ) {
     val locale = LocalLocale.current.platformLocale
     ColumnChartCard(
@@ -176,7 +173,7 @@ private fun MonthlyChart(
         values = values,
         valueText = valueText,
         axisValue = axisValue,
-        wholeNumbers = wholeNumbers,
+        wholeNumbers = true,
     )
 }
 
@@ -206,11 +203,11 @@ internal fun ColumnChartCard(
     val bars = values.mapIndexed { index, value ->
         ChartBar(label = labels[index], value = value, valueText = valueText(value))
     }
-    val description = title + ": " + values
+    val named = values
         .mapIndexed { index, value -> names[index] to value }
         .filter { it.second > 0f }
         .map { (name, value) -> "$name ${valueText(value)}" }
-        .joinToString("; ")
+    val description = "$title: ${named.joinToString("; ")}"
 
     ChartCard(title) {
         ColumnChart(bars = bars, contentDescription = description, axisText = axisValue, wholeNumbers = wholeNumbers)
@@ -258,6 +255,7 @@ internal fun longestFinished(
     physical: Boolean,
     limit: Int = LONGEST_BOOKS_SHOWN,
 ): List<Pair<Book, Int>> = completed
+    .asSequence()
     .map { it.book }
     .distinctBy { it.id }
     .filter { it.inLibrary != physical }
@@ -267,6 +265,7 @@ internal fun longestFinished(
     }
     .sortedByDescending { it.second }
     .take(limit)
+    .toList()
 
 /** The two kinds of [longestFinished] behind a tab each, the physical books on the left and shown first. */
 @Composable

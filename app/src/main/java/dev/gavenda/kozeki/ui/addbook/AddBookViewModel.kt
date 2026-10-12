@@ -13,6 +13,7 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -43,7 +44,7 @@ data class AddBookUiState(
 
 class AddBookViewModel(
     private val metadata: MetadataRepository,
-    private val library: LibraryRepository,
+    library: LibraryRepository,
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
@@ -118,7 +119,7 @@ class AddBookViewModel(
         if (debounceMs > 0 && query == searched) return
         cancelSearch()
         searchJob = viewModelScope.launch {
-            delay(debounceMs)
+            delay(debounceMs.milliseconds)
             searched = query
             val source = _uiState.value.source
             _uiState.update { it.copy(loading = true, error = null) }

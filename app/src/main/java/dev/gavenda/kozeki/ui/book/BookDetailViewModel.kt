@@ -217,7 +217,7 @@ class BookDetailViewModel(
             library.importEpub(uri, attachTo = bookId)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             ImportResult.Failed(ImportResult.Failed.Reason.UNREADABLE, null)
         } finally {
             importing.value = false

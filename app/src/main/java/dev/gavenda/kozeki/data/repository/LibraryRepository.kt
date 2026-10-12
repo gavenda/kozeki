@@ -150,7 +150,7 @@ class LibraryRepository(
             storage.copyToStaging(uri)
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return ImportResult.Failed(ImportResult.Failed.Reason.UNREADABLE, null)
         }
         try {

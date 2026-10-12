@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.map
 
 /** Turns raw sessions and read-throughs into what the calendar and statistics screens show. */
 class StatsRepository(
-    private val db: KozekiDatabase,
+    db: KozekiDatabase,
     private val library: LibraryRepository,
     private val settings: SettingsRepository,
     private val clock: Clock,

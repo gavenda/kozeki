@@ -92,11 +92,11 @@ private fun ReadingTimeChart(period: PeriodStats, range: StatsRange) {
             valueText = formatDuration(day.durationMs),
         )
     }
-    val description = stringResource(R.string.stats_time_per_day) + ": " + period.days
+    val daysRead = period.days
         .filter { it.durationMs > 0 }
         .map { stringResource(R.string.stats_day_description, formatDate(it.date), formatDuration(it.durationMs)) }
-        .joinToString("; ")
-        .ifEmpty { stringResource(R.string.stats_day_empty_title) }
+    val description = stringResource(R.string.stats_time_per_day) + ": " +
+        daysRead.joinToString("; ").ifEmpty { stringResource(R.string.stats_day_empty_title) }
 
     ChartCard(stringResource(R.string.stats_time_per_day)) {
         ColumnChart(

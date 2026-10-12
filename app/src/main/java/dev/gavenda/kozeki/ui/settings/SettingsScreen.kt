@@ -98,7 +98,7 @@ fun SettingsScreen(
             when (event) {
                 is SettingsEvent.OpenBrowser -> try {
                     CustomTabsIntent.Builder().build().launchUrl(context, event.uri)
-                } catch (e: ActivityNotFoundException) {
+                } catch (_: ActivityNotFoundException) {
                     // No browser to sign in with; treat it like closing the browser straight away.
                     viewModel.onResumed()
                 }
@@ -121,7 +121,7 @@ fun SettingsScreen(
         viewModel.onDriveConsentShown()
         try {
             driveConsent.launch(IntentSenderRequest.Builder(consent.intentSender).build())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // The screen cannot be opened, which leaves things as if it had been closed unanswered.
             viewModel.onDriveConsent(null)
         }

@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -27,7 +26,6 @@ private val Separators = charArrayOf(',', ';')
  * @param multiple The field holds several entries separated by commas. Only the one being typed
  *   is completed, and the ones already in the field are not offered again.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryTextField(
     value: String,

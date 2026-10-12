@@ -128,7 +128,7 @@ fun BookFormContent(
     if (!editing || state.book != null) {
         BookForm(state, onBack, onAdd, onSave, modifier)
     } else {
-        BookFormScaffold(editing, onClose = onBack, modifier = modifier) {
+        BookFormScaffold(editing = true, onClose = onBack, modifier = modifier) {
             if (state.loading) HaloLoadingIndicator(Modifier.padding(48.dp))
         }
     }

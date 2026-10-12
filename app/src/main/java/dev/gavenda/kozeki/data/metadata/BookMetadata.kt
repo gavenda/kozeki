@@ -26,10 +26,7 @@ data class BookMetadata(
     val averageRating: Float? = null,
     /** The book's page on the source. */
     val infoUrl: String? = null,
-) {
-    /** The author called [name], when the source can show more of them. */
-    fun authorRef(name: String): AuthorRef? = authorRefs.firstOrNull { it.name == name }
-}
+)
 
 /** An author by the ID the source knows them under. */
 @Serializable
@@ -146,7 +143,7 @@ sealed class MetadataException(message: String, cause: Throwable? = null) : Exce
     class MissingScope(val scope: String?) : MetadataException("Missing scope: ${scope ?: "unknown"}")
 
     /** The quota is used up; worth retrying later, not now. */
-    class RateLimited(val retryAfterSeconds: Long? = null) : MetadataException("Rate limit reached")
+    class RateLimited : MetadataException("Rate limit reached")
 
     class Network(cause: Throwable) : MetadataException("Network error: ${cause.message}", cause)
 

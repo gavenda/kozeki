@@ -6,6 +6,7 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.singleLines
 import java.time.Clock
 import java.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -113,7 +114,7 @@ class MetadataRepository(
             read(fullKey, serializer)?.let { return@withLock it }
 
             val wait = gate.lastRequestAt + MIN_REQUEST_GAP_MS - clock.millis()
-            if (wait > 0) delay(wait)
+            if (wait > 0) delay(wait.milliseconds)
 
             val result = try {
                 fetch()

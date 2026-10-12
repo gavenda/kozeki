@@ -70,11 +70,11 @@ class MatchService(
                     Outcome.NOT_FOUND
                 }
             }
-        } catch (e: MetadataException.Unavailable) {
+        } catch (_: MetadataException.Unavailable) {
             Outcome.UNAVAILABLE
-        } catch (e: MetadataException.Unauthorized) {
+        } catch (_: MetadataException.Unauthorized) {
             Outcome.UNAVAILABLE
-        } catch (e: MetadataException) {
+        } catch (_: MetadataException) {
             Outcome.RETRY
         }
     }
@@ -124,6 +124,7 @@ class MatchService(
      *
      * @return true when something should be retried later.
      */
+    @Suppress("DestructuringDeclaration")
     private suspend fun linkAuthors(): Boolean {
         for (book in library.withoutAuthorRefs()) {
             // A source without pages for authors has no IDs to give, however often it is asked.
@@ -133,11 +134,11 @@ class MatchService(
                 // Only the ones the book is already credited to: the names shown are not replaced.
                 val refs = metadata.book(linkedTo, sourceId)?.authorRefs.orEmpty().filter { it.name in book.authors }
                 if (refs.isNotEmpty()) library.setAuthorRefs(book.id, refs)
-            } catch (e: MetadataException.Unavailable) {
+            } catch (_: MetadataException.Unavailable) {
                 return false
-            } catch (e: MetadataException.Unauthorized) {
+            } catch (_: MetadataException.Unauthorized) {
                 return false
-            } catch (e: MetadataException) {
+            } catch (_: MetadataException) {
                 return true
             }
         }

@@ -11,6 +11,7 @@ import dev.gavenda.kozeki.data.model.SessionDraft
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.ReaderPreferences
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -105,7 +106,7 @@ class ReaderViewModel(
         // Page turns come in bursts; writing once they settle is enough, and pausing flushes the rest.
         @OptIn(FlowPreview::class)
         viewModelScope.launch {
-            unsaved.filterNotNull().debounce(SAVE_DEBOUNCE_MS).collect { library.saveProgress(bookId, it) }
+            unsaved.filterNotNull().debounce(SAVE_DEBOUNCE_MS.milliseconds).collect { library.saveProgress(bookId, it) }
         }
     }
 
@@ -123,7 +124,7 @@ class ReaderViewModel(
 
             val opened = try {
                 readium.open(storage.epubFile(bookId))
-            } catch (e: Readium.OpenException) {
+            } catch (_: Readium.OpenException) {
                 return@launch fail(ReaderFailure.UNREADABLE)
             }
             publication = opened

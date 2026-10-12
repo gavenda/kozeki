@@ -44,7 +44,7 @@ class AuthorViewModel(
     private val authorId: String,
     name: String,
     private val metadata: MetadataRepository,
-    private val library: LibraryRepository,
+    library: LibraryRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthorUiState(name = name))

@@ -292,7 +292,7 @@ class LibraryViewModel(
                     library.importEpub(uri)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     ImportResult.Failed(ImportResult.Failed.Reason.UNREADABLE, null)
                 }
             }

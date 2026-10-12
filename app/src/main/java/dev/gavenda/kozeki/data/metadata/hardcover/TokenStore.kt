@@ -47,7 +47,7 @@ class TokenStore(context: Context) {
             cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, bytes, 0, IV_BYTES))
             val plain = cipher.doFinal(bytes, IV_BYTES, bytes.size - IV_BYTES)
             json.decodeFromString<StoredSession>(plain.decodeToString())
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // The key is gone or the file is damaged; either way the user has to sign in again.
             file.delete()
             StoredSession()

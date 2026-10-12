@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -52,7 +53,7 @@ fun DraggableScrollbar(state: LazyGridState, modifier: Modifier = Modifier) {
         if (active) {
             alpha.snapTo(1f)
         } else {
-            delay(FadeDelayMillis)
+            delay(FadeDelayMillis.milliseconds)
             alpha.animateTo(0f, tween(FadeMillis))
         }
     }

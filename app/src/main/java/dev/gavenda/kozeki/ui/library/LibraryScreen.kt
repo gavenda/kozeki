@@ -17,13 +17,11 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -587,7 +585,6 @@ private fun AddBooksMenu(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilterRow(
     state: LibraryUiState,
@@ -712,7 +709,6 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryBookItem(
     book: Book,
@@ -829,7 +825,6 @@ private fun LibraryBookItem(
 }
 
 /** One book of the list: a small cover, with what the grid shows as badges spelled out beside it. */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryBookRow(
     book: Book,

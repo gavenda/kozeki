@@ -243,7 +243,7 @@ class HardcoverProvider(
         response.use {
             val text = it.body.string()
             when {
-                it.code == 429 -> throw MetadataException.RateLimited(it.header("Retry-After")?.toLongOrNull())
+                it.code == 429 -> throw MetadataException.RateLimited()
                 it.code == 403 && errorField(text, "error") == "insufficient_scope" ->
                     throw MetadataException.MissingScope(errorField(text, "scope"))
                 it.code == 401 || it.code == 403 -> throw MetadataException.Unauthorized(errorMessage(text))
@@ -318,8 +318,8 @@ class HardcoverProvider(
     private companion object {
         const val SEARCH_PAGE_SIZE = 12
 
-        const val SEARCH_QUERY = "query Search(\$query: String!, \$page: Int!, \$perPage: Int!) { " +
-            "search(query: \$query, query_type: \"Book\", per_page: \$perPage, page: \$page) { results } }"
+        const val SEARCH_QUERY = $$"query Search($query: String!, $page: Int!, $perPage: Int!) { " +
+            $$"search(query: $query, query_type: \"Book\", per_page: $perPage, page: $page) { results } }"
 
         const val AUTHOR_PAGE_SIZE = 20
 
@@ -327,17 +327,17 @@ class HardcoverProvider(
         private const val AUTHOR_BOOK_ROWS =
             "contributions(where: { contributable_type: { _eq: \"Book\" }, " +
                 "book: { canonical_id: { _is_null: true } } }, " +
-                "order_by: [{ book: { users_count: desc } }, { id: asc }], limit: \$limit, offset: \$offset)"
+                $$"order_by: [{ book: { users_count: desc } }, { id: asc }], limit: $limit, offset: $offset)"
         private const val AUTHOR_BOOK_FIELDS =
             "id title subtitle slug description release_date release_year pages rating compilation image { url } " +
                 "contributions { contribution author { id name } } " +
                 "default_physical_edition { isbn_13 } default_ebook_edition { isbn_13 }"
 
-        const val AUTHOR_QUERY = "query Author(\$id: Int!, \$limit: Int!, \$offset: Int!) { " +
-            "authors_by_pk(id: \$id) { name bio born_year death_year location books_count slug image { url } " +
+        const val AUTHOR_QUERY = $$"query Author($id: Int!, $limit: Int!, $offset: Int!) { " +
+            $$"authors_by_pk(id: $id) { name bio born_year death_year location books_count slug image { url } " +
             "$AUTHOR_BOOK_ROWS { contribution book { $AUTHOR_BOOK_FIELDS } } } }"
 
-        const val BOOK_QUERY = "query Book(\$id: Int!) { books_by_pk(id: \$id) { $AUTHOR_BOOK_FIELDS } }"
+        const val BOOK_QUERY = $$"query Book($id: Int!) { books_by_pk(id: $id) { $$AUTHOR_BOOK_FIELDS } }"
 
         val WriterRoles = setOf("author", "writer")
 
@@ -348,14 +348,14 @@ class HardcoverProvider(
 
         // The most liked reviews first, as on the book's page on Hardcover.
         private const val REVIEW_ROWS =
-            "user_books(where: { book_id: { _eq: \$id }, has_review: { _eq: true } }, " +
-                "order_by: [{ likes_count: desc }, { reviewed_at: desc_nulls_last }], limit: \$limit)"
+            $$"user_books(where: { book_id: { _eq: $id }, has_review: { _eq: true } }, " +
+                $$"order_by: [{ likes_count: desc }, { reviewed_at: desc_nulls_last }], limit: $limit)"
         private const val REVIEW_FIELDS = "id rating review_raw review review_has_spoilers reviewed_at likes_count"
-        private const val BOOK_FIGURES = "books_by_pk(id: \$id) { rating ratings_count reviews_count }"
+        private const val BOOK_FIGURES = $$"books_by_pk(id: $id) { rating ratings_count reviews_count }"
 
-        const val REVIEWS_QUERY = "query Reviews(\$id: Int!, \$limit: Int!) { " +
+        const val REVIEWS_QUERY = $$"query Reviews($id: Int!, $limit: Int!) { " +
             "$BOOK_FIGURES $REVIEW_ROWS { $REVIEW_FIELDS user { name username } } }"
-        const val ANONYMOUS_REVIEWS_QUERY = "query Reviews(\$id: Int!, \$limit: Int!) { " +
+        const val ANONYMOUS_REVIEWS_QUERY = $$"query Reviews($id: Int!, $limit: Int!) { " +
             "$BOOK_FIGURES $REVIEW_ROWS { $REVIEW_FIELDS } }"
 
         // Deliberately narrow: a "collection" on its own is as often one book of short stories.
@@ -363,7 +363,7 @@ class HardcoverProvider(
             "(?i)\\b(box(ed)?[ -]?set|omnibus|(e?books?|series|trilogy) bundle|\\d+[ -]book\\b|books? \\d+ ?(-|–|—|to|&|and) ?\\d+|" +
                 "(complete|entire|whole) (series|saga|trilogy|collection)|(series|trilogy|saga) collection|" +
                 "collection set|\\d+ (books|volumes|novels) (collection|set)|" +
-                "vol(ume)?s?\\.? ?\\d+ ?(-|–|—) ?\\d+)",
+                "vol(ume)?s?\\.? ?\\d+ ?[-–—] ?\\d+)",
         )
 
         val LineBreakTag = Regex("(?i)<br\\s*/?>|</p>")

@@ -56,9 +56,9 @@ class HardcoverSignIn(
                 throw e
             } catch (e: HardcoverAuth.SignInException) {
                 if (e.failure == HardcoverAuth.SignInFailure.DENIED) Status.DENIED else Status.REJECTED
-            } catch (e: MetadataException.Network) {
+            } catch (_: MetadataException.Network) {
                 Status.OFFLINE
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Status.REJECTED
             }
         }

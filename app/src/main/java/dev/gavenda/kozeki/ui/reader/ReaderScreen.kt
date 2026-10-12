@@ -77,6 +77,7 @@ import dev.gavenda.kozeki.ui.formatPercent
 import dev.gavenda.kozeki.ui.book.NoteDialog
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
@@ -112,7 +113,7 @@ fun ReaderScreen(
     var systemColors by remember { mutableStateOf(currentColors) }
     val isDark = isSystemInDarkTheme()
     LaunchedEffect(isDark) {
-        delay(THEME_SETTLE_MS)
+        delay(THEME_SETTLE_MS.milliseconds)
         systemColors = latestColors
     }
 
@@ -547,7 +548,7 @@ private fun KeepScreenOn(interactions: Int) {
     val view = LocalView.current
     LaunchedEffect(view, interactions) {
         view.keepScreenOn = true
-        delay(KEEP_AWAKE_MS)
+        delay(KEEP_AWAKE_MS.milliseconds)
         view.keepScreenOn = false
     }
     DisposableEffect(view) {

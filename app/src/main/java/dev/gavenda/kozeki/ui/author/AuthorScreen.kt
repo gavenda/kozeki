@@ -49,7 +49,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.metadata.Author
-import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
@@ -75,7 +74,6 @@ fun AuthorScreen(
     onBack: () -> Unit,
     onOpenBook: (String) -> Unit,
     onOpenResult: (BookMetadata) -> Unit,
-    onOpenAuthor: (AuthorRef) -> Unit,
     viewModel: AuthorViewModel = koinViewModel(key = authorId) { parametersOf(authorId, name) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -86,8 +84,6 @@ fun AuthorScreen(
         onLoadMore = viewModel::loadMore,
         onOpenResult = onOpenResult,
         onOpenBook = onOpenBook,
-        // A co-author has a page of their own; this author's is the one already open.
-        onOpenAuthor = { if (it.id != authorId) onOpenAuthor(it) },
     )
 }
 
@@ -99,7 +95,6 @@ fun AuthorContent(
     onLoadMore: () -> Unit,
     onOpenResult: (BookMetadata) -> Unit,
     onOpenBook: (String) -> Unit,
-    onOpenAuthor: (AuthorRef) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -323,7 +318,6 @@ private fun AuthorPreview() {
             onLoadMore = {},
             onOpenResult = {},
             onOpenBook = {},
-            onOpenAuthor = {},
         )
     }
 }
@@ -339,7 +333,6 @@ private fun AuthorErrorPreview() {
             onLoadMore = {},
             onOpenResult = {},
             onOpenBook = {},
-            onOpenAuthor = {},
         )
     }
 }

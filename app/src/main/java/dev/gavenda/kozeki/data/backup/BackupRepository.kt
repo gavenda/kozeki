@@ -126,6 +126,7 @@ internal class RestoreLayout(
  * new device before the backup is put back is filed under an ID of its own. The cover goes the
  * same way, since a backup has the name of a picture and not the picture.
  */
+@Suppress("DestructuringDeclaration")
 internal fun layOutRestore(
     incoming: List<BookEntity>,
     here: List<BookEntity>,

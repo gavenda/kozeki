@@ -177,8 +177,12 @@ class DriveBackupTest {
     private fun book(id: String) = BookEntity(id = id, title = "Book $id", sync = SyncStamp.created(0))
 
     /** A device with its own library and its own idea of what is on Drive. */
-    private inner class Device(scope: TestScope, books: List<String>, link: DriveLink? = null, drive: FakeDrive = FakeDrive()) {
-        val drive = drive
+    private inner class Device(
+        scope: TestScope,
+        books: List<String>,
+        link: DriveLink? = null,
+        val drive: FakeDrive = FakeDrive(),
+    ) {
         val auth = FakeAuthorizer()
         val library = FakeLibrary(books.map(::book))
         val links = FakeLinks(link)
