@@ -34,10 +34,6 @@
     <string name="duration_minutes">%1$dm</string>
     <string name="duration_under_minute">&lt;1m</string>
     <string name="x_of_y">%1$d of %2$d</string>
-    <plurals name="pages_count">
-        <item quantity="one">%1$d page</item>
-        <item quantity="other">%1$d pages</item>
-    </plurals>
     <plurals name="book_count">
         <item quantity="one">%1$d book</item>
         <item quantity="other">%1$d books</item>
@@ -63,7 +59,6 @@
     <string name="library_add_import">Import EPUB</string>
     <string name="library_add_find">Find a book online</string>
     <string name="library_add_manual">Add manually</string>
-    <string name="library_owned">Owned</string>
     <string name="library_imported_epub">Imported EPUB</string>
     <string name="selection_select">Select</string>
     <plurals name="selection_count">
@@ -102,7 +97,6 @@
     <string name="book_more_actions">More actions</string>
     <string name="book_mark_as">Mark as %1$s</string>
     <string name="book_not_found">This book is no longer in Kozeki.</string>
-    <string name="book_file_missing">EPUB not on this device</string>
     <string name="book_file_missing_message">Ui cannot find this book\'s EPUB on this device. Add it again to keep reading; your progress is kept.</string>
     <string name="book_start">Start reading</string>
     <string name="book_continue">Continue reading</string>
