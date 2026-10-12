@@ -7,13 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SecondaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,7 +20,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
@@ -33,10 +31,13 @@ import dev.gavenda.kozeki.data.model.CompletedBook
 import dev.gavenda.kozeki.data.model.YearStats
 import dev.gavenda.kozeki.ui.components.ChartBar
 import dev.gavenda.kozeki.ui.components.ColumnChart
+import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
 import dev.gavenda.kozeki.ui.components.GoalRing
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.RankedBar
 import dev.gavenda.kozeki.ui.components.RankedBars
 import dev.gavenda.kozeki.ui.components.StatTile
+import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatPrice
 import java.time.LocalDate
@@ -126,7 +127,16 @@ private fun YearGoal(year: YearStats, onSetGoal: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                TextButton(onClick = onSetGoal) { Text(stringResource(R.string.stats_set_goal)) }
+                Button(
+                    onClick = onSetGoal,
+                    shapes = ButtonDefaults.shapes(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary,
+                        contentColor = MaterialTheme.colorScheme.onSecondary,
+                    ),
+                ) {
+                    Text(stringResource(R.string.stats_set_goal))
+                }
             }
         }
     }
@@ -276,15 +286,16 @@ private fun LongestBooksCard(physical: List<Pair<Book, Int>>, epubs: List<Pair<B
     val tabs = listOf(R.string.stats_longest_physical, R.string.stats_longest_epub)
 
     ChartCard(stringResource(R.string.stats_longest_books)) {
-        SecondaryTabRow(selectedTabIndex = selected, containerColor = Color.Transparent) {
-            tabs.forEachIndexed { index, label ->
-                Tab(
-                    selected = index == selected,
-                    onClick = { picked = index },
-                    text = { Text(stringResource(label)) },
-                )
-            }
-        }
+        ConnectedButtonGroup(
+            options = tabs.map { stringResource(it) },
+            selectedIndex = selected,
+            onSelect = { picked = it },
+            modifier = Modifier.fillMaxWidth(),
+            // The EPUB's is the icon of the library's imported badge.
+            icons = listOf(R.drawable.auto_stories_48px, R.drawable.library_books_fill_48px),
+            // Leather for paper and violet for EPUB, as on a book's own page.
+            optionColors = listOf(OptionColor.LEATHER, OptionColor.VIOLET).map { it.toggleButtonColors() },
+        )
         val longest = if (selected == 0) physical else epubs
         if (longest.isEmpty()) {
             Text(

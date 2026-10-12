@@ -55,6 +55,7 @@
     <string name="library_empty_title">The shelves are empty</string>
     <string name="library_empty_message">W-Welcome. Hand me an EPUB to start reading, or ask for a book and I\'ll put it on your wishlist. I\'ll keep your place from there.</string>
     <string name="library_add">Add books</string>
+    <string name="library_end_bubble">That\'s every book I have. I\'ve kept them all in order, so please, take your time.</string>
     <string name="library_scroll_to_top">Back to top</string>
     <string name="library_add_import">Import EPUB</string>
     <string name="library_add_find">Find a book online</string>
@@ -313,6 +314,7 @@
     <string name="manual_book_authors_hint">Separate several with commas</string>
     <string name="manual_book_field_subtitle">Subtitle</string>
     <string name="manual_book_field_description">Description</string>
+    <string name="manual_book_end_bubble">I only need a title and an author. I\'ll file the rest wherever it fits, so don\'t worry about the blanks.</string>
     <string name="manual_book_isbn_invalid">Not a valid ISBN</string>
     <string name="manual_book_cover">Cover</string>
     <string name="manual_book_cover_add">Add cover</string>
@@ -369,6 +371,8 @@
     <string name="stats_day_description">%1$s, %2$s</string>
     <string name="stats_day_empty_title">A quiet day</string>
     <string name="stats_day_empty_message">Nothing was read, so Ui got some sleep.</string>
+    <string name="stats_day_birthday_title">World Book Day</string>
+    <string name="stats_day_birthday_message">It\'s also my birthday… Will you read something today?</string>
     <string name="stats_page_span">p. %1$d – %2$d</string>
     <plurals name="stats_pages_gained">
         <item quantity="one">+%1$d page (%2$d%%)</item>
@@ -404,8 +408,8 @@
         <item quantity="other">%1$d stars</item>
     </plurals>
     <string name="stats_longest_books">Longest books finished, in pages</string>
-    <string name="stats_longest_physical">Physical books</string>
-    <string name="stats_longest_epub">EPUBs</string>
+    <string name="stats_longest_physical">Physical</string>
+    <string name="stats_longest_epub">EPUB</string>
     <string name="stats_longest_physical_empty">No physical book with a page count was finished.</string>
     <string name="stats_longest_epub_empty">No EPUB with a page count was finished.</string>
     <string name="stats_spending">Spent on books</string>
@@ -425,7 +429,7 @@
     <string name="settings_hardcover_sign_out">Sign out</string>
     <string name="settings_hardcover_sign_out_title">Sign out of Hardcover?</string>
     <string name="settings_hardcover_sign_out_message">Book lookups through Hardcover stop until you sign in again. Your library is not affected.</string>
-    <string name="settings_hardcover_denied">Access was declined on Hardcover, so nothing was connected.</string>
+    <string name="settings_hardcover_denied">Access was declined on Hardcover, so nothing was connected</string>
     <string name="settings_hardcover_rejected">Hardcover did not accept the sign-in. Contact the developer.</string>
     <string name="settings_appearance_title">Appearance</string>
     <string name="settings_display_mode">Display mode</string>
@@ -490,4 +494,8 @@
     <string name="settings_cache_clear">Clear</string>
     <string name="settings_about_version">Kozeki %1$s</string>
     <string name="settings_about_credits">I\'ll keep your books in order and your reading on record.</string>
+    <string name="settings_about_birthday">It\'s my birthday today. A book read would be present enough.</string>
+    <string name="character_name">Ui</string>
+    <string name="settings_about_keeper">Kept by %1$s, Magician of the Old Library</string>
+    <string name="settings_about_illustrator">Character design and illustration by CHILD, from Blue Archive</string>
 </resources>

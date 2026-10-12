@@ -42,6 +42,7 @@ import dev.gavenda.kozeki.ui.components.MiniRing
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatTime
+import dev.gavenda.kozeki.ui.isUiBirthday
 import java.time.LocalDate
 import java.time.format.TextStyle
 import kotlin.math.roundToInt
@@ -58,14 +59,7 @@ internal fun LazyListScope.dayItems(
 
     // Pages of a physical copy take no time on record, so it is the timeline that tells a day with reading.
     if (day.timeline.isEmpty() && day.completed.isEmpty()) {
-        item(key = "day-empty") {
-            EmptyState(
-                expression = Expression.ASLEEP,
-                icon = painterResource(R.drawable.auto_stories_off_48px),
-                title = stringResource(R.string.stats_day_empty_title),
-                message = stringResource(R.string.stats_day_empty_message),
-            )
-        }
+        item(key = "day-empty") { DayEmpty(isUiBirthday(day.date)) }
         return
     }
 
@@ -85,6 +79,17 @@ internal fun LazyListScope.dayItems(
         item(key = "timeline-label") { SectionLabel(stringResource(R.string.stats_timeline)) }
         itemsIndexed(day.timeline, key = { index, _ -> "timeline-$index" }) { _, entry -> TimelineRow(entry) }
     }
+}
+
+/** A day with nothing read: Ui asleep, or awake for her birthday. */
+@Composable
+private fun DayEmpty(birthday: Boolean) {
+    EmptyState(
+        expression = if (birthday) Expression.HAPPY else Expression.ASLEEP,
+        icon = painterResource(R.drawable.auto_stories_off_48px),
+        title = stringResource(if (birthday) R.string.stats_day_birthday_title else R.string.stats_day_empty_title),
+        message = stringResource(if (birthday) R.string.stats_day_birthday_message else R.string.stats_day_empty_message),
+    )
 }
 
 /** Seven days, each a small ring filled by how much of the goal was read. Tapping one opens it. */

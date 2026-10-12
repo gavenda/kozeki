@@ -62,7 +62,7 @@ fun DraggableScrollbar(state: LazyGridState, modifier: Modifier = Modifier) {
 
     val thickness by animateDpAsState(if (dragging) 8.dp else 4.dp)
     val color by animateColorAsState(
-        if (dragging) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        if (dragging) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
     )
 
     val drag = rememberDraggableState { delta ->

@@ -75,7 +75,10 @@ import dev.gavenda.kozeki.data.model.BookDraft
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
+import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.Portrait
+import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -369,6 +372,16 @@ private fun BookForm(
                 maxLines = 10,
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (book == null) {
+                Row(
+                    modifier = Modifier.padding(top = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Portrait(Expression.STUDIOUS, Modifier.width(96.dp))
+                    SpeechBubble(stringResource(R.string.manual_book_end_bubble), Modifier.weight(1f, fill = false))
+                }
+            }
         }
     }
 

@@ -18,8 +18,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -101,7 +99,7 @@ internal fun LazyListScope.allTimeItems(stats: AllTimeStats, onBookClick: (Book)
 
 @Composable
 private fun AllTimeSummary(stats: AllTimeStats) {
-    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
         Box {
             // Far taller than the card, which cuts it off: what shows is its hub and hands, and the
             // rings coming in from the trailing edge.
@@ -110,10 +108,9 @@ private fun AllTimeSummary(stats: AllTimeStats) {
                     .matchParentSize()
                     .wrapContentSize(Alignment.CenterEnd, unbounded = true)
                     .offset(x = 64.dp)
-                    .size(200.dp)
-                    // Faded as one piece. Line by line, it would be darker wherever two of them cross.
-                    // Its colour is a pale one, so it is left more of it on a light card to show as much.
-                    .alpha(if (MaterialTheme.colorScheme.surfaceContainerLow.luminance() > 0.5f) 1.0f else 0.5f),
+                    // At full strength in both themes: the leather under it is a mid-tone in both,
+                    // and the halo's pale colour only just stands off it.
+                    .size(200.dp),
             )
             Column(
                 Modifier
@@ -125,7 +122,7 @@ private fun AllTimeSummary(stats: AllTimeStats) {
                     Text(
                         text = stringResource(R.string.stats_since, formatDate(since)),
                         style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
                     )
                 }
                 Text(

@@ -7,6 +7,7 @@ import dev.gavenda.kozeki.R
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Month
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -31,6 +32,9 @@ fun formatDuration(durationMs: Long): String {
         else -> stringResource(R.string.duration_minutes, 0)
     }
 }
+
+/** Ui's birthday, 23 April, which is also World Book Day. */
+fun isUiBirthday(date: LocalDate): Boolean = date.month == Month.APRIL && date.dayOfMonth == 23
 
 fun formatPercent(fraction: Double): String = "${(fraction.coerceIn(0.0, 1.0) * 100).roundToInt()}%"
 

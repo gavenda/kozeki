@@ -13,6 +13,7 @@ import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
+import dev.gavenda.kozeki.ui.isUiBirthday
 import java.time.Clock
 import java.time.LocalDate
 import kotlinx.coroutines.channels.Channel
@@ -36,6 +37,8 @@ data class SettingsUiState(
     val yearlyGoalBooks: Int? = null,
     val cachedLookups: Int = 0,
     val versionName: String = "",
+    /** Today is Ui's birthday. */
+    val birthday: Boolean = false,
 )
 
 sealed interface SettingsEvent {
@@ -79,6 +82,7 @@ class SettingsViewModel(
             yearlyGoalBooks = yearlyGoal,
             cachedLookups = cached,
             versionName = versionName,
+            birthday = isUiBirthday(today),
         )
     }.stateIn(
         viewModelScope,
@@ -88,6 +92,7 @@ class SettingsViewModel(
             backup = driveBackup.state.value,
             year = today.year,
             versionName = versionName,
+            birthday = isUiBirthday(today),
         ),
     )
 

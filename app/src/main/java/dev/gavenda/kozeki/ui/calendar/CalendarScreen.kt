@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -36,6 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
@@ -45,10 +47,12 @@ import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
+import dev.gavenda.kozeki.ui.components.HaloMark
 import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
+import dev.gavenda.kozeki.ui.isUiBirthday
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -257,6 +261,11 @@ private fun DayCell(
                 .aspectRatio(CoverAspectRatio),
         ) {
             CoverStack(books)
+            // Her birthday, every year. The rings are as wide as the cover box, so they take no room
+            // of their own and stay clear of the day number above.
+            if (isUiBirthday(date)) {
+                HaloMark(Modifier.fillMaxWidth().aspectRatio(1f).align(Alignment.Center), dial = false)
+            }
         }
         // The same height on every day, so the rows of the grid stay aligned.
         Box(Modifier.size(width = 40.dp, height = 10.dp), contentAlignment = Alignment.Center) {
@@ -311,6 +320,29 @@ private fun CoverStack(books: List<CalendarBook>) {
                         text = stringResource(R.string.calendar_more_books, books.size - 2),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 3.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 23 April with no books, one and several. */
+@PreviewLightDark
+@Composable
+private fun DayCellBirthdayPreview() {
+    val date = LocalDate.of(2026, 4, 23)
+    val books = PreviewData.books
+    AppTheme {
+        Surface {
+            Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(0, 1, 3).forEach { count ->
+                    DayCell(
+                        date = date,
+                        day = CalendarDay(date, List(count) { CalendarBook(books[it % 3], 20 * 60_000L, completed = false) }),
+                        isToday = false,
+                        onClick = {},
+                        modifier = Modifier.width(56.dp),
                     )
                 }
             }

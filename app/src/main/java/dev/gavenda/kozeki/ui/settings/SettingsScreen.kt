@@ -30,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,9 +39,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.FilledTonalToggleButtonDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,6 +61,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,8 +77,10 @@ import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
 import dev.gavenda.kozeki.ui.components.Expression
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
+import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
 import org.koin.compose.viewmodel.koinViewModel
@@ -225,13 +232,13 @@ fun SettingsContent(
                             ),
                             subtitle = stringResource(R.string.settings_cache_description),
                         ) {
-                            TextButton(onClick = onClearCache, enabled = state.cachedLookups > 0) {
+                            FilledTonalButton(onClick = onClearCache, enabled = state.cachedLookups > 0) {
                                 Text(stringResource(R.string.settings_cache_clear))
                             }
                         }
                     }
                 }
-                item(key = "about") { About(state.versionName) }
+                item(key = "about") { About(state.versionName, state.birthday) }
             }
         }
     }
@@ -243,7 +250,7 @@ internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit)
     Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMediumEmphasized,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 8.dp),
         )
@@ -303,9 +310,12 @@ internal fun SettingRow(
     }
 }
 
-/** Ui saying what she is here for, over the app's name and version. It ends the list and is no setting, so it has no card. */
+/**
+ * Ui saying what she is here for, over the app's name and version, then who she is and who drew her.
+ * On her birthday she says so instead. It ends the list and is no setting, so it has no card.
+ */
 @Composable
-private fun About(versionName: String) {
+private fun About(versionName: String, birthday: Boolean) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -322,10 +332,34 @@ private fun About(versionName: String) {
                 modifier = Modifier.weight(1f, fill = false).heightIn(min = ABOUT_PORTRAIT_WIDTH),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                SpeechBubble(stringResource(R.string.settings_about_credits))
+                SpeechBubble(stringResource(if (birthday) R.string.settings_about_birthday else R.string.settings_about_credits))
             }
         }
         Text(stringResource(R.string.settings_about_version, versionName), style = MaterialTheme.typography.titleMedium)
+        // Two plain lines in the third person, as they are about her and not from her. The credit
+        // is the quieter of the two.
+        val name = stringResource(R.string.character_name)
+        val keeper = stringResource(R.string.settings_about_keeper, name)
+        val nameColor = MaterialTheme.colorScheme.primary
+        Text(
+            // Her name alone is picked out, wherever a translation puts it in the line.
+            text = remember(keeper, name, nameColor) {
+                buildAnnotatedString {
+                    append(keeper)
+                    val start = keeper.indexOf(name)
+                    if (start >= 0) addStyle(SpanStyle(color = nameColor), start, start + name.length)
+                }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = stringResource(R.string.settings_about_illustrator),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 
@@ -451,11 +485,20 @@ private fun ThemeModeSetting(mode: ThemeMode, onSet: (ThemeMode) -> Unit) {
         selectedIndex = modes.indexOf(mode),
         onSelect = { onSet(modes[it]) },
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-        // The default unselected colour is the card's own, which would hide the group's shape.
-        colors = FilledTonalToggleButtonDefaults.colors(),
         icons = modes.map { it.icon },
+        // One of the theme's three colours each. An unselected button is in its colour's container,
+        // since the default is the card's own colour and would hide the group's shape.
+        optionColors = modes.map { it.color.toggleButtonColors() },
+        iconOnly = setOf(modes.indexOf(ThemeMode.SYSTEM)),
     )
 }
+
+private val ThemeMode.color: OptionColor
+    get() = when (this) {
+        ThemeMode.SYSTEM -> OptionColor.VIOLET
+        ThemeMode.LIGHT -> OptionColor.GOLD
+        ThemeMode.DARK -> OptionColor.LEATHER
+    }
 
 private val ThemeMode.labelRes: Int
     get() = when (this) {
@@ -535,6 +578,27 @@ private fun SettingsContentPreview() {
             onClearCache = {},
             backupActions = BackupActions(),
         )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AboutPreview() {
+    AppTheme {
+        Surface {
+            About(versionName = "2.0", birthday = false)
+        }
+    }
+}
+
+/** The speech bubble on 23 April. */
+@PreviewLightDark
+@Composable
+private fun AboutBirthdayPreview() {
+    AppTheme {
+        Surface {
+            About(versionName = "2.0", birthday = true)
+        }
     }
 }
 

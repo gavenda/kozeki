@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
@@ -38,7 +39,9 @@ private val LabelSidePadding = 4.dp
 
 /**
  * A single-choice row of connected toggle buttons, the Material 3 Expressive replacement for
- * segmented buttons. Options share the width equally. [icons], when given, has one drawable per option.
+ * segmented buttons. Options share the width equally. [icons], when given, has one drawable per option,
+ * and [optionColors] one set of colours per option in place of [colors]. An option in [iconOnly]
+ * shows its icon alone, is only as wide as that takes, and has its label read out instead.
  */
 @Composable
 fun ConnectedButtonGroup(
@@ -48,6 +51,8 @@ fun ConnectedButtonGroup(
     modifier: Modifier = Modifier,
     colors: ToggleButtonColors = ToggleButtonDefaults.colors(),
     icons: List<Int>? = null,
+    optionColors: List<ToggleButtonColors>? = null,
+    iconOnly: Set<Int> = emptySet(),
 ) {
     val defaultPadding = ToggleButtonDefaults.contentPaddingFor(ToggleButtonDefaults.size)
     val contentPadding = PaddingValues(
@@ -64,24 +69,59 @@ fun ConnectedButtonGroup(
             ToggleButton(
                 checked = index == selectedIndex,
                 onCheckedChange = { onSelect(index) },
-                modifier = Modifier
-                    .weight(1f)
+                modifier = (if (index in iconOnly) Modifier else Modifier.weight(1f))
                     .semantics { role = Role.RadioButton },
-                colors = colors,
+                colors = optionColors?.get(index) ?: colors,
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
-                contentPadding = contentPadding,
+                contentPadding = if (index in iconOnly) defaultPadding else contentPadding,
             ) {
-                if (icons != null) {
-                    Icon(painterResource(icons[index]), contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
-                    Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
+                if (icons != null && index in iconOnly) {
+                    Icon(painterResource(icons[index]), contentDescription = label, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
+                } else {
+                    if (icons != null) {
+                        Icon(painterResource(icons[index]), contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
+                        Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
+                    }
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
+    }
+}
+
+/**
+ * One of the theme's three colours, for a group whose options take a colour each. An unselected
+ * button is in its colour's container and a selected one in the solid colour, so the colours can
+ * be told apart in the light theme, where gold and leather are solid browns much alike.
+ */
+enum class OptionColor { VIOLET, GOLD, LEATHER }
+
+@Composable
+fun OptionColor.toggleButtonColors(): ToggleButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return when (this) {
+        OptionColor.VIOLET -> ToggleButtonDefaults.colors(
+            containerColor = scheme.primaryContainer,
+            contentColor = scheme.onPrimaryContainer,
+            checkedContainerColor = scheme.primary,
+            checkedContentColor = scheme.onPrimary,
+        )
+        OptionColor.GOLD -> ToggleButtonDefaults.colors(
+            containerColor = scheme.secondaryContainer,
+            contentColor = scheme.onSecondaryContainer,
+            checkedContainerColor = scheme.secondary,
+            checkedContentColor = scheme.onSecondary,
+        )
+        OptionColor.LEATHER -> ToggleButtonDefaults.colors(
+            containerColor = scheme.tertiaryContainer,
+            contentColor = scheme.onTertiaryContainer,
+            checkedContainerColor = scheme.tertiary,
+            checkedContentColor = scheme.onTertiary,
+        )
     }
 }
 

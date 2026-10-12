@@ -115,6 +115,8 @@ import dev.gavenda.kozeki.ui.components.DraggableScrollbar
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.Portrait
+import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.ReadingProgressRing
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.icon
@@ -412,6 +414,16 @@ fun LibraryContent(
                                     }
                                 }
                             }
+                            item(key = "end", span = { GridItemSpan(maxLineSpan) }) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Portrait(Expression.CONTENT, Modifier.width(96.dp))
+                                    SpeechBubble(stringResource(R.string.library_end_bubble), Modifier.weight(1f, fill = false))
+                                }
+                            }
                         }
                         // Shows how far down a long library is while it moves, and takes it there
                         // when dragged. Stops short of the corner the floating action button has.
@@ -564,6 +576,8 @@ private fun AddBooksMenu(
                 onImportClick()
             },
             text = { Text(stringResource(R.string.library_add_import)) },
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             icon = { Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         )
         FloatingActionButtonMenuItem(
@@ -572,6 +586,8 @@ private fun AddBooksMenu(
                 onAddBook()
             },
             text = { Text(stringResource(R.string.library_add_find)) },
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             icon = { Icon(painterResource(R.drawable.travel_explore_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         )
         FloatingActionButtonMenuItem(
@@ -580,6 +596,8 @@ private fun AddBooksMenu(
                 onAddManually()
             },
             text = { Text(stringResource(R.string.library_add_manual)) },
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
             icon = { Icon(painterResource(R.drawable.edit_note_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
         )
     }

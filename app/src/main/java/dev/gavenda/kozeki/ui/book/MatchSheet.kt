@@ -87,10 +87,24 @@ private fun MatchSheetContent(
             },
             label = { Text(stringResource(R.string.search_hint)) },
             singleLine = true,
-            trailingIcon = {
+            leadingIcon = {
                 IconButton(onClick = onSearch) {
                     Icon(painterResource(R.drawable.search_48px), contentDescription = stringResource(R.string.action_search), modifier = Modifier.size(24.dp))
                 }
+            },
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(
+                        onClick = {
+                            query = ""
+                            onQueryChange("")
+                        },
+                    ) {
+                        Icon(painterResource(R.drawable.close_48px), contentDescription = stringResource(R.string.search_clear), modifier = Modifier.size(24.dp))
+                    }
+                }
+            } else {
+                null
             },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),

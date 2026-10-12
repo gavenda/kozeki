@@ -43,7 +43,9 @@ import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.RatingBar
+import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
@@ -151,6 +153,9 @@ fun StatisticsContent(
                             selectedIndex = ranges.indexOf(state.range),
                             onSelect = { onSelectRange(ranges[it]) },
                             modifier = Modifier.fillMaxWidth(),
+                            // One of the theme's three colours for each kind of range: the single
+                            // day, the longer periods, and everything at once.
+                            optionColors = ranges.map { it.color.toggleButtonColors() },
                         )
                         periodLabel(state)?.let { PeriodNavigator(it, state.canGoForward, onPrevious, onNext) }
                     }
@@ -165,6 +170,13 @@ fun StatisticsContent(
         }
     }
 }
+
+private val StatsRange.color: OptionColor
+    get() = when (this) {
+        StatsRange.DAY -> OptionColor.VIOLET
+        StatsRange.WEEK, StatsRange.MONTH, StatsRange.YEAR -> OptionColor.GOLD
+        StatsRange.ALL -> OptionColor.LEATHER
+    }
 
 /** What the period being shown is called, or null for all time, which is not one of several. */
 @Composable
@@ -327,6 +339,37 @@ private fun StatisticsDayPreview() {
                 today = PreviewData.dailyStats.date,
                 firstDayOfWeek = PreviewFirstDayOfWeek,
                 day = PreviewData.dailyStats,
+            ),
+            onSelectRange = {},
+            onPrevious = {},
+            onNext = {},
+            onSelectDate = {},
+            onBookClick = {},
+            onSettingsClick = {},
+        )
+    }
+}
+
+/** A day with nothing read that falls on Ui's birthday, 23 April. */
+@ScreenPreviews
+@Composable
+private fun StatisticsBirthdayPreview() {
+    val birthday = LocalDate.of(2026, 4, 23)
+    AppTheme {
+        StatisticsContent(
+            state = StatisticsUiState(
+                range = StatsRange.DAY,
+                anchor = birthday,
+                today = birthday,
+                firstDayOfWeek = PreviewFirstDayOfWeek,
+                day = PreviewData.dailyStats.copy(
+                    date = birthday,
+                    durationMs = 0,
+                    pages = 0,
+                    books = emptyList(),
+                    timeline = emptyList(),
+                    completed = emptyList(),
+                ),
             ),
             onSelectRange = {},
             onPrevious = {},
