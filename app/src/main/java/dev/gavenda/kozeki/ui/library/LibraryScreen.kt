@@ -124,7 +124,7 @@ import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.components.outlinedIcon
 import dev.gavenda.kozeki.ui.components.ownershipBadge
 import dev.gavenda.kozeki.ui.formatPercent
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.libraryViewModel
 import dev.gavenda.kozeki.ui.search.SearchTopBar
 import dev.gavenda.kozeki.ui.search.SearchUiState
@@ -144,8 +144,8 @@ fun LibraryScreen(
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: LibraryViewModel = injektViewModel { libraryViewModel() },
-    searchViewModel: SearchViewModel = injektViewModel { searchViewModel() },
+    viewModel: LibraryViewModel = koinViewModel { libraryViewModel() },
+    searchViewModel: SearchViewModel = koinViewModel { searchViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val search by searchViewModel.uiState.collectAsStateWithLifecycle()

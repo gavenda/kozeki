@@ -75,7 +75,7 @@ import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.formatPercent
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.readerViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
@@ -106,7 +106,7 @@ private const val THEME_SETTLE_MS = 600L
 fun ReaderScreen(
     bookId: String,
     onBack: () -> Unit,
-    viewModel: ReaderViewModel = injektViewModel(key = "reader-$bookId") { readerViewModel(bookId) },
+    viewModel: ReaderViewModel = koinViewModel(key = "reader-$bookId") { readerViewModel(bookId) },
 ) {
     val currentColors = readerSystemColors()
     val latestColors by rememberUpdatedState(currentColors)

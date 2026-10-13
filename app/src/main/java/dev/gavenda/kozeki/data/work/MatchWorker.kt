@@ -10,17 +10,18 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.gavenda.kozeki.data.metadata.MatchService
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import java.util.concurrent.TimeUnit
-import uy.kohesive.injekt.injectLazy
 
 /**
  * Looks up metadata for books imported while offline. It only runs with a connection, which is
  * what lets importing itself stay fully offline.
  */
 class MatchWorker(context: Context, parameters: WorkerParameters) :
-    CoroutineWorker(context, parameters) {
+    CoroutineWorker(context, parameters), KoinComponent {
 
-    private val matchService: MatchService by injectLazy()
+    private val matchService: MatchService by inject()
 
     override suspend fun doWork(): Result {
         val retry = matchService.matchPending()

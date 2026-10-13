@@ -105,7 +105,7 @@ import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatPercent
 import dev.gavenda.kozeki.ui.formatPrice
 import dev.gavenda.kozeki.ui.foundBookViewModel
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.library.EpubMimeTypes
 import dev.gavenda.kozeki.ui.library.importMessage
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -157,7 +157,7 @@ fun BookDetailScreen(
     onOpenAuthor: (AuthorRef) -> Unit,
     /** Shown until the stored book has loaded, for a page that was already showing this book. */
     placeholder: Book? = null,
-    viewModel: BookDetailViewModel = injektViewModel(key = bookId) { bookDetailViewModel(bookId) },
+    viewModel: BookDetailViewModel = koinViewModel(key = bookId) { bookDetailViewModel(bookId) },
 ) {
     val loaded by viewModel.uiState.collectAsStateWithLifecycle()
     val state = if (loaded.loading && placeholder != null) loaded.copy(loading = false, book = placeholder) else loaded
@@ -231,7 +231,7 @@ fun FoundBookScreen(
     onReadChapter: (bookId: String, chapterUrl: String) -> Unit,
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
-    viewModel: FoundBookViewModel = injektViewModel(key = "found-${result.source}-${result.sourceId}") {
+    viewModel: FoundBookViewModel = koinViewModel(key = "found-${result.source}-${result.sourceId}") {
         foundBookViewModel(result)
     },
 ) {

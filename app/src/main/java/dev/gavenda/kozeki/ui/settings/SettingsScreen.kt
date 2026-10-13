@@ -83,7 +83,7 @@ import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.settingsViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
@@ -98,7 +98,7 @@ private val ABOUT_PORTRAIT_WIDTH = 96.dp
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = injektViewModel { settingsViewModel() },
+    viewModel: SettingsViewModel = koinViewModel { settingsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current

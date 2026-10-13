@@ -158,6 +158,8 @@ dependencies {
     implementation(libs.readium.navigator.web.reflowable)
     implementation(libs.readium.navigator.web.fixedlayout)
 
+    implementation(libs.koin.core)
+    // Mihon extensions look their dependencies up through Injekt; see exposeToExtensions().
     implementation(libs.injekt)
     implementation(project(":mihon-host"))
 

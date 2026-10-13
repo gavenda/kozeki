@@ -64,7 +64,7 @@ import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.SourcePicker
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.sourceAttributionItem
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
 @Composable
@@ -74,7 +74,7 @@ fun AddBookScreen(
     onOpenResult: (BookMetadata) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: AddBookViewModel = injektViewModel { addBookViewModel() },
+    viewModel: AddBookViewModel = koinViewModel { addBookViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     AddBookContent(

@@ -53,7 +53,7 @@ import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.isUiBirthday
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.DayOfWeek
@@ -66,7 +66,7 @@ import java.time.temporal.TemporalAdjusters
 fun CalendarScreen(
     onOpenDay: (LocalDate) -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: CalendarViewModel = injektViewModel { calendarViewModel() },
+    viewModel: CalendarViewModel = koinViewModel { calendarViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CalendarContent(

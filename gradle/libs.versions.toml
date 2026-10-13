@@ -23,6 +23,7 @@ okhttp = "5.5.0"
 playServicesAuth = "22.0.0"
 readium = "3.4.0"
 injekt = "1.16.1"
+koin = "4.2.2"
 rxjava = "1.3.8"
 jsoup = "1.23.2"
 quickjs = "547f5b1597"
@@ -87,6 +88,7 @@ readium-navigator-web-reflowable = { group = "org.readium.kotlin-toolkit", name 
 readium-navigator-web-fixedlayout = { group = "org.readium.kotlin-toolkit", name = "readium-navigator-web-fixedlayout", version.ref = "readium" }
 
 injekt = { group = "uy.kohesive.injekt", name = "injekt-core", version.ref = "injekt" }
+koin-core = { group = "io.insert-koin", name = "koin-core", version.ref = "koin" }
 rxjava = { group = "io.reactivex", name = "rxjava", version.ref = "rxjava" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 quickjs = { group = "com.github.zhanghai.quickjs-java", name = "quickjs-android", version.ref = "quickjs" }

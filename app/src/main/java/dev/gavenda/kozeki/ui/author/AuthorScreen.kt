@@ -63,7 +63,7 @@ import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
 /** An author as the metadata source describes them, above the books it lists as theirs. */
@@ -74,7 +74,7 @@ fun AuthorScreen(
     onBack: () -> Unit,
     onOpenBook: (String) -> Unit,
     onOpenResult: (BookMetadata) -> Unit,
-    viewModel: AuthorViewModel = injektViewModel(key = authorId) { authorViewModel(authorId, name) },
+    viewModel: AuthorViewModel = koinViewModel(key = authorId) { authorViewModel(authorId, name) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     AuthorContent(

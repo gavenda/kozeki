@@ -76,7 +76,7 @@ import dev.gavenda.kozeki.ui.components.HistoryTextField
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.formatDate
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.Instant
 import java.time.LocalDate
@@ -90,7 +90,7 @@ fun BookFormScreen(
     bookId: String?,
     onBack: () -> Unit,
     onAdded: (String) -> Unit,
-    viewModel: BookFormViewModel = injektViewModel(key = "book-form-$bookId") { bookFormViewModel(bookId) },
+    viewModel: BookFormViewModel = koinViewModel(key = "book-form-$bookId") { bookFormViewModel(bookId) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 

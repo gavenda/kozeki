@@ -49,7 +49,7 @@ import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.statisticsViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.DayOfWeek
@@ -68,7 +68,7 @@ fun StatisticsScreen(
     onOpenSettings: () -> Unit,
     initialDate: LocalDate? = null,
     onBack: (() -> Unit)? = null,
-    viewModel: StatisticsViewModel = injektViewModel(key = "statistics-$initialDate") { statisticsViewModel(initialDate) },
+    viewModel: StatisticsViewModel = koinViewModel(key = "statistics-$initialDate") { statisticsViewModel(initialDate) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     StatisticsContent(

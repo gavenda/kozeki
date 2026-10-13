@@ -74,7 +74,7 @@ import dev.gavenda.kozeki.data.model.MangaChapter
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
-import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.mangaReaderViewModel
 import dev.gavenda.kozeki.ui.reader.ImmersiveMode
 import dev.gavenda.kozeki.ui.reader.KeepScreenOn
@@ -92,7 +92,7 @@ fun MangaReaderScreen(
     bookId: String,
     chapterUrl: String,
     onBack: () -> Unit,
-    viewModel: MangaReaderViewModel = injektViewModel(key = "manga-$bookId-$chapterUrl") {
+    viewModel: MangaReaderViewModel = koinViewModel(key = "manga-$bookId-$chapterUrl") {
         mangaReaderViewModel(bookId, chapterUrl)
     },
 ) {
