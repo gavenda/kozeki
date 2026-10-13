@@ -49,14 +49,14 @@ import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
+import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.statisticsViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 
 /**
  * @param initialDate When set, the screen opens on that day and behaves as a detail page with a
@@ -68,7 +68,7 @@ fun StatisticsScreen(
     onOpenSettings: () -> Unit,
     initialDate: LocalDate? = null,
     onBack: (() -> Unit)? = null,
-    viewModel: StatisticsViewModel = koinViewModel(key = "statistics-$initialDate") { parametersOf(initialDate) },
+    viewModel: StatisticsViewModel = injektViewModel(key = "statistics-$initialDate") { statisticsViewModel(initialDate) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     StatisticsContent(

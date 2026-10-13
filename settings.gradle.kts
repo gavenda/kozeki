@@ -20,8 +20,13 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // The QuickJS binding Mihon extensions evaluate JavaScript with is only published here.
+        maven("https://www.jitpack.io") {
+            content { includeGroup("com.github.zhanghai.quickjs-java") }
+        }
     }
 }
 
 rootProject.name = "Kozeki"
 include(":app")
+include(":mihon-host")

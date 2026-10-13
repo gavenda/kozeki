@@ -76,9 +76,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
@@ -116,21 +116,23 @@ import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.Portrait
-import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.ReadingProgressRing
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
+import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.icon
 import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.components.outlinedIcon
 import dev.gavenda.kozeki.ui.components.ownershipBadge
 import dev.gavenda.kozeki.ui.formatPercent
+import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.libraryViewModel
 import dev.gavenda.kozeki.ui.search.SearchTopBar
 import dev.gavenda.kozeki.ui.search.SearchUiState
 import dev.gavenda.kozeki.ui.search.SearchViewModel
+import dev.gavenda.kozeki.ui.searchViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.LocalDate
 import kotlinx.coroutines.launch
-import org.koin.compose.viewmodel.koinViewModel
 
 /** MIME types offered by the file picker. Some providers report EPUBs as generic binary data. */
 internal val EpubMimeTypes = arrayOf("application/epub+zip", "application/octet-stream")
@@ -142,8 +144,8 @@ fun LibraryScreen(
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: LibraryViewModel = koinViewModel(),
-    searchViewModel: SearchViewModel = koinViewModel(),
+    viewModel: LibraryViewModel = injektViewModel { libraryViewModel() },
+    searchViewModel: SearchViewModel = injektViewModel { searchViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val search by searchViewModel.uiState.collectAsStateWithLifecycle()
@@ -171,6 +173,7 @@ fun LibraryScreen(
         onFilterSelected = viewModel::selectFilter,
         onSortSelected = viewModel::selectSort,
         onDisplaySelected = viewModel::selectDisplay,
+        onKindToggle = viewModel::toggleKind,
         onImportClick = { picker.launch(EpubMimeTypes) },
         onAddBook = onAddBook,
         onAddManually = onAddManually,
@@ -230,6 +233,7 @@ fun LibraryContent(
     selectionActions: SelectionActions,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onKindToggle: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyGridState()
@@ -245,6 +249,18 @@ fun LibraryContent(
         if (state.filter != shownFilter) {
             shownFilter = state.filter
             gridState.scrollToItem(0)
+        }
+    }
+
+    // The same for the other kind, whose books are not the ones the grid was showing: left where it
+    // was, it would open part way down a list of a different length, with the title still folded away.
+    var shownKind by rememberSaveable { mutableStateOf(state.kind) }
+    LaunchedEffect(state.kind) {
+        if (state.kind != shownKind) {
+            shownKind = state.kind
+            gridState.scrollToItem(0)
+            scrollBehavior.state.heightOffset = 0f
+            scrollBehavior.state.contentOffset = 0f
         }
     }
 
@@ -345,7 +361,7 @@ fun LibraryContent(
             }
 
             else -> Column(Modifier.padding(top = innerPadding.calculateTopPadding())) {
-                FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected)
+                FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected, onKindToggle)
                 if (state.isFilterEmpty) {
                     EmptyState(
                         expression = Expression.NEUTRAL,
@@ -609,6 +625,7 @@ private fun FilterRow(
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
     onDisplaySelected: (LibraryDisplay) -> Unit,
+    onKindToggle: () -> Unit,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     Column {
@@ -640,6 +657,7 @@ private fun FilterRow(
             }
             Row {
                 DisplayToggle(state.display, onDisplaySelected)
+                if (state.separateKinds) KindToggle(state.kind, onKindToggle)
                 SortMenu(state.sort, onSortSelected)
             }
         }
@@ -686,6 +704,23 @@ private fun DisplayToggle(display: LibraryDisplay, onDisplaySelected: (LibraryDi
             painter = if (other == LibraryDisplay.LIST) painterResource(R.drawable.view_list_fill_48px) else painterResource(R.drawable.grid_view_fill_48px),
             contentDescription = stringResource(
                 if (other == LibraryDisplay.LIST) R.string.display_as_list else R.string.display_as_covers,
+            ),
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+/** Flips between the books and the manga. Like the display toggle, it shows what a tap leads to. */
+@Composable
+private fun KindToggle(kind: LibraryKind, onToggle: () -> Unit) {
+    val other = kind.other
+    IconButton(onClick = onToggle) {
+        Icon(
+            painter = painterResource(
+                if (other == LibraryKind.MANGA) R.drawable.auto_stories_48px else R.drawable.library_books_fill_48px,
+            ),
+            contentDescription = stringResource(
+                if (other == LibraryKind.MANGA) R.string.show_manga else R.string.show_books,
             ),
             modifier = Modifier.size(24.dp),
         )

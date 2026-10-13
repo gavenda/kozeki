@@ -46,6 +46,8 @@
     <string name="filter_books">Filter books</string>
     <string name="display_as_list">Show as list</string>
     <string name="display_as_covers">Show as covers</string>
+    <string name="show_manga">Show manga</string>
+    <string name="show_books">Show books</string>
     <string name="sort_recent">Recently read</string>
     <string name="sort_title">Title</string>
     <string name="sort_author">Author</string>
@@ -109,6 +111,30 @@
     <string name="book_page">Page</string>
     <string name="book_time_read">Time read</string>
     <string name="progress_epub">EPUB</string>
+    <string name="progress_manga">Chapters</string>
+    <string name="manga_chapters_title">Chapters</string>
+    <string name="manga_chapter_short">Ch. %1$s</string>
+    <string name="manga_start">Start · %1$s</string>
+    <string name="manga_continue">Continue · %1$s</string>
+    <string name="manga_add_to_library">Add to library</string>
+    <string name="manga_chapters_empty">This source lists no chapters.</string>
+    <string name="manga_chapters_show_all">Show all %1$d chapters</string>
+    <string name="manga_chapter_page">Page %1$d</string>
+    <string name="manga_mark_read">Mark as read</string>
+    <string name="manga_mark_unread">Mark as unread</string>
+    <string name="manga_reader_chapter_missing">This chapter is no longer listed by its source.</string>
+    <string name="manga_reader_page_description">Page %1$d</string>
+    <string name="manga_reader_page_failed">This page could not be loaded.</string>
+    <string name="manga_reader_end_latest">That is the latest chapter the source has.</string>
+    <string name="manga_reader_end_back">Back to the book</string>
+    <string name="manga_reader_start_first">This is the first chapter</string>
+    <string name="manga_reader_mode">Reading mode</string>
+    <string name="manga_reader_previous_chapter">Previous chapter</string>
+    <string name="manga_reader_next_chapter">Next chapter</string>
+    <string name="manga_reader_position">Page %1$d of %2$d</string>
+    <string name="manga_mode_rtl">Right to left</string>
+    <string name="manga_mode_ltr">Left to right</string>
+    <string name="manga_mode_vertical">Vertical strip</string>
     <string name="progress_physical">Physical</string>
     <string name="physical_prompt">Reading a physical copy? Tell Ui the page you are on, so no corner needs folding.</string>
     <string name="physical_track">Track progress</string>
@@ -132,6 +158,7 @@
     <string name="book_about">Synopsis</string>
     <string name="book_no_details">No details yet. Have Ui look this book up in the catalogue to fill them in.</string>
     <string name="book_view_on_source">View on %1$s</string>
+    <string name="book_view_in_browser">Open in browser</string>
     <string name="detail_publisher">Publisher</string>
     <string name="detail_published">Published</string>
     <string name="detail_pages">Pages</string>
@@ -200,6 +227,7 @@
     <!-- Metadata sources and matching -->
     <string name="source_hardcover">Hardcover</string>
     <string name="source_google_books">Google Books</string>
+    <string name="source_manga">Manga</string>
     <string name="attribution_google">Powered by Google</string>
     <string name="match_find">Look up in the catalogue</string>
     <string name="match_unlink">Unlink from the catalogue</string>
@@ -223,6 +251,7 @@
     <string name="lookup_error_not_configured">Google Books needs an API key, and this build of Kozeki was made without one.</string>
     <string name="lookup_error_key_rejected">Google Books refused the API key this build of Kozeki was made with.</string>
     <string name="lookup_error_missing_permission">Kozeki has not been given access to this yet. Sign out of Hardcover in Settings and sign in again to allow it.</string>
+    <string name="lookup_error_no_extensions">No manga source is installed on this device. Install a Mihon extension and its sources show up here.</string>
     <string name="lookup_error_other">The lookup failed. Try again later.</string>
 
     <!-- Reviews -->
@@ -299,6 +328,9 @@
     <string name="add_book_prompt_message">Was there something you needed? Give me a title, an author or an ISBN and I\'ll look it up. I keep what I find on this device, so asking twice costs nothing.</string>
     <string name="add_book_no_results_title">Not in the catalogue</string>
     <string name="add_book_no_results_message">I couldn\'t find it… Try fewer or different words, or the ISBN.</string>
+    <string name="add_book_manga_none_title">No manga sources</string>
+    <string name="add_book_manga_none_message">I can\'t find a manga source on this device. Install a Mihon extension and I\'ll look through it for you.</string>
+    <string name="add_book_manga_no_results_message">I couldn\'t find it on this source… Try different words, or pick another source above.</string>
     <string name="add_book_error_title">S-Sorry. I can\'t search right now.</string>
     <string name="add_book_to_wishlist">I want this</string>
     <string name="add_book_as_purchased">I own this</string>
@@ -485,6 +517,9 @@
     <string name="settings_backup_error_unreadable">The backup on Google Drive cannot be read.</string>
     <string name="settings_backup_error_too_new">The backup was made by a newer version of Kozeki. Update the app to restore it.</string>
     <string name="settings_backup_error_other">That did not work. Try again later.</string>
+    <string name="settings_library_title">Library</string>
+    <string name="settings_library_separate_title">Keep manga apart</string>
+    <string name="settings_library_separate_description">Books and manga are shown one kind at a time, with a button to switch. Off shows them all together</string>
     <string name="settings_cache_title">Looked up before</string>
     <string name="settings_cache_description">So nothing is looked up twice</string>
     <plurals name="settings_cache_entries">
@@ -492,6 +527,21 @@
         <item quantity="other">%1$d stored lookups</item>
     </plurals>
     <string name="settings_cache_clear">Clear</string>
+    <string name="settings_manga_title">Mihon sources</string>
+    <string name="settings_manga_loading">Looking for extensions…</string>
+    <plurals name="settings_manga_extensions">
+        <item quantity="one">%1$d extension</item>
+        <item quantity="other">%1$d extensions</item>
+    </plurals>
+    <string name="settings_manga_description">Extensions installed on this device</string>
+    <string name="settings_manga_refresh">Look again</string>
+    <string name="settings_manga_none_title">No extensions found</string>
+    <string name="settings_manga_none_description">Install Mihon extensions on this device and they are listed here. Extensions kept inside the Mihon app cannot be used.</string>
+    <string name="settings_manga_nsfw">18+</string>
+    <string name="settings_manga_broken_lib">Built for extension library %1$s. Only 1.6 is used.</string>
+    <string name="settings_manga_broken_lib_unknown">Does not say which extension library it was built for. Only 1.6 is used.</string>
+    <string name="settings_manga_broken_malformed">Its package is missing what an extension needs.</string>
+    <string name="settings_manga_broken_failed">Could not be loaded: %1$s</string>
     <string name="settings_about_version">Kozeki %1$s</string>
     <string name="settings_about_credits">I\'ll keep your books in order and your reading on record.</string>
     <string name="settings_about_birthday">It\'s my birthday today. A book read would be present enough.</string>

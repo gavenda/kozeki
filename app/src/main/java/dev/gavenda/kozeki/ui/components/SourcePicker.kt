@@ -23,12 +23,17 @@ internal val MetadataSource.nameRes: Int
     get() = when (this) {
         MetadataSource.HARDCOVER -> R.string.source_hardcover
         MetadataSource.GOOGLE_BOOKS -> R.string.source_google_books
+        MetadataSource.MANGA -> R.string.source_manga
     }
 
 /** The choice of which catalogue an online search goes to, for under that search's field. */
 @Composable
-fun SourcePicker(source: MetadataSource, onSourceChange: (MetadataSource) -> Unit, modifier: Modifier = Modifier) {
-    val sources = MetadataSource.entries
+fun SourcePicker(
+    source: MetadataSource,
+    onSourceChange: (MetadataSource) -> Unit,
+    modifier: Modifier = Modifier,
+    sources: List<MetadataSource> = MetadataSource.entries,
+) {
     ConnectedButtonGroup(
         options = sources.map { stringResource(it.nameRes) },
         selectedIndex = sources.indexOf(source),

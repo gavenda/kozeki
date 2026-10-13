@@ -1,18 +1,22 @@
 package dev.gavenda.kozeki.ui.addbook
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -41,6 +45,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.manga.MangaProvider
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
@@ -49,6 +54,7 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.addBookViewModel
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
@@ -58,8 +64,8 @@ import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.SourcePicker
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.sourceAttributionItem
+import dev.gavenda.kozeki.ui.injektViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun AddBookScreen(
@@ -68,7 +74,7 @@ fun AddBookScreen(
     onOpenResult: (BookMetadata) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: AddBookViewModel = koinViewModel(),
+    viewModel: AddBookViewModel = injektViewModel { addBookViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     AddBookContent(
@@ -76,6 +82,7 @@ fun AddBookScreen(
         onBack = onBack,
         onQueryChange = viewModel::onQueryChange,
         onSourceChange = viewModel::setSource,
+        onMangaSourceChange = viewModel::setMangaSource,
         onSearch = viewModel::search,
         onLoadMore = viewModel::loadMore,
         onOpenResult = onOpenResult,
@@ -98,6 +105,7 @@ fun AddBookContent(
     onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onMangaSourceChange: (Long) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -151,7 +159,7 @@ fun AddBookContent(
                     leadingIcon = {
                         IconButton(
                             onClick = submit,
-                            enabled = query.trim().length >= 3,
+                            enabled = query.trim().length >= state.minQueryLength,
                             // The library's icon never dims, so neither does this one.
                             colors = IconButtonDefaults.iconButtonColors(
                                 contentColor = MaterialTheme.colorScheme.onSurface,
@@ -191,11 +199,31 @@ fun AddBookContent(
                         .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 )
 
+                if (state.source == MetadataSource.MANGA && state.mangaSources.isNotEmpty()) {
+                    MangaSourceChips(
+                        options = state.mangaSources,
+                        selectedId = state.mangaSourceId,
+                        onSelect = onMangaSourceChange,
+                    )
+                }
+
                 val results = state.results
                 when {
                     state.loading -> Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
                         HaloLoadingIndicator()
                     }
+
+                    // Nothing to look through yet: she says so, as she does when a book is not found.
+                    state.error == LookupError.NO_EXTENSIONS -> EmptyState(
+                        expression = Expression.DOWNCAST,
+                        icon = painterResource(R.drawable.auto_stories_off_48px),
+                        title = stringResource(R.string.add_book_manga_none_title),
+                        message = stringResource(R.string.add_book_manga_none_message),
+                        // Where the extensions that were found, and why the others were not, are listed.
+                        action = {
+                            Button(onClick = onOpenSettings) { Text(stringResource(R.string.settings_manga_title)) }
+                        },
+                    )
 
                     state.error != null -> EmptyState(
                         expression = Expression.DISMAYED,
@@ -220,7 +248,13 @@ fun AddBookContent(
                         expression = Expression.WORRIED,
                         icon = painterResource(R.drawable.search_off_48px),
                         title = stringResource(R.string.add_book_no_results_title),
-                        message = stringResource(R.string.add_book_no_results_message),
+                        message = stringResource(
+                            if (state.source == MetadataSource.MANGA) {
+                                R.string.add_book_manga_no_results_message
+                            } else {
+                                R.string.add_book_no_results_message
+                            },
+                        ),
                     )
 
                     else -> {
@@ -236,6 +270,7 @@ fun AddBookContent(
                                     onClick = { if (owned != null) onOpenBook(owned.id) else onOpenResult(result) },
                                     trailingContent = owned?.let { book -> { OwnedBadge(book) } },
                                     onOpenAuthor = onOpenAuthor,
+                                    sourceLabel = state.mangaLabel(result),
                                 )
                             }
                             loadingMoreItem(state.loadingMore)
@@ -246,6 +281,36 @@ fun AddBookContent(
         }
     }
 
+}
+
+/** The chip of the manga source [result] came from, when it is one of the sources listed. */
+private fun AddBookUiState.mangaLabel(result: BookMetadata): String? {
+    if (result.source != MetadataSource.MANGA) return null
+    val id = MangaProvider.parseSourceId(result.sourceId)?.first ?: return null
+    return mangaSources.firstOrNull { it.id == id }?.label
+}
+
+/** The manga sources to search, one of them picked. Scrolls when the extensions have many. */
+@Composable
+private fun MangaSourceChips(
+    options: List<MangaSourceOption>,
+    selectedId: Long,
+    onSelect: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyRow(
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(options, key = { it.id }) { option ->
+            FilterChip(
+                selected = option.id == selectedId,
+                onClick = { onSelect(option.id) },
+                label = { Text(option.label) },
+            )
+        }
+    }
 }
 
 /** Errors the user fixes in Settings rather than by retrying. */
@@ -337,6 +402,66 @@ private fun AddBookGoogleBooksPreview() {
                 source = MetadataSource.GOOGLE_BOOKS,
                 results = PreviewResults.map { it.copy(source = MetadataSource.GOOGLE_BOOKS) },
             ),
+            onBack = {},
+            onQueryChange = {},
+            onSourceChange = {},
+            onSearch = {},
+            onLoadMore = {},
+            onOpenResult = {},
+            onOpenBook = {},
+            onOpenAuthor = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun AddBookMangaPreview() {
+    AppTheme {
+        AddBookContent(
+            state = AddBookUiState(
+                source = MetadataSource.MANGA,
+                mangaSources = listOf(
+                    MangaSourceOption(1L, "MangaDex"),
+                    MangaSourceOption(2L, "Asura Scans"),
+                    MangaSourceOption(3L, "Comick"),
+                ),
+                mangaSourceId = 1L,
+                results = listOf(
+                    BookMetadata(
+                        source = MetadataSource.MANGA,
+                        sourceId = "1:/title/a",
+                        title = "Frieren: Beyond Journey's End",
+                        authors = listOf("Kanehito Yamada", "Tsukasa Abe"),
+                    ),
+                    BookMetadata(
+                        source = MetadataSource.MANGA,
+                        sourceId = "1:/title/b",
+                        title = "Dungeon Meshi",
+                        authors = listOf("Ryoko Kui"),
+                    ),
+                ),
+            ),
+            onBack = {},
+            onQueryChange = {},
+            onSourceChange = {},
+            onSearch = {},
+            onLoadMore = {},
+            onOpenResult = {},
+            onOpenBook = {},
+            onOpenAuthor = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun AddBookNoMangaSourcesPreview() {
+    AppTheme {
+        AddBookContent(
+            state = AddBookUiState(source = MetadataSource.MANGA, error = LookupError.NO_EXTENSIONS),
             onBack = {},
             onQueryChange = {},
             onSourceChange = {},

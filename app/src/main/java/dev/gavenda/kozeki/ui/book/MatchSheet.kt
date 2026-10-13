@@ -115,6 +115,7 @@ private fun MatchSheetContent(
         SourcePicker(
             source = state.source,
             onSourceChange = onSourceChange,
+            sources = MetadataSource.matchable,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),

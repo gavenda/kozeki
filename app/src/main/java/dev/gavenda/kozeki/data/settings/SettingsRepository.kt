@@ -5,6 +5,7 @@ import androidx.core.content.edit
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -85,6 +86,16 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     /** Name of the way the library's books were last laid out, or null while the user has not picked one. */
     val libraryDisplay: Flow<String?> = store.data.map { it[Keys.LibraryDisplay] }.distinctUntilChanged()
 
+    /** Name of the kind of book the library is showing, or null while the user has not picked one. */
+    val libraryKind: Flow<String?> = store.data.map { it[Keys.LibraryKind] }.distinctUntilChanged()
+
+    /**
+     * Whether the library keeps manga apart from the books with an EPUB or a paper copy, showing
+     * one kind at a time. On unless the user turned it off.
+     */
+    val separateLibraryKinds: Flow<Boolean> =
+        store.data.map { it[Keys.SeparateLibraryKinds] ?: true }.distinctUntilChanged()
+
     // Opened here, ahead of its first use, so that reading it later does not wait for the disk.
     private val searchPreferences = context.applicationContext.getSharedPreferences("search", Context.MODE_PRIVATE)
 
@@ -99,6 +110,14 @@ class SettingsRepository(context: Context) : DriveLinkStore {
             return MetadataSource.entries.find { it.name == name } ?: MetadataSource.HARDCOVER
         }
         set(value) = searchPreferences.edit { putString(SEARCH_SOURCE, value.name) }
+
+    /**
+     * The ID of the manga source the online search of manga goes to, or 0 while the user has not
+     * picked one. Kept beside [searchSource] for the same reason.
+     */
+    var mangaSourceId: Long
+        get() = searchPreferences.getLong(MANGA_SOURCE, 0L)
+        set(value) = searchPreferences.edit { putLong(MANGA_SOURCE, value) }
 
     /**
      * The Google account backups go to, or null while nobody is signed in. It says where the
@@ -161,6 +180,14 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.LibrarySort] = name }
     }
 
+    suspend fun setLibraryKind(name: String) {
+        store.edit { it[Keys.LibraryKind] = name }
+    }
+
+    suspend fun setSeparateLibraryKinds(separate: Boolean) {
+        store.edit { it[Keys.SeparateLibraryKinds] = separate }
+    }
+
     suspend fun setLibraryDisplay(name: String) {
         store.edit { it[Keys.LibraryDisplay] = name }
     }
@@ -172,11 +199,14 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val LastCurrency = stringPreferencesKey("last_currency")
         val LibrarySort = stringPreferencesKey("library_sort")
         val LibraryDisplay = stringPreferencesKey("library_display")
+        val LibraryKind = stringPreferencesKey("library_kind")
+        val SeparateLibraryKinds = booleanPreferencesKey("separate_library_kinds")
         val DriveLink = stringPreferencesKey("drive_link")
     }
 
     companion object {
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
         private const val SEARCH_SOURCE = "source"
+        private const val MANGA_SOURCE = "manga_source"
     }
 }

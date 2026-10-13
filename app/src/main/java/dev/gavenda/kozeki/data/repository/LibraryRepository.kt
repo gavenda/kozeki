@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.room.withTransaction
 import dev.gavenda.kozeki.data.db.BookEntity
 import dev.gavenda.kozeki.data.db.KozekiDatabase
+import dev.gavenda.kozeki.data.db.isInLibrary
+import dev.gavenda.kozeki.data.db.isManga
 import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
@@ -23,6 +25,7 @@ import dev.gavenda.kozeki.data.model.BookDraft
 import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MatchStatus
+import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.PhysicalReading
 import dev.gavenda.kozeki.data.model.ReadOutcome
@@ -67,6 +70,7 @@ class LibraryRepository(
     private val sessions = db.readingSessionDao()
     private val physicalReadings = db.physicalReadingDao()
     private val notes = db.noteDao()
+    private val mangaChapters = db.mangaChapterDao()
     private val importLock = Mutex()
 
     init {
@@ -275,8 +279,10 @@ class LibraryRepository(
     // ---- Adding and metadata ---------------------------------------------------------------
 
     /** Adds a book found in a metadata source to the wishlist or the purchased list. */
-    suspend fun addFromMetadata(metadata: BookMetadata, acquisition: Acquisition): String {
+    suspend fun addFromMetadata(metadata: BookMetadata, wanted: Acquisition): String {
         books.findBySource(metadata.source, metadata.sourceId).firstOrNull()?.let { return it.id }
+        // A manga can be read from the moment it is added, so it is never merely wanted.
+        val acquisition = if (metadata.source == MetadataSource.MANGA) Acquisition.DOWNLOADED else wanted
 
         val bookId = UUID.randomUUID().toString()
         books.upsert(
@@ -301,6 +307,7 @@ class LibraryRepository(
                 source = metadata.source,
                 sourceId = metadata.sourceId,
                 sourceUrl = metadata.infoUrl,
+                sourceMemo = metadata.sourceMemo,
                 matchStatus = MatchStatus.MATCHED,
                 sync = SyncStamp.created(clock.millis()),
             ),
@@ -564,7 +571,7 @@ class LibraryRepository(
                     if (newState == ReadingState.COMPLETED) {
                         progression = 1.0
                         // Without an EPUB it can only have been the physical copy that was finished.
-                        if (book.fileHash == null && physicalPage != null) {
+                        if (!book.isInLibrary && physicalPage != null) {
                             physicalPage = book.physicalPageCount ?: book.pageCount ?: physicalPage
                         }
                     }
@@ -734,7 +741,7 @@ class LibraryRepository(
             // Without a purchase, a book with an EPUB is a download and one without is a wish.
             val target = when {
                 acquisition == Acquisition.PURCHASED -> Acquisition.PURCHASED
-                book.fileHash != null -> Acquisition.DOWNLOADED
+                book.isInLibrary -> Acquisition.DOWNLOADED
                 else -> Acquisition.WISHLIST
             }
             // A book that goes back to being wanted is Planned again, whatever it was marked as.
@@ -774,6 +781,7 @@ class LibraryRepository(
             sessions.softDeleteForBook(bookId, now)
             physicalReadings.softDeleteForBook(bookId, now)
             notes.softDeleteForBook(bookId, now)
+            mangaChapters.softDeleteForBook(bookId, now)
             books.upsert(book.copy(sync = book.sync.deleted(now)))
             cover = book.coverFile
         }
@@ -904,7 +912,9 @@ class LibraryRepository(
         sourceId = sourceId,
         sourceUrl = sourceUrl,
         matchStatus = matchStatus,
-        inLibrary = fileHash != null,
+        sourceMemo = sourceMemo,
+        inLibrary = isInLibrary,
+        isManga = isManga,
         hasFile = fileHash != null && storage.hasEpub(id),
         locator = locator,
         progression = progression,

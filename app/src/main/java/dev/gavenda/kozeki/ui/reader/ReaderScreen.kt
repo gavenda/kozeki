@@ -70,18 +70,18 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.ui.book.NoteDialog
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.formatPercent
-import dev.gavenda.kozeki.ui.book.NoteDialog
+import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.readerViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 import org.readium.navigator.common.InputListener
 import org.readium.navigator.common.TapContext
 import org.readium.navigator.common.TapEvent
@@ -106,7 +106,7 @@ private const val THEME_SETTLE_MS = 600L
 fun ReaderScreen(
     bookId: String,
     onBack: () -> Unit,
-    viewModel: ReaderViewModel = koinViewModel(key = "reader-$bookId") { parametersOf(bookId) },
+    viewModel: ReaderViewModel = injektViewModel(key = "reader-$bookId") { readerViewModel(bookId) },
 ) {
     val currentColors = readerSystemColors()
     val latestColors by rememberUpdatedState(currentColors)
@@ -527,7 +527,7 @@ private fun ReaderFailed(reason: ReaderFailure, onBack: () -> Unit) {
 
 /** Hides the status and navigation bars while reading; a swipe brings them back briefly. */
 @Composable
-private fun ImmersiveMode(hideSystemBars: Boolean) {
+internal fun ImmersiveMode(hideSystemBars: Boolean) {
     val window = LocalActivity.current?.window ?: return
     val view = LocalView.current
     DisposableEffect(window, view, hideSystemBars) {
@@ -544,7 +544,7 @@ private fun ImmersiveMode(hideSystemBars: Boolean) {
 
 /** Keeps the display awake while pages are being turned, but not for a book left lying open. */
 @Composable
-private fun KeepScreenOn(interactions: Int) {
+internal fun KeepScreenOn(interactions: Int) {
     val view = LocalView.current
     LaunchedEffect(view, interactions) {
         view.keepScreenOn = true

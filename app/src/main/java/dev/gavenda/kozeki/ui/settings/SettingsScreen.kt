@@ -40,6 +40,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -71,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.manga.BrokenExtension
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.settings.ThemeMode
@@ -81,9 +83,10 @@ import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
+import dev.gavenda.kozeki.ui.injektViewModel
+import dev.gavenda.kozeki.ui.settingsViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
-import org.koin.compose.viewmodel.koinViewModel
 
 private const val MIN_DAILY_GOAL = 5
 private const val MAX_DAILY_GOAL = 180
@@ -95,7 +98,7 @@ private val ABOUT_PORTRAIT_WIDTH = 96.dp
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = koinViewModel(),
+    viewModel: SettingsViewModel = injektViewModel { settingsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -155,6 +158,8 @@ fun SettingsScreen(
         onSetYearlyGoal = viewModel::setYearlyGoal,
         onClearCache = viewModel::clearCache,
         backupActions = backupActions,
+        onRefreshExtensions = viewModel::refreshExtensions,
+        onSetSeparateKinds = viewModel::setSeparateKinds,
     )
 }
 
@@ -171,6 +176,8 @@ fun SettingsContent(
     onClearCache: () -> Unit,
     backupActions: BackupActions,
     modifier: Modifier = Modifier,
+    onRefreshExtensions: () -> Unit = {},
+    onSetSeparateKinds: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -203,6 +210,22 @@ fun SettingsContent(
                 item(key = "source") {
                     Section(title = stringResource(R.string.settings_source_title)) {
                         HardcoverSetting(state, onSignIn, onSignOut, onDismissSignInError)
+                    }
+                }
+                item(key = "manga") {
+                    Section(title = stringResource(R.string.settings_manga_title)) {
+                        MangaSourcesSetting(state.extensions, onRefreshExtensions)
+                    }
+                }
+                item(key = "library") {
+                    Section(title = stringResource(R.string.settings_library_title)) {
+                        SettingRow(
+                            icon = painterResource(R.drawable.shelves_48px),
+                            title = stringResource(R.string.settings_library_separate_title),
+                            subtitle = stringResource(R.string.settings_library_separate_description),
+                        ) {
+                            Switch(checked = state.separateKinds, onCheckedChange = onSetSeparateKinds)
+                        }
                     }
                 }
                 item(key = "appearance") {
@@ -566,6 +589,22 @@ private fun SettingsContentPreview() {
                 year = 2026,
                 yearlyGoalBooks = 24,
                 cachedLookups = 128,
+                extensions = listOf(
+                    BrokenExtension(
+                        name = "MangaDex",
+                        packageName = "eu.kanade.tachiyomi.extension.all.mangadex",
+                        versionName = "1.4.190",
+                        versionCode = 190,
+                        reason = BrokenExtension.Reason.UnsupportedLib(1.4),
+                    ),
+                    BrokenExtension(
+                        name = "Some Source",
+                        packageName = "eu.kanade.tachiyomi.extension.en.some",
+                        versionName = "1.6.3",
+                        versionCode = 3,
+                        reason = BrokenExtension.Reason.Failed("ClassNotFoundException: ..."),
+                    ),
+                ),
                 versionName = "1.0",
             ),
             onBack = {},

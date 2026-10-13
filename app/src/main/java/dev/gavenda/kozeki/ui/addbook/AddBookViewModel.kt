@@ -2,6 +2,7 @@ package dev.gavenda.kozeki.ui.addbook
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.gavenda.kozeki.data.manga.MangaSources
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
@@ -27,6 +28,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** A manga source the search can be pointed at, as a chip. */
+data class MangaSourceOption(val id: Long, val label: String)
+
 data class AddBookUiState(
     val query: String = "",
     /** The catalogue being searched. */
@@ -40,20 +44,45 @@ data class AddBookUiState(
     val error: LookupError? = null,
     /** The results already among the user's own books, by source ID, so their rows can show it. */
     val owned: Map<String, Book> = emptyMap(),
-)
+    /** The manga sources the installed extensions provide. Only searched when [source] is manga. */
+    val mangaSources: List<MangaSourceOption> = emptyList(),
+    /** The one of [mangaSources] searched, or 0 when there is none. */
+    val mangaSourceId: Long = 0L,
+) {
+    /**
+     * How much of a query is searched. Manga are browsed too, so with nothing typed the source
+     * lists what is popular on it, and titles there can be short.
+     */
+    val minQueryLength: Int get() = if (source == MetadataSource.MANGA) 0 else 3
+}
 
 class AddBookViewModel(
     private val metadata: MetadataRepository,
     library: LibraryRepository,
     private val settings: SettingsRepository,
+    mangaSources: MangaSources,
 ) : ViewModel() {
 
     // Opens on the source searched last time.
     private val _uiState = MutableStateFlow(AddBookUiState(source = settings.searchSource))
 
+    private val pickedManga = MutableStateFlow(settings.mangaSourceId)
+
     val uiState: StateFlow<AddBookUiState> =
-        combine(_uiState, library.observeAll().map(::OwnedBooks)) { state, owned ->
-            state.copy(owned = owned.among(state.results.orEmpty()))
+        combine(
+            _uiState,
+            library.observeAll().map(::OwnedBooks),
+            mangaSources.sources,
+            pickedManga,
+        ) { state, owned, sources, picked ->
+            val labels = mangaSourceLabels(sources.map { it.name to it.lang })
+            val options = sources.mapIndexed { i, source -> MangaSourceOption(source.id, labels[i]) }
+            state.copy(
+                owned = owned.among(state.results.orEmpty()),
+                mangaSources = options,
+                // The same fallback the search itself makes while the picked source is not installed.
+                mangaSourceId = (options.firstOrNull { it.id == picked } ?: options.firstOrNull())?.id ?: 0L,
+            )
         }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), _uiState.value)
@@ -69,7 +98,8 @@ class AddBookViewModel(
     private var searched: String? = null
 
     init {
-        checkAvailability()
+        // Manga are browsed, so they open on what is popular instead of waiting for a query.
+        if (_uiState.value.source == MetadataSource.MANGA) search() else checkAvailability()
     }
 
     /** Points the search at [source], repeats it there, and remembers the choice for next time. */
@@ -81,7 +111,21 @@ class AddBookViewModel(
             it.copy(source = source, loading = false, results = null, canLoadMore = false, error = null)
         }
         settings.searchSource = source
-        if (_uiState.value.query.trim().length >= MIN_QUERY_LENGTH) search() else checkAvailability()
+        if (source == MetadataSource.MANGA || _uiState.value.query.trim().length >= MIN_QUERY_LENGTH) {
+            search()
+        } else {
+            checkAvailability()
+        }
+    }
+
+    /** Points manga searches at the source with [id], and repeats the search there. */
+    fun setMangaSource(id: Long) {
+        if (id == _uiState.value.mangaSourceId) return
+        settings.mangaSourceId = id
+        pickedManga.value = id
+        cancelSearch()
+        _uiState.update { it.copy(loading = false, results = null, canLoadMore = false, error = null) }
+        search()
     }
 
     /** Says at once when the source cannot be searched, instead of after the first attempt. */
@@ -107,7 +151,8 @@ class AddBookViewModel(
      */
     private fun search(debounceMs: Long) {
         val query = _uiState.value.query.trim()
-        if (query.length < MIN_QUERY_LENGTH) {
+        val browsing = _uiState.value.source == MetadataSource.MANGA
+        if (!browsing && query.length < MIN_QUERY_LENGTH) {
             // Too short to search, and the results on screen were for something longer.
             if (debounceMs > 0) {
                 cancelSearch()
@@ -125,7 +170,7 @@ class AddBookViewModel(
             _uiState.update { it.copy(loading = true, error = null) }
             try {
                 // A bare ISBN gets an exact lookup instead of a text search.
-                val isbn = Isbn.toIsbn13(query)
+                val isbn = if (source == MetadataSource.MANGA) null else Isbn.toIsbn13(query)
                 val search = if (isbn == null) BookSearch(metadata, source, query) else null
                 val results = search?.next() ?: metadata.findByIsbn(source, isbn!!)
                 pager = search
@@ -163,8 +208,23 @@ class AddBookViewModel(
         pager = null
     }
 
-    private companion object {
-        const val MIN_QUERY_LENGTH = 3
-        const val SEARCH_DEBOUNCE_MS = 500L
+    internal companion object {
+        /**
+         * How each of the manga sources, given as (name, language), is shown: by name, and with its
+         * language only where another has the same name, as sources of one site often differ only by it.
+         */
+        fun mangaSourceLabels(sources: List<Pair<String, String>>): List<String> {
+            val clashing = sources.groupingBy { it.first }.eachCount().filterValues { it > 1 }.keys
+            return sources.map { (name, lang) ->
+                if (name in clashing && lang != "all" && lang != "other" && lang.isNotBlank()) {
+                    "$name · ${lang.uppercase()}"
+                } else {
+                    name
+                }
+            }
+        }
+
+        private const val MIN_QUERY_LENGTH = 3
+        private const val SEARCH_DEBOUNCE_MS = 500L
     }
 }

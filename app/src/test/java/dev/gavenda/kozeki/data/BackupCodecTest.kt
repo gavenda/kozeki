@@ -4,6 +4,7 @@ import dev.gavenda.kozeki.data.backup.BackupCodec
 import dev.gavenda.kozeki.data.backup.BackupException
 import dev.gavenda.kozeki.data.backup.LibraryBackup
 import dev.gavenda.kozeki.data.db.BookEntity
+import dev.gavenda.kozeki.data.db.MangaChapterEntity
 import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
@@ -190,6 +191,30 @@ class BackupCodecTest {
     }
 
     @Test
+    fun `manga chapters are written and read back`() {
+        val withChapters = sample.copy(
+            schemaVersion = 7,
+            mangaChapters = listOf(
+                MangaChapterEntity(
+                    bookId = "book-2",
+                    url = "/chapter/1",
+                    name = "Chapter 1",
+                    chapterNumber = 1f,
+                    scanlator = "Group",
+                    uploadedAt = 1_790_000_000_000,
+                    sourceOrder = 3,
+                    read = true,
+                    lastPageRead = 17,
+                    pageCount = 18,
+                    sync = stamp,
+                ),
+            ),
+        )
+
+        assertEquals(withChapters, BackupCodec.decode(BackupCodec.encode(withChapters), schemaVersion = 7))
+    }
+
+    @Test
     fun `a backup from an older database goes into a newer one`() {
         assertEquals(sample, BackupCodec.decode(BackupCodec.encode(sample), schemaVersion = 9))
     }
@@ -236,7 +261,7 @@ class BackupCodecTest {
         assertEquals(
             setOf(
                 "format", "schemaVersion", "createdAt", "appVersion", "device", "books", "readThroughs",
-                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "settings",
+                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "mangaChapters", "settings",
             ),
             written.keys,
         )

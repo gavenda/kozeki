@@ -1,0 +1,217 @@
+package dev.gavenda.kozeki.data.manga
+
+import androidx.room.withTransaction
+import dev.gavenda.kozeki.data.db.KozekiDatabase
+import dev.gavenda.kozeki.data.db.MangaChapterEntity
+import dev.gavenda.kozeki.data.db.SyncStamp
+import dev.gavenda.kozeki.data.manga.MangaProvider.Companion.toMetadata
+import dev.gavenda.kozeki.data.metadata.BookMetadata
+import dev.gavenda.kozeki.data.metadata.MetadataException
+import dev.gavenda.kozeki.data.metadata.MetadataProvider
+import dev.gavenda.kozeki.data.model.MangaChapter
+import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.data.model.inReadingOrder
+import dev.gavenda.kozeki.data.model.recognizeChapterNumber
+import dev.gavenda.kozeki.data.model.resumeChapter
+import eu.kanade.tachiyomi.source.model.SChapter
+import eu.kanade.tachiyomi.source.model.SManga
+import java.time.Clock
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/** The chapters of manga, as their sources list them and as the user has read them. */
+class MangaChapterRepository(
+    private val db: KozekiDatabase,
+    private val clock: Clock,
+    private val sources: MangaSources,
+) {
+
+    private val chapters = db.mangaChapterDao()
+    private val books = db.bookDao()
+
+    /** The chapters of [bookId] in the order the source listed them. */
+    fun observe(bookId: String): Flow<List<MangaChapter>> =
+        chapters.observeForBook(bookId).map { rows -> rows.map { it.toChapter() } }
+
+    /** A source may not be asked about one manga twice at once, and says so by throwing. */
+    private val updateLocks = ConcurrentHashMap<String, Mutex>()
+
+    /** What a source answers about a manga: what it says of it, when asked, and the chapters, when asked. */
+    class Update(val details: BookMetadata?, val chapters: List<SChapter>?)
+
+    /**
+     * Asks the source of the manga with [sourceId] about it, once, for whatever of its details and
+     * its chapters is wanted. Nothing is stored. Throws when the source is not installed or fails.
+     */
+    suspend fun fetch(
+        sourceId: String,
+        title: String,
+        memo: String?,
+        details: Boolean = false,
+        chapters: Boolean = true,
+    ): Update = guardSource {
+        val (id, url) = MangaProvider.parseSourceId(sourceId)
+            ?: throw MetadataException.Server(0, "Not a manga: $sourceId")
+        // A manga whose extension was removed can be browsed but not asked for chapters.
+        val source = sources.get(id)
+            ?: throw MetadataException.Unavailable(MetadataProvider.Unavailable.NO_EXTENSIONS)
+        val stub = SManga.create().apply {
+            this.url = url
+            this.title = title
+            this.memo = MangaMemo.decode(memo)
+        }
+        updateLocks.getOrPut(sourceId) { Mutex() }.withLock {
+            val update = source.getMangaUpdate(stub, emptyList(), fetchDetails = details, fetchChapters = chapters)
+            Update(
+                details = if (details) update.manga.also { if (it.url.isEmpty()) it.url = url }.toMetadata(source) else null,
+                chapters = if (chapters) update.chapters else null,
+            )
+        }
+    }
+
+    /** The chapters of [bookId] as the source listed them, in the order it did. */
+    suspend fun get(bookId: String): List<MangaChapter> = chapters.getForBook(bookId).map { it.toChapter() }
+
+    /** What a source lists, as chapters nobody has read. For showing a manga before it is the user's. */
+    fun preview(remote: List<SChapter>): List<MangaChapter> =
+        remote.distinctBy { it.url }.mapIndexed { index, chapter ->
+            MangaChapter(
+                url = chapter.url,
+                name = chapter.name,
+                number = chapter.chapter_number.takeIf { it >= 0f } ?: recognizeChapterNumber(chapter.name),
+                scanlator = chapter.scanlator?.takeIf { it.isNotBlank() },
+                uploadedAt = chapter.date_upload.takeIf { it > 0 },
+                sourceOrder = index,
+                read = false,
+                lastPageRead = 0,
+                pageCount = null,
+                memo = MangaMemo.encode(chapter.memo),
+            )
+        }
+
+    /**
+     * Takes over the chapters [remote] the source lists now. What the user did in the ones it
+     * already had is kept, and chapters the source no longer lists are put away rather than lost,
+     * in case they come back.
+     */
+    suspend fun sync(bookId: String, remote: List<SChapter>) {
+        db.withTransaction {
+            val changed = mergeChapters(bookId, chapters.getAllForBook(bookId), remote, clock.millis())
+            if (changed.isNotEmpty()) chapters.upsertAll(changed)
+        }
+        updateBookProgress(bookId)
+    }
+
+    /** Records how far the user got in a chapter. [read] is that it was finished. */
+    suspend fun saveProgress(bookId: String, url: String, read: Boolean, lastPageRead: Int, pageCount: Int?) {
+        chapters.updateProgress(bookId, url, read, lastPageRead, pageCount, clock.millis())
+        // The part of the chapter in hand that has been turned through counts towards the book too.
+        val partial = if (!read && pageCount != null && pageCount > 0) (lastPageRead + 1.0) / pageCount else 0.0
+        updateBookProgress(bookId, reading = true, currentUrl = url, partial = partial)
+    }
+
+    suspend fun markRead(bookId: String, urls: List<String>, read: Boolean) {
+        if (urls.isEmpty()) return
+        chapters.markRead(bookId, urls, read, clock.millis())
+        updateBookProgress(bookId)
+    }
+
+    /**
+     * Puts the book's own progress where its chapters say: the part read, and the chapter reading
+     * goes on from. Left alone when nothing changed, so a screen opened does not make the book
+     * look edited.
+     */
+    private suspend fun updateBookProgress(
+        bookId: String,
+        reading: Boolean = false,
+        currentUrl: String? = null,
+        partial: Double = 0.0,
+    ) {
+        val ordered = chapters.getForBook(bookId).map { it.toChapter() }.inReadingOrder()
+        val book = books.get(bookId) ?: return
+        if (ordered.isEmpty()) return
+        val current = ordered.firstOrNull { it.url == currentUrl } ?: ordered.resumeChapter() ?: ordered.last()
+        val progression = (ordered.count { it.read } + partial) / ordered.size
+        val index = ordered.indexOf(current) + 1
+        if (reading) {
+            // Reading puts the book at the top of the library, unlike marking chapters read.
+            books.updateProgress(
+                id = bookId,
+                locator = null,
+                progression = progression,
+                position = null,
+                positionCount = null,
+                chapterTitle = current.name,
+                chapterIndex = index,
+                chapterCount = ordered.size,
+                now = clock.millis(),
+            )
+            return
+        }
+        val effective = if (book.state == ReadingState.COMPLETED) 1.0 else progression
+        if (book.progression == effective && book.chapterTitle == current.name &&
+            book.chapterIndex == index && book.chapterCount == ordered.size
+        ) {
+            return
+        }
+        books.updateChapterProgress(bookId, progression, current.name, index, ordered.size, clock.millis())
+    }
+
+    private fun MangaChapterEntity.toChapter() = MangaChapter(
+        url = url,
+        name = name,
+        number = chapterNumber.takeIf { it >= 0f } ?: recognizeChapterNumber(name),
+        scanlator = scanlator,
+        uploadedAt = uploadedAt.takeIf { it > 0 },
+        sourceOrder = sourceOrder,
+        read = read,
+        lastPageRead = lastPageRead,
+        pageCount = pageCount,
+        memo = memo,
+    )
+}
+
+/**
+ * The rows to write so that [existing] matches what the source lists in [remote], and nothing else:
+ * a row that is already as it should be is not part of the result.
+ */
+internal fun mergeChapters(
+    bookId: String,
+    existing: List<MangaChapterEntity>,
+    remote: List<SChapter>,
+    now: Long,
+): List<MangaChapterEntity> {
+    val byUrl = existing.associateBy { it.url }
+    val listed = HashSet<String>()
+    val changed = ArrayList<MangaChapterEntity>()
+
+    remote.forEachIndexed { index, chapter ->
+        // A source that lists a chapter twice means one chapter.
+        if (!listed.add(chapter.url)) return@forEachIndexed
+        val old = byUrl[chapter.url]
+        val row = MangaChapterEntity(
+            bookId = bookId,
+            url = chapter.url,
+            name = chapter.name,
+            chapterNumber = chapter.chapter_number,
+            scanlator = chapter.scanlator?.takeIf { it.isNotBlank() },
+            uploadedAt = chapter.date_upload,
+            sourceOrder = index,
+            // What the user did is not the source's to say.
+            read = old?.read ?: false,
+            lastPageRead = old?.lastPageRead ?: 0,
+            pageCount = old?.pageCount,
+            memo = MangaMemo.encode(chapter.memo),
+            sync = old?.sync?.copy(deletedAt = null) ?: SyncStamp.created(now),
+        )
+        if (old == null || old != row) changed += row.copy(sync = row.sync.touched(now))
+    }
+
+    for (old in existing) {
+        if (old.url !in listed && old.sync.deletedAt == null) changed += old.copy(sync = old.sync.deleted(now))
+    }
+    return changed
+}

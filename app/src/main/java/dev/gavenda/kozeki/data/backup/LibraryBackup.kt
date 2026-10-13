@@ -1,6 +1,7 @@
 package dev.gavenda.kozeki.data.backup
 
 import dev.gavenda.kozeki.data.db.BookEntity
+import dev.gavenda.kozeki.data.db.MangaChapterEntity
 import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
@@ -41,6 +42,8 @@ data class LibraryBackup(
     val physicalReadings: List<PhysicalReadingEntity> = emptyList(),
     val notes: List<NoteEntity> = emptyList(),
     val yearlyGoals: List<YearlyGoalEntity> = emptyList(),
+    /** Absent from backups made before manga could be read. */
+    val mangaChapters: List<MangaChapterEntity> = emptyList(),
     val settings: SettingsSnapshot = SettingsSnapshot(),
 ) {
     companion object {

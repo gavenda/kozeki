@@ -16,15 +16,18 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE deletedAt IS NULL ORDER BY title COLLATE NOCASE")
     fun observeAll(): Flow<List<BookEntity>>
 
-    /** Books with an EPUB attached, most recently read first. */
+    /** Books with an EPUB attached, and manga, which are read online, most recently read first. */
     @Query(
-        "SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NOT NULL " +
+        "SELECT * FROM books WHERE deletedAt IS NULL AND (fileHash IS NOT NULL OR source = 'MANGA') " +
             "ORDER BY COALESCE(lastReadAt, createdAt) DESC",
     )
     fun observeLibrary(): Flow<List<BookEntity>>
 
     /** Wishlist and purchased entries that have no EPUB yet. */
-    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL ORDER BY createdAt DESC")
+    @Query(
+        "SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL AND (source IS NULL OR source != 'MANGA') " +
+            "ORDER BY createdAt DESC",
+    )
     fun observeWithoutFile(): Flow<List<BookEntity>>
 
     @Query("SELECT * FROM books WHERE id = :id AND deletedAt IS NULL")
@@ -39,7 +42,8 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE source = :source AND sourceId = :sourceId AND deletedAt IS NULL")
     suspend fun findBySource(source: MetadataSource, sourceId: String): List<BookEntity>
 
-    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL")
+    /** The entries an imported EPUB could complete. A manga has no EPUB to wait for. */
+    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL AND (source IS NULL OR source != 'MANGA')")
     suspend fun withoutFile(): List<BookEntity>
 
     @Query("SELECT * FROM books WHERE deletedAt IS NULL AND matchStatus = 'PENDING'")
@@ -69,6 +73,24 @@ interface BookDao {
 
     @Upsert
     suspend fun upsert(book: BookEntity)
+
+    /**
+     * A manga's place, from how many of its chapters are read. Unlike [updateProgress] it leaves
+     * [BookEntity.lastReadAt] alone, since marking chapters read is not reading.
+     */
+    @Query(
+        "UPDATE books SET progression = CASE WHEN state = 'COMPLETED' THEN 1.0 ELSE :progression END, " +
+            "chapterTitle = :chapterTitle, chapterIndex = :chapterIndex, chapterCount = :chapterCount, " +
+            "updatedAt = :now WHERE id = :id",
+    )
+    suspend fun updateChapterProgress(
+        id: String,
+        progression: Double,
+        chapterTitle: String?,
+        chapterIndex: Int?,
+        chapterCount: Int?,
+        now: Long,
+    )
 
     /** Wishlist entries cannot be favorites; this drops the flag from rows written before that held. */
     @Query("UPDATE books SET isFavorite = 0, updatedAt = :now WHERE acquisition = 'WISHLIST' AND isFavorite = 1")
@@ -109,6 +131,46 @@ interface BookDao {
         chapterCount: Int?,
         now: Long,
     )
+}
+
+@Dao
+interface MangaChapterDao {
+
+    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
+    fun observeForBook(bookId: String): Flow<List<MangaChapterEntity>>
+
+    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
+    suspend fun getForBook(bookId: String): List<MangaChapterEntity>
+
+    /** Every row of the book, the ones whose chapter left the source included. */
+    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId")
+    suspend fun getAllForBook(bookId: String): List<MangaChapterEntity>
+
+    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId AND url = :url AND deletedAt IS NULL")
+    suspend fun get(bookId: String, url: String): MangaChapterEntity?
+
+    @Upsert
+    suspend fun upsertAll(chapters: List<MangaChapterEntity>)
+
+    /**
+     * [pageCount] only replaces what is there when it is known. A chapter that is read stays read:
+     * opening it again to look at a page is not reading it unread, which [markRead] is for.
+     */
+    @Query(
+        "UPDATE manga_chapters SET read = CASE WHEN :read THEN 1 ELSE read END, lastPageRead = :lastPageRead, " +
+            "pageCount = COALESCE(:pageCount, pageCount), updatedAt = :now WHERE bookId = :bookId AND url = :url",
+    )
+    suspend fun updateProgress(bookId: String, url: String, read: Boolean, lastPageRead: Int, pageCount: Int?, now: Long)
+
+    /** Marking a chapter unread puts it back to its first page. */
+    @Query(
+        "UPDATE manga_chapters SET read = :read, lastPageRead = CASE WHEN :read THEN lastPageRead ELSE 0 END, " +
+            "updatedAt = :now WHERE bookId = :bookId AND url IN (:urls)",
+    )
+    suspend fun markRead(bookId: String, urls: List<String>, read: Boolean, now: Long)
+
+    @Query("UPDATE manga_chapters SET deletedAt = :now, updatedAt = :now WHERE bookId = :bookId AND deletedAt IS NULL")
+    suspend fun softDeleteForBook(bookId: String, now: Long)
 }
 
 @Dao
@@ -313,6 +375,9 @@ interface BackupDao {
     @Query("SELECT * FROM yearly_goals WHERE deletedAt IS NULL")
     suspend fun yearlyGoals(): List<YearlyGoalEntity>
 
+    @Query("SELECT * FROM manga_chapters WHERE deletedAt IS NULL")
+    suspend fun mangaChapters(): List<MangaChapterEntity>
+
     @Query("DELETE FROM books")
     suspend fun clearBooks()
 
@@ -330,6 +395,9 @@ interface BackupDao {
 
     @Query("DELETE FROM yearly_goals")
     suspend fun clearYearlyGoals()
+
+    @Query("DELETE FROM manga_chapters")
+    suspend fun clearMangaChapters()
 
     // Upserts, so a backup that names a row twice still goes in.
     @Upsert
@@ -349,4 +417,7 @@ interface BackupDao {
 
     @Upsert
     suspend fun putYearlyGoals(rows: List<YearlyGoalEntity>)
+
+    @Upsert
+    suspend fun putMangaChapters(rows: List<MangaChapterEntity>)
 }

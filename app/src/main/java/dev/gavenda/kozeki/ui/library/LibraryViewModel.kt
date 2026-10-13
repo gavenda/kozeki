@@ -57,6 +57,20 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
     }
 }
 
+/** Which of the two kinds of thing in the library is shown, when they are kept apart. */
+enum class LibraryKind {
+    /** Books with an EPUB, books on paper, and the ones only wanted. */
+    BOOKS,
+
+    /** Manga, read online through a Mihon source. */
+    MANGA,
+    ;
+
+    fun matches(book: Book): Boolean = book.isManga == (this == MANGA)
+
+    val other: LibraryKind get() = if (this == BOOKS) MANGA else BOOKS
+}
+
 /** The order the books of a filter are shown in. Books that tie keep the order of [RECENT]. */
 enum class LibrarySort(@param:StringRes val label: Int) {
     /** Books with an EPUB first, most recently read at the top, then the ones still without a file. */
@@ -146,9 +160,16 @@ data class LibraryUiState(
     val filter: LibraryFilter = LibraryFilter.ALL,
     val sort: LibrarySort = LibrarySort.RECENT,
     val display: LibraryDisplay = LibraryDisplay.COVERS,
+    /** The kind shown, when [separateKinds]. */
+    val kind: LibraryKind = LibraryKind.BOOKS,
+    /** Whether books and manga are kept apart. When not, everything is shown and [kind] means nothing. */
+    val separateKinds: Boolean = true,
     val sections: List<LibrarySection> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
+    /** How many books are shown, whatever the filter. */
     val totalBooks: Int = 0,
+    /** How many there are in the library altogether, which [totalBooks] is less of when one kind is shown. */
+    val libraryBooks: Int? = null,
     val importing: Boolean = false,
     /** The books whose details are being looked up right now. */
     val matching: Set<String> = emptySet(),
@@ -162,7 +183,7 @@ data class LibraryUiState(
 
     val allSelected: Boolean get() = selection.size == sections.sumOf { it.books.size }
 
-    val isLibraryEmpty: Boolean get() = !loading && totalBooks == 0
+    val isLibraryEmpty: Boolean get() = !loading && (libraryBooks ?: totalBooks) == 0
     val isFilterEmpty: Boolean get() = !loading && sections.isEmpty()
 }
 
@@ -212,15 +233,29 @@ class LibraryViewModel(
         LibraryDisplay.entries.firstOrNull { it.name == name } ?: LibraryDisplay.COVERS
     }
 
-    private val view = combine(chosenFilter, sort, display, ::Triple)
+    private val kind = settings.libraryKind.map { name ->
+        LibraryKind.entries.firstOrNull { it.name == name } ?: LibraryKind.BOOKS
+    }
+
+    private data class ViewOptions(
+        val filter: LibraryFilter,
+        val sort: LibrarySort,
+        val display: LibraryDisplay,
+        val kind: LibraryKind,
+        val separateKinds: Boolean,
+    )
+
+    private val view = combine(chosenFilter, sort, display, kind, settings.separateLibraryKinds, ::ViewOptions)
 
     private val busy = combine(importsRunning, matchService.matching) { imports, matching -> (imports > 0) to matching }
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
     val uiState: StateFlow<LibraryUiState> =
-        combine(books, view, busy, selectedIds, purchaseDefaults) { books, view, busy, selected, defaults ->
-            val (filter, sort, display) = view
+        combine(books, view, busy, selectedIds, purchaseDefaults) { allBooks, view, busy, selected, defaults ->
+            val (filter, sort, display) = Triple(view.filter, view.sort, view.display)
+            // One kind at a time, unless the user has asked for everything together.
+            val books = if (view.separateKinds) allBooks.filter(view.kind::matches) else allBooks
             val (importing, matching) = busy
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
@@ -230,9 +265,12 @@ class LibraryViewModel(
                 filter = filter,
                 sort = sort,
                 display = display,
+                kind = view.kind,
+                separateKinds = view.separateKinds,
                 sections = librarySections(filter, shown),
                 counts = counts,
                 totalBooks = books.size,
+                libraryBooks = allBooks.size,
                 importing = importing,
                 matching = matching,
                 lastCurrency = currency,
@@ -249,6 +287,14 @@ class LibraryViewModel(
 
     fun selectSort(sort: LibrarySort) {
         viewModelScope.launch { settings.setLibrarySort(sort.name) }
+    }
+
+    /** Switches between the books and the manga. */
+    fun toggleKind() {
+        val next = uiState.value.kind.other
+        viewModelScope.launch { settings.setLibraryKind(next.name) }
+        // What was picked among the other kind's books is not on screen any more.
+        clearSelection()
     }
 
     fun selectDisplay(display: LibraryDisplay) {

@@ -46,6 +46,8 @@ fun MetadataResultItem(
     modifier: Modifier = Modifier,
     trailingContent: (@Composable () -> Unit)? = null,
     onOpenAuthor: ((AuthorRef) -> Unit)? = null,
+    /** Where the result was found, for a list that mixes sources of one catalogue. */
+    sourceLabel: String? = null,
 ) {
     // Laid out by hand rather than as a ListItem: that one asks its content for a baseline while
     // measuring, and Compose crashes on it when a lazy list measures a reused row ahead of time.
@@ -91,7 +93,7 @@ fun MetadataResultItem(
                         AuthorLinks(result.authors, result.authorRefs, onOpenAuthor)
                     }
                 }
-                val details = listOfNotNull(result.publishedDate?.take(4), result.publisher).joinToString(" · ")
+                val details = listOfNotNull(result.publishedDate?.take(4), result.publisher, sourceLabel).joinToString(" · ")
                 val rating = result.averageRating
                 if (details.isNotEmpty() || rating != null) {
                     Row(verticalAlignment = Alignment.CenterVertically) {

@@ -55,6 +55,7 @@ import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.authorViewModel
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
@@ -62,9 +63,8 @@ import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
+import dev.gavenda.kozeki.ui.injektViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 
 /** An author as the metadata source describes them, above the books it lists as theirs. */
 @Composable
@@ -74,7 +74,7 @@ fun AuthorScreen(
     onBack: () -> Unit,
     onOpenBook: (String) -> Unit,
     onOpenResult: (BookMetadata) -> Unit,
-    viewModel: AuthorViewModel = koinViewModel(key = authorId) { parametersOf(authorId, name) },
+    viewModel: AuthorViewModel = injektViewModel(key = authorId) { authorViewModel(authorId, name) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     AuthorContent(

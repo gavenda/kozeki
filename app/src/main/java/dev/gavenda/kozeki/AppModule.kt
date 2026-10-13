@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki
 
+import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -11,6 +12,12 @@ import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.epub.Readium
 import dev.gavenda.kozeki.data.files.BookStorage
 import dev.gavenda.kozeki.data.files.IncomingEpubs
+import dev.gavenda.kozeki.data.manga.MangaChapterRepository
+import dev.gavenda.kozeki.data.manga.MangaImages
+import dev.gavenda.kozeki.data.manga.MangaPages
+import dev.gavenda.kozeki.data.manga.MangaReaderPreferences
+import dev.gavenda.kozeki.data.manga.MangaProvider
+import dev.gavenda.kozeki.data.manga.MangaSources
 import dev.gavenda.kozeki.data.metadata.CoverDownloader
 import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -23,18 +30,6 @@ import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.work.MatchWorker
-import dev.gavenda.kozeki.data.metadata.BookMetadata
-import dev.gavenda.kozeki.ui.addbook.AddBookViewModel
-import dev.gavenda.kozeki.ui.addbook.BookFormViewModel
-import dev.gavenda.kozeki.ui.author.AuthorViewModel
-import dev.gavenda.kozeki.ui.book.BookDetailViewModel
-import dev.gavenda.kozeki.ui.book.FoundBookViewModel
-import dev.gavenda.kozeki.ui.calendar.CalendarViewModel
-import dev.gavenda.kozeki.ui.library.LibraryViewModel
-import dev.gavenda.kozeki.ui.reader.ReaderViewModel
-import dev.gavenda.kozeki.ui.search.SearchViewModel
-import dev.gavenda.kozeki.ui.settings.SettingsViewModel
-import dev.gavenda.kozeki.ui.statistics.StatisticsViewModel
 import java.security.MessageDigest
 import java.time.Clock
 import java.util.concurrent.TimeUnit
@@ -42,136 +37,148 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import eu.kanade.tachiyomi.network.JavaScriptEngine
+import eu.kanade.tachiyomi.network.NetworkHelper
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.protobuf.ProtoBuf
+import nl.adaptivity.xmlutil.XmlDeclMode
+import nl.adaptivity.xmlutil.core.XmlVersion
+import nl.adaptivity.xmlutil.serialization.XML
 import okhttp3.OkHttpClient
-import org.koin.android.ext.koin.androidApplication
-import org.koin.android.ext.koin.androidContext
-import org.koin.core.module.dsl.viewModel
-import org.koin.core.scope.Scope
-import org.koin.dsl.module
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.InjektModule
+import uy.kohesive.injekt.api.InjektRegistrar
+import uy.kohesive.injekt.api.addSingleton
+import uy.kohesive.injekt.api.addSingletonFactory
+import uy.kohesive.injekt.api.get
 
 private const val USER_AGENT = "Kozeki/${BuildConfig.VERSION_NAME} (Android)"
 
 /** The app's dependency graph. Singles are created lazily and live as long as the process. */
-val appModule = module {
+class AppModule(private val app: Application) : InjektModule {
 
-    // The application-wide scope, for work that must outlive the screen that started it.
-    single<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    override fun InjektRegistrar.registerInjectables() {
+        addSingleton(app)
+        addSingleton<Context>(app)
 
-    single<Clock> { Clock.systemDefaultZone() }
+        // The application-wide scope, for work that must outlive the screen that started it.
+        addSingletonFactory<CoroutineScope> { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
 
-    single { KozekiDatabase.create(androidContext()) }
+        addSingletonFactory<Clock> { Clock.systemDefaultZone() }
 
-    single { SettingsRepository(androidContext()) }
+        addSingletonFactory { KozekiDatabase.create(app) }
 
-    single { BookStorage(androidContext()) }
+        addSingletonFactory { SettingsRepository(app) }
 
-    single { IncomingEpubs() }
+        addSingletonFactory { BookStorage(app) }
 
-    single { Readium(androidApplication()) }
+        addSingletonFactory { IncomingEpubs() }
 
-    single {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(20, TimeUnit.SECONDS)
-            .addInterceptor { chain ->
-                chain.proceed(chain.request().newBuilder().header("User-Agent", USER_AGENT).build())
-            }
-            .build()
-    }
+        addSingletonFactory { Readium(app) }
 
-    single { LibraryRepository(get(), get(), get(), CoverDownloader(get()), get(), get()) }
+        addSingletonFactory {
+            OkHttpClient.Builder()
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(20, TimeUnit.SECONDS)
+                .addInterceptor { chain ->
+                    chain.proceed(chain.request().newBuilder().header("User-Agent", USER_AGENT).build())
+                }
+                .build()
+        }
 
-    single { StatsRepository(get(), get(), get(), get()) }
+        addSingletonFactory {
+            LibraryRepository(get(), get(), get(), CoverDownloader(get(), get()), get(), get())
+        }
 
-    single {
-        HardcoverAuth(
-            client = get(),
-            store = TokenStore(androidContext()),
-            clock = get(),
-            clientId = BuildConfig.HARDCOVER_CLIENT_ID,
-            redirectUri = BuildConfig.HARDCOVER_REDIRECT_URI,
-            scopes = BuildConfig.HARDCOVER_SCOPES,
-        )
-    }
+        addSingletonFactory { StatsRepository(get(), get(), get(), get()) }
 
-    // Signing in may be what books imported earlier were waiting for.
-    single { HardcoverSignIn(get(), get(), scheduleMatching()) }
-
-    single {
-        val context = androidContext()
-        val providers = listOf(
-            HardcoverProvider(get(), get()),
-            GoogleBooksProvider(
+        addSingletonFactory {
+            HardcoverAuth(
                 client = get(),
-                apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY,
-                androidPackage = context.packageName,
-                androidCertSha1 = signingCertificateSha1(context),
-            ),
-        )
-        MetadataRepository(providers, get<KozekiDatabase>().metadataCacheDao(), get())
-    }
+                store = TokenStore(app),
+                clock = get(),
+                clientId = BuildConfig.HARDCOVER_CLIENT_ID,
+                redirectUri = BuildConfig.HARDCOVER_REDIRECT_URI,
+                scopes = BuildConfig.HARDCOVER_SCOPES,
+            )
+        }
 
-    single { MatchService(get(), get()) }
+        // Signing in may be what books imported earlier were waiting for.
+        addSingletonFactory { HardcoverSignIn(get(), get(), scheduleMatching()) }
 
-    single { BackupRepository(get(), get(), get(), get(), BuildConfig.VERSION_NAME, Build.MODEL) }
+        addSingletonFactory {
+            val providers = listOf(
+                HardcoverProvider(get(), get()),
+                GoogleBooksProvider(
+                    client = get(),
+                    apiKey = BuildConfig.GOOGLE_BOOKS_API_KEY,
+                    androidPackage = app.packageName,
+                    androidCertSha1 = signingCertificateSha1(app),
+                ),
+                MangaProvider(get(), get()),
+            )
+            MetadataRepository(providers, get<KozekiDatabase>().metadataCacheDao(), get())
+        }
 
-    single {
-        val library = get<LibraryRepository>()
-        val scope = get<CoroutineScope>()
-        val matchPending = scheduleMatching()
-        DriveBackup(
-            auth = PlayServicesDriveAuthorizer(androidContext()),
-            drive = DriveApi(get()),
-            library = get<BackupRepository>(),
-            links = get<SettingsRepository>(),
-            scope = scope,
-            // The books come back without their cover pictures, and some still waiting for a lookup.
-            onRestored = {
-                matchPending()
-                scope.launch { library.downloadMissingCovers() }
-            },
-        )
-    }
+        addSingletonFactory { MatchService(get(), get()) }
 
-    viewModel { LibraryViewModel(get(), get(), get(), get(), scheduleMatching()) }
+        addSingletonFactory { BackupRepository(get(), get(), get(), get(), BuildConfig.VERSION_NAME, Build.MODEL) }
 
-    viewModel { AddBookViewModel(get(), get(), get()) }
+        addSingletonFactory {
+            val library = get<LibraryRepository>()
+            val scope = get<CoroutineScope>()
+            val matchPending = scheduleMatching()
+            DriveBackup(
+                auth = PlayServicesDriveAuthorizer(app),
+                drive = DriveApi(get()),
+                library = get<BackupRepository>(),
+                links = get<SettingsRepository>(),
+                scope = scope,
+                // The books come back without their cover pictures, and some still waiting for a lookup.
+                onRestored = {
+                    matchPending()
+                    scope.launch { library.downloadMissingCovers() }
+                },
+            )
+        }
 
-    viewModel { params -> BookFormViewModel(bookId = params.getOrNull(), library = get()) }
+        // What Mihon extensions look up through Injekt. They ask for these by type, so the set is
+        // fixed by the extension API (together with Application and Context above).
+        addSingletonFactory { Json { ignoreUnknownKeys = true; explicitNulls = false } }
 
-    viewModel { (authorId: String, name: String) -> AuthorViewModel(authorId, name, get(), get()) }
+        addSingletonFactory<ProtoBuf> { ProtoBuf }
 
-    viewModel { SearchViewModel(get()) }
+        addSingletonFactory {
+            XML.v1 {
+                policy {
+                    ignoreUnknownChildren()
+                    autoPolymorphic = true
+                }
+                xmlDeclMode = XmlDeclMode.Charset
+                xmlVersion = XmlVersion.XML10
+                setIndent(2)
+            }
+        }
 
-    viewModel { CalendarViewModel(get(), get()) }
+        addSingletonFactory { NetworkHelper(scope = get(), context = app) }
 
-    viewModel { params -> StatisticsViewModel(get(), get(), initialDate = params.getOrNull()) }
+        addSingletonFactory { JavaScriptEngine(app) }
 
-    viewModel { (result: BookMetadata) -> FoundBookViewModel(result, get(), get()) }
+        addSingletonFactory { MangaSources(app, get()) }
 
-    viewModel { (bookId: String) -> BookDetailViewModel(bookId, get(), get(), get(), get(), scheduleMatching()) }
+        addSingletonFactory { MangaImages(get(), get()) }
 
-    viewModel { (bookId: String) ->
-        ReaderViewModel(bookId, androidApplication(), get(), get(), get(), get(), get())
-    }
+        addSingletonFactory { MangaChapterRepository(get(), get(), get()) }
 
-    viewModel {
-        SettingsViewModel(
-            settings = get(),
-            metadata = get(),
-            stats = get(),
-            hardcoverAuth = get(),
-            hardcoverSignIn = get(),
-            driveBackup = get(),
-            versionName = BuildConfig.VERSION_NAME,
-            clock = get(),
-        )
+        addSingletonFactory { MangaPages(app, get()) }
+
+        addSingletonFactory { MangaReaderPreferences(app) }
     }
 }
 
 /** Queues a metadata lookup for every book still waiting for one. Safe to call repeatedly. */
-private fun Scope.scheduleMatching(): () -> Unit {
-    val context = androidContext()
+internal fun scheduleMatching(): () -> Unit {
+    val context = Injekt.get<Application>()
     return { MatchWorker.enqueue(context) }
 }
 

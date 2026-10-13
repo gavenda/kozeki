@@ -45,8 +45,8 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 9
-        versionName = "2.0.1"
+        versionCode = 10
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -145,6 +145,8 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Pinch and double-tap zoom for a manga page, which can be far larger than the screen.
+    implementation(libs.telephoto.zoomable.image.coil)
     implementation(libs.okhttp)
 
     // Asks Google for access to the user's Drive, which is where backups go.
@@ -156,8 +158,8 @@ dependencies {
     implementation(libs.readium.navigator.web.reflowable)
     implementation(libs.readium.navigator.web.fixedlayout)
 
-    implementation(libs.koin.android)
-    implementation(libs.koin.androidx.compose)
+    implementation(libs.injekt)
+    implementation(project(":mihon-host"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

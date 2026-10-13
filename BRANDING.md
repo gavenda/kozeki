@@ -2,7 +2,7 @@
 
 Kozeki is named after Kozeki Ui (古関ウイ), the head of her school's Library Committee in the game Blue Archive. What makes the app look and sound like itself is taken from her: her halo is its mark, her colours are its theme, her face is on its empty screens, and its text is written as a librarian looking after the user's books.
 
-This file records what is used, where, and the rules that hold it together, as of Kozeki 2.0.1.
+This file records what is used, where, and the rules that hold it together, as of Kozeki 2.1.0.
 
 ## In short
 
@@ -133,7 +133,7 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 | `CURIOUS` | A small "o" | 8 | Library search, before typing |
 | `STUDIOUS` | Monocle | 23 | Add book, before searching |
 | `ASLEEP` | Eyes closed | 7 | A day with nothing read |
-| `DOWNCAST` | Half-lidded eyes | 15 | Library search with nothing found; an author with no books listed |
+| `DOWNCAST` | Half-lidded eyes | 15 | Library search with nothing found; an author with no books listed; Add book on Manga with no source installed |
 | `WORRIED` | Mouth open, a bead of sweat | 13 | Add book, nothing found |
 | `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page |
 | `DUMBFOUNDED` | Black dots for eyes | 21 | An author whose page is gone |

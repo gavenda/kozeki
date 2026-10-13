@@ -19,14 +19,14 @@ import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.ui.KozekiApp
 import dev.gavenda.kozeki.ui.theme.AppTheme
-import org.koin.android.ext.android.inject
+import uy.kohesive.injekt.injectLazy
 
 class MainActivity : ComponentActivity() {
 
-    private val hardcoverAuth: HardcoverAuth by inject()
-    private val hardcoverSignIn: HardcoverSignIn by inject()
-    private val incomingEpubs: IncomingEpubs by inject()
-    private val settings: SettingsRepository by inject()
+    private val hardcoverAuth: HardcoverAuth by injectLazy()
+    private val hardcoverSignIn: HardcoverSignIn by injectLazy()
+    private val incomingEpubs: IncomingEpubs by injectLazy()
+    private val settings: SettingsRepository by injectLazy()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

@@ -45,6 +45,7 @@ import dev.gavenda.kozeki.data.model.CalendarBook
 import dev.gavenda.kozeki.data.model.CalendarDay
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.calendarViewModel
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
 import dev.gavenda.kozeki.ui.components.HaloMark
@@ -52,6 +53,7 @@ import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
+import dev.gavenda.kozeki.ui.injektViewModel
 import dev.gavenda.kozeki.ui.isUiBirthday
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.DayOfWeek
@@ -59,13 +61,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
-import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun CalendarScreen(
     onOpenDay: (LocalDate) -> Unit,
     onOpenSettings: () -> Unit,
-    viewModel: CalendarViewModel = koinViewModel(),
+    viewModel: CalendarViewModel = injektViewModel { calendarViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     CalendarContent(

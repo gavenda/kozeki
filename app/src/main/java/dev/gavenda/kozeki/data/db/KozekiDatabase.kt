@@ -17,8 +17,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NoteEntity::class,
         YearlyGoalEntity::class,
         MetadataCacheEntity::class,
+        MangaChapterEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -31,12 +32,20 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun yearlyGoalDao(): YearlyGoalDao
     abstract fun metadataCacheDao(): MetadataCacheDao
+    abstract fun mangaChapterDao(): MangaChapterDao
     abstract fun backupDao(): BackupDao
 
     companion object {
         fun create(context: Context): KozekiDatabase =
             Room.databaseBuilder(context, KozekiDatabase::class.java, "kozeki.db")
-                .addMigrations(DropGoogleBooks, AddAuthorRefs, AddCustomCover, AddPhysicalReadings, AddPurchaseMemo)
+                .addMigrations(
+                    DropGoogleBooks,
+                    AddAuthorRefs,
+                    AddCustomCover,
+                    AddPhysicalReadings,
+                    AddPurchaseMemo,
+                    AddMangaChapters,
+                )
                 .build()
 
         /**
@@ -102,6 +111,22 @@ abstract class KozekiDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_physical_readings_bookId` ON `physical_readings` (`bookId`)",
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_physical_readings_day` ON `physical_readings` (`day`)")
+            }
+        }
+
+        /** Manga are read chapter by chapter, and the user's place in each is kept. */
+        private val AddMangaChapters = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `manga_chapters` (`bookId` TEXT NOT NULL, `url` TEXT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `chapterNumber` REAL NOT NULL, `scanlator` TEXT, " +
+                        "`uploadedAt` INTEGER NOT NULL, `sourceOrder` INTEGER NOT NULL, `read` INTEGER NOT NULL, " +
+                        "`lastPageRead` INTEGER NOT NULL, `pageCount` INTEGER, `memo` TEXT, `createdAt` INTEGER NOT NULL, " +
+                        "`updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, `syncedAt` INTEGER, " +
+                        "PRIMARY KEY(`bookId`, `url`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_manga_chapters_bookId` ON `manga_chapters` (`bookId`)")
+                db.execSQL("ALTER TABLE books ADD COLUMN sourceMemo TEXT")
             }
         }
 

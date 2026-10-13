@@ -3,6 +3,7 @@ package dev.gavenda.kozeki.ui.book
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.gavenda.kozeki.data.manga.MangaChapterRepository
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.BookReviews
@@ -12,12 +13,15 @@ import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
+import dev.gavenda.kozeki.data.model.MangaChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.PhysicalReading
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.data.model.inReadingOrder
+import dev.gavenda.kozeki.data.model.resumeChapter
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
@@ -32,6 +36,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -60,7 +66,27 @@ data class ReviewsUiState(
     val error: LookupError? = null,
 )
 
+/** The chapters of a manga, for the page of a book that is one. */
+data class MangaChaptersUiState(
+    /** In reading order, the first chapter first. */
+    val chapters: List<MangaChapter> = emptyList(),
+    /** Whether the source is being asked what chapters it has right now. */
+    val loading: Boolean = false,
+    val error: LookupError? = null,
+) {
+    /** Where reading goes on from, which is the last chapter once every one is read. */
+    val resume: MangaChapter? get() = chapters.resumeChapter() ?: chapters.lastOrNull()
+
+    /** Every chapter is read. */
+    val finished: Boolean get() = chapters.isNotEmpty() && chapters.all { it.read }
+
+    /** Something in it has been read, so reading would continue and not start. */
+    val started: Boolean get() = chapters.any { it.read || it.lastPageRead > 0 }
+}
+
 data class BookDetailUiState(
+    /** Null for a book that is not a manga. */
+    val chapters: MangaChaptersUiState? = null,
     val loading: Boolean = true,
     val book: Book? = null,
     val notes: List<Note> = emptyList(),
@@ -94,8 +120,16 @@ class BookDetailViewModel(
     private val metadata: MetadataRepository,
     private val matchService: MatchService,
     private val settings: SettingsRepository,
+    private val mangaChapters: MangaChapterRepository,
     private val scheduleMatching: () -> Unit,
 ) : ViewModel() {
+
+    private data class Activity(
+        val importing: Boolean,
+        val matching: Boolean,
+        val chapters: List<MangaChapter>,
+        val chaptersStatus: MangaChaptersUiState,
+    )
 
     private data class BookData(
         val book: Book?,
@@ -108,6 +142,10 @@ class BookDetailViewModel(
     private val match = MutableStateFlow(MatchUiState())
     private val reviews = MutableStateFlow<ReviewsUiState?>(null)
     private val importing = MutableStateFlow(false)
+
+    /** Whether the source is being asked for chapters, and how that went. Its list is not in it. */
+    private val chaptersStatus = MutableStateFlow(MangaChaptersUiState())
+    private var chaptersJob: Job? = null
     private var searchJob: Job? = null
     private var loadMoreJob: Job? = null
 
@@ -137,12 +175,24 @@ class BookDetailViewModel(
         combine(
             bookData,
             combine(match, reviews, ::Pair),
-            combine(importing, matchService.matching.map { bookId in it }, ::Pair),
+            combine(
+                importing,
+                matchService.matching.map { bookId in it },
+                mangaChapters.observe(bookId),
+                chaptersStatus,
+                ::Activity,
+            ),
             settings.lastCurrency,
             library.observePurchaseLocations(),
-        ) { data, (matchState, reviewsState), (busy, matching), currency, locations ->
+        ) { data, (matchState, reviewsState), activity, currency, locations ->
+            val (busy, matching) = activity.importing to activity.matching
             BookDetailUiState(
                 loading = false,
+                chapters = if (data.book?.isManga == true) {
+                    activity.chaptersStatus.copy(chapters = activity.chapters.inReadingOrder())
+                } else {
+                    null
+                },
                 book = data.book,
                 notes = data.notes,
                 readThroughs = data.readThroughs,
@@ -158,6 +208,11 @@ class BookDetailViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookDetailUiState())
 
     init {
+        // A manga's chapters are asked for again whenever its page is opened: new ones appear there.
+        viewModelScope.launch {
+            val book = library.observeBook(bookId).filterNotNull().first()
+            if (book.isManga) refreshChapters()
+        }
         // Reviews follow the link to the source: matching, re-matching or unlinking the book
         // changes which reviews, if any, belong on the screen.
         viewModelScope.launch {
@@ -170,7 +225,32 @@ class BookDetailViewModel(
 
     fun setState(state: ReadingState) = launch { library.setState(bookId, state) }
 
-    fun readAgain() = launch { library.readAgain(bookId) }
+    fun readAgain() = launch {
+        library.readAgain(bookId)
+        // A manga is read again from its first chapter, so none counts as read.
+        uiState.value.chapters?.chapters?.let { mangaChapters.markRead(bookId, it.map(MangaChapter::url), read = false) }
+    }
+
+    /** Marks a chapter of a manga read, or puts it back to unread. */
+    fun setChapterRead(url: String, read: Boolean) = launch { mangaChapters.markRead(bookId, listOf(url), read) }
+
+    /** Asks the source for its chapters again, after it failed or to see whether new ones came out. */
+    fun retryChapters() = refreshChapters()
+
+    private fun refreshChapters() {
+        chaptersJob?.cancel()
+        chaptersJob = viewModelScope.launch {
+            val book = library.observeBook(bookId).first() ?: return@launch
+            val sourceId = book.sourceId ?: return@launch
+            chaptersStatus.value = MangaChaptersUiState(loading = true)
+            chaptersStatus.value = try {
+                mangaChapters.sync(bookId, mangaChapters.fetch(sourceId, book.title, book.sourceMemo).chapters.orEmpty())
+                MangaChaptersUiState()
+            } catch (e: MetadataException) {
+                MangaChaptersUiState(error = LookupError.from(e))
+            }
+        }
+    }
 
     fun setFavorite(favorite: Boolean) = launch { library.setFavorite(bookId, favorite) }
 
@@ -261,7 +341,13 @@ class BookDetailViewModel(
     fun openMatch() {
         val book = uiState.value.book ?: return
         val query = listOfNotNull(book.title, book.authors.firstOrNull()).joinToString(" ")
-        match.value = MatchUiState(open = true, loading = true, query = query, source = settings.searchSource)
+        match.value = MatchUiState(
+            open = true,
+            loading = true,
+            query = query,
+            // Manga are never what a file is matched to.
+            source = settings.searchSource.takeIf { it in MetadataSource.matchable } ?: MetadataSource.HARDCOVER,
+        )
         loadCandidates(book)
     }
 

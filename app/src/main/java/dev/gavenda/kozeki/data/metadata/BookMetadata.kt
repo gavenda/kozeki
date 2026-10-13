@@ -26,6 +26,8 @@ data class BookMetadata(
     val averageRating: Float? = null,
     /** The book's page on the source. */
     val infoUrl: String? = null,
+    /** What the source asked to have handed back with the book, as JSON. Only a Mihon source has any. */
+    val sourceMemo: String? = null,
 )
 
 /** An author by the ID the source knows them under. */
@@ -120,6 +122,9 @@ interface MetadataProvider {
 
         /** The source needs an API key and the app was built without one. */
         NOT_CONFIGURED,
+
+        /** The source is what the installed extensions provide, and none is installed. */
+        NO_EXTENSIONS,
     }
 }
 

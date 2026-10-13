@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
@@ -60,6 +61,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalResources
@@ -77,6 +79,7 @@ import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.MangaChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
@@ -84,9 +87,10 @@ import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.ui.LookupError
-import dev.gavenda.kozeki.ui.addbook.CoverPhotoRequest
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.addbook.CoverPhotoRequest
+import dev.gavenda.kozeki.ui.bookDetailViewModel
 import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
@@ -100,13 +104,13 @@ import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatPercent
 import dev.gavenda.kozeki.ui.formatPrice
+import dev.gavenda.kozeki.ui.foundBookViewModel
+import dev.gavenda.kozeki.ui.injektViewModel
 import dev.gavenda.kozeki.ui.library.EpubMimeTypes
 import dev.gavenda.kozeki.ui.library.importMessage
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.text.NumberFormat
 import java.time.LocalDate
-import org.koin.compose.viewmodel.koinViewModel
-import org.koin.core.parameter.parametersOf
 
 /** Everything the detail screen can ask for. Defaults make previews short. */
 @Immutable
@@ -137,6 +141,10 @@ class BookDetailActions(
     val onApplyMatch: (BookMetadata) -> Unit = {},
     val onCloseMatch: () -> Unit = {},
     val onRetryReviews: () -> Unit = {},
+    /** Opens the chapter of a manga with this URL. For a manga not in the library yet, adds it first. */
+    val onReadChapter: (String) -> Unit = {},
+    val onSetChapterRead: (String, Boolean) -> Unit = { _, _ -> },
+    val onRetryChapters: () -> Unit = {},
 )
 
 @Composable
@@ -144,11 +152,12 @@ fun BookDetailScreen(
     bookId: String,
     onBack: () -> Unit,
     onRead: (String) -> Unit,
+    onReadChapter: (bookId: String, chapterUrl: String) -> Unit,
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
     /** Shown until the stored book has loaded, for a page that was already showing this book. */
     placeholder: Book? = null,
-    viewModel: BookDetailViewModel = koinViewModel(key = bookId) { parametersOf(bookId) },
+    viewModel: BookDetailViewModel = injektViewModel(key = bookId) { bookDetailViewModel(bookId) },
 ) {
     val loaded by viewModel.uiState.collectAsStateWithLifecycle()
     val state = if (loaded.loading && placeholder != null) loaded.copy(loading = false, book = placeholder) else loaded
@@ -200,6 +209,9 @@ fun BookDetailScreen(
             onApplyMatch = viewModel::applyMatch,
             onCloseMatch = viewModel::closeMatch,
             onRetryReviews = viewModel::retryReviews,
+            onReadChapter = { onReadChapter(bookId, it) },
+            onSetChapterRead = viewModel::setChapterRead,
+            onRetryChapters = viewModel::retryChapters,
         )
     }
 
@@ -216,10 +228,11 @@ fun FoundBookScreen(
     result: BookMetadata,
     onBack: () -> Unit,
     onRead: (String) -> Unit,
+    onReadChapter: (bookId: String, chapterUrl: String) -> Unit,
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
-    viewModel: FoundBookViewModel = koinViewModel(key = "found-${result.source}-${result.sourceId}") {
-        parametersOf(result)
+    viewModel: FoundBookViewModel = injektViewModel(key = "found-${result.source}-${result.sourceId}") {
+        foundBookViewModel(result)
     },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -228,16 +241,26 @@ fun FoundBookScreen(
     var addedId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(viewModel) {
-        viewModel.events.collect { addedId = it.bookId }
+        viewModel.events.collect { added ->
+            addedId = added.bookId
+            added.readChapter?.let { onReadChapter(added.bookId, it) }
+        }
     }
 
     addedId?.let { bookId ->
-        BookDetailScreen(bookId, onBack, onRead, onEdit, onOpenAuthor, placeholder = state.book)
+        BookDetailScreen(bookId, onBack, onRead, onReadChapter, onEdit, onOpenAuthor, placeholder = state.book)
         return
     }
 
     val actions = remember(viewModel) {
-        BookDetailActions(onBack = onBack, onOpenAuthor = onOpenAuthor, onRetryReviews = viewModel::retryReviews)
+        BookDetailActions(
+            onBack = onBack,
+            onOpenAuthor = onOpenAuthor,
+            onRetryReviews = viewModel::retryReviews,
+            // Reading a chapter of a manga that is not the user's yet makes it theirs first.
+            onReadChapter = viewModel::startReading,
+            onRetryChapters = viewModel::retryChapters,
+        )
     }
 
     BookDetailContent(state, snackbarHostState, actions, onAdd = viewModel::add)
@@ -262,6 +285,7 @@ fun BookDetailContent(
     // "" means a new note is being written; null means no note dialog.
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
     var showingAllReviews by rememberSaveable { mutableStateOf(false) }
+    var showingAllChapters by rememberSaveable { mutableStateOf(false) }
     val listState = rememberLazyListState()
     // The header carries the title, so the bar only takes it over once the header's copy, which
     // sits at the very top of the list, has scrolled under it.
@@ -324,14 +348,17 @@ fun BookDetailContent(
                                         actions.onEdit()
                                     },
                                 )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.match_find)) },
-                                    onClick = {
-                                        menuOpen = false
-                                        actions.onOpenMatch()
-                                    },
-                                )
-                                if (book.source != null) {
+                                // A manga's details come from the source it is read from, with no EPUB to match.
+                                if (!book.isManga) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.match_find)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            actions.onOpenMatch()
+                                        },
+                                    )
+                                }
+                                if (book.source != null && !book.isManga) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.match_unlink)) },
                                         onClick = {
@@ -399,7 +426,12 @@ fun BookDetailContent(
                     )
                 }
                 item(key = "primary") {
-                    if (onAdd != null) AddActions(onAdd) else PrimaryAction(book, state.importing, actions)
+                    when {
+                        onAdd != null && book.isManga ->
+                            MangaAddActions(state.chapters, onRead = actions.onReadChapter, onAdd = onAdd)
+                        onAdd != null -> AddActions(onAdd)
+                        else -> PrimaryAction(book, state.chapters, state.importing, actions)
+                    }
                 }
                 if (book.canChangeState) {
                     item(key = "state") { StateSelector(book.state, actions.onSetState) }
@@ -407,7 +439,7 @@ fun BookDetailContent(
                 if (book.inLibrary) {
                     item(key = "progress") { ProgressCard(book, state.readingTimeMs, state.readThroughs) }
                 }
-                if (book.canTrackPhysical) {
+                if (book.canTrackPhysical && !book.isManga) {
                     item(key = "physical-progress") {
                         PhysicalProgressCard(book, onEdit = { editingPhysicalProgress = true })
                     }
@@ -416,6 +448,11 @@ fun BookDetailContent(
                     item(key = "match") { MatchNoticeCard(notice, state.matching, actions) }
                 }
                 item(key = "about") { AboutSection(book) }
+                state.chapters?.let { chapters ->
+                    chaptersSection(chapters, owned, actions, showingAll = showingAllChapters) {
+                        showingAllChapters = true
+                    }
+                }
                 if (owned) {
                     item(key = "ownership") {
                         OwnershipSection(book, onEdit = { editingPurchase = true }, onSetPurchase = actions.onSetPurchase)
@@ -582,6 +619,208 @@ private fun Header(
     }
 }
 
+/** The label of a chapter where there is little room: "Ch. 12", or its name when it has no number. */
+@Composable
+private fun MangaChapter.shortLabel(): String =
+    numberText?.let { stringResource(R.string.manga_chapter_short, it) } ?: name
+
+/**
+ * What a manga that is not the user's yet offers: to start reading it, which also adds it, or only
+ * to add it. Reading waits for the source to say what chapters it has.
+ */
+@Composable
+private fun MangaAddActions(
+    chapters: MangaChaptersUiState?,
+    onRead: (String) -> Unit,
+    onAdd: (Acquisition) -> Unit,
+) {
+    val first = chapters?.chapters?.firstOrNull()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { first?.let { onRead(it.url) } },
+            enabled = first != null,
+            shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.weight(1f),
+        ) {
+            if (chapters?.loading == true) {
+                LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
+            } else {
+                Icon(painterResource(R.drawable.menu_book_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            }
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text(first?.let { stringResource(R.string.manga_start, it.shortLabel()) } ?: stringResource(R.string.book_start))
+        }
+        FilledTonalButton(
+            onClick = { onAdd(Acquisition.DOWNLOADED) },
+            shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.weight(1f),
+        ) {
+            Icon(painterResource(R.drawable.shelves_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.manga_add_to_library))
+        }
+    }
+}
+
+/** Reading a manga of the user's goes on from its first unread chapter. */
+@Composable
+private fun MangaPrimaryAction(book: Book, chapters: MangaChaptersUiState?, actions: BookDetailActions) {
+    val resume = chapters?.resume
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = { resume?.let { actions.onReadChapter(it.url) } },
+            enabled = resume != null,
+            shapes = ButtonDefaults.shapes(),
+            modifier = Modifier.weight(1f),
+        ) {
+            if (chapters?.loading == true && resume == null) {
+                LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
+            } else {
+                Icon(painterResource(R.drawable.menu_book_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+            }
+            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+            Text(
+                when {
+                    resume == null -> stringResource(R.string.book_start)
+                    chapters.finished -> stringResource(R.string.book_open)
+                    chapters.started -> stringResource(R.string.manga_continue, resume.shortLabel())
+                    else -> stringResource(R.string.manga_start, resume.shortLabel())
+                },
+            )
+        }
+        if (book.state == ReadingState.COMPLETED || book.state == ReadingState.DROPPED) {
+            FilledTonalButton(onClick = actions.onReadAgain, shapes = ButtonDefaults.shapes()) {
+                Text(stringResource(R.string.book_read_again))
+            }
+        }
+    }
+}
+
+/**
+ * The chapters of a manga, the newest first. Only the latest few show until the user asks for the
+ * rest, so that a long series does not push the notes and the purchase out of reach.
+ */
+private fun LazyListScope.chaptersSection(
+    state: MangaChaptersUiState,
+    owned: Boolean,
+    actions: BookDetailActions,
+    showingAll: Boolean,
+    onShowAll: () -> Unit,
+) {
+    item(key = "chapters-header") {
+        SectionTitle(stringResource(R.string.manga_chapters_title)) {
+            if (state.chapters.isNotEmpty()) {
+                Text(
+                    text = state.chapters.size.toString(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    val newestFirst = state.chapters.asReversed()
+    when {
+        state.chapters.isEmpty() && state.loading -> item(key = "chapters-status") {
+            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { LoadingIndicator() }
+        }
+
+        state.chapters.isEmpty() && state.error != null -> item(key = "chapters-status") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                MutedText(stringResource(state.error.message))
+                OutlinedButton(onClick = actions.onRetryChapters, shapes = ButtonDefaults.shapes()) {
+                    Text(stringResource(R.string.action_retry))
+                }
+            }
+        }
+
+        state.chapters.isEmpty() -> item(key = "chapters-status") {
+            MutedText(stringResource(R.string.manga_chapters_empty))
+        }
+
+        else -> {
+            val shown = if (showingAll) newestFirst else newestFirst.take(CHAPTERS_PREVIEW)
+            items(shown, key = { "chapter-${it.url}" }) { chapter ->
+                ChapterRow(
+                    chapter = chapter,
+                    onClick = { actions.onReadChapter(chapter.url) },
+                    onToggleRead = if (owned) {
+                        { actions.onSetChapterRead(chapter.url, !chapter.read) }
+                    } else {
+                        null
+                    },
+                )
+            }
+            if (shown.size < newestFirst.size) {
+                item(key = "chapters-more") {
+                    TextButton(onClick = onShowAll) {
+                        Text(stringResource(R.string.manga_chapters_show_all, newestFirst.size))
+                    }
+                }
+            }
+            // The source could not be reached this time, so what is listed may be out of date.
+            if (state.error != null) {
+                item(key = "chapters-stale") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.weight(1f)) { MutedText(stringResource(state.error.message)) }
+                        TextButton(onClick = actions.onRetryChapters) { Text(stringResource(R.string.action_retry)) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterRow(chapter: MangaChapter, onClick: () -> Unit, onToggleRead: (() -> Unit)?) {
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    // Laid out by hand, as the rows of the search results are, for the same reason.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(MaterialTheme.shapes.medium)
+            .clickable(onClick = onClick)
+            .padding(start = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
+            Text(
+                text = chapter.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (chapter.read) muted else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val details = listOfNotNull(
+                chapter.lastPageRead.takeIf { !chapter.read && it > 0 }
+                    ?.let { stringResource(R.string.manga_chapter_page, it + 1) },
+                chapter.scanlator,
+                chapter.uploadedAt?.let(::formatDate),
+            ).joinToString(" · ")
+            if (details.isNotEmpty()) {
+                Text(
+                    text = details,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = muted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (onToggleRead != null) {
+            IconToggleButton(checked = chapter.read, onCheckedChange = { onToggleRead() }) {
+                Icon(
+                    painterResource(if (chapter.read) R.drawable.check_circle_fill_48px else R.drawable.check_48px),
+                    contentDescription = stringResource(
+                        if (chapter.read) R.string.manga_mark_unread else R.string.manga_mark_read,
+                    ),
+                    tint = if (chapter.read) MaterialTheme.colorScheme.primary else muted,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
+}
+
 /** The two ways to make a found book the user's own: as one they have, or as one they want. */
 @Composable
 private fun AddActions(onAdd: (Acquisition) -> Unit) {
@@ -608,9 +847,11 @@ private fun AddActions(onAdd: (Acquisition) -> Unit) {
 }
 
 @Composable
-private fun PrimaryAction(book: Book, importing: Boolean, actions: BookDetailActions) {
+private fun PrimaryAction(book: Book, chapters: MangaChaptersUiState?, importing: Boolean, actions: BookDetailActions) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         when {
+            book.isManga -> MangaPrimaryAction(book, chapters, actions)
+
             book.canRead -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = actions.onRead,
@@ -685,7 +926,7 @@ private fun StateSelector(current: ReadingState, onSetState: (ReadingState) -> U
 private fun ProgressCard(book: Book, readingTimeMs: Long, readThroughs: List<ReadThrough>) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ProgressLabel(stringResource(R.string.progress_epub))
+            ProgressLabel(stringResource(if (book.isManga) R.string.progress_manga else R.string.progress_epub))
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(formatPercent(book.progression), style = MaterialTheme.typography.displaySmallEmphasized)
                 val readingNumber = readThroughs.maxOfOrNull { it.number } ?: 1
@@ -893,7 +1134,14 @@ private fun AboutSection(book: Book) {
         val url = book.sourceUrl
         if (source != null && url != null) {
             TextButton(onClick = { uriHandler.openUri(url) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text(stringResource(R.string.book_view_on_source, stringResource(source.nameRes)))
+                Text(
+                    if (source == MetadataSource.MANGA) {
+                        // The catalogue is every installed source, so it names none of them.
+                        stringResource(R.string.book_view_in_browser)
+                    } else {
+                        stringResource(R.string.book_view_on_source, stringResource(source.nameRes))
+                    },
+                )
                 Spacer(Modifier.width(4.dp))
                 Icon(painterResource(R.drawable.open_in_new_48px), contentDescription = null, modifier = Modifier.size(16.dp))
             }
@@ -996,6 +1244,9 @@ private fun HistorySection(readThroughs: List<ReadThrough>) {
 
 /** How many reviews are shown before the user asks for the rest. */
 private const val REVIEWS_PREVIEW = 3
+
+/** How many of a manga's chapters show before the user asks for the rest. */
+private const val CHAPTERS_PREVIEW = 5
 
 /** The section title with, once known, what the source's readers rate the book overall. */
 @Composable
@@ -1196,6 +1447,94 @@ private fun BookDetailNeedsReviewPreview() {
     AppTheme {
         BookDetailContent(
             state = BookDetailUiState(loading = false, book = PreviewData.books[3]),
+            snackbarHostState = remember { SnackbarHostState() },
+            actions = BookDetailActions(),
+        )
+    }
+}
+
+private val PreviewChapters = (1..12).map { n ->
+    MangaChapter(
+        url = "/chapter/$n",
+        name = "Chapter $n: A title for it",
+        number = n.toFloat(),
+        scanlator = "Some Group",
+        uploadedAt = 1_790_000_000_000L + n * 86_400_000L,
+        sourceOrder = 12 - n,
+        read = n <= 4,
+        lastPageRead = if (n == 5) 6 else 0,
+        pageCount = null,
+    )
+}
+
+private val PreviewManga = Book(
+    id = "manga",
+    title = "Frieren: Beyond Journey's End",
+    authors = listOf("Kanehito Yamada", "Tsukasa Abe"),
+    description = "The mage Frieren outlived the party that defeated the Demon King, and sets out to understand them.",
+    categories = listOf("Fantasy", "Drama"),
+    acquisition = Acquisition.DOWNLOADED,
+    state = ReadingState.READING,
+    source = MetadataSource.MANGA,
+    sourceId = "1:/title/frieren",
+    inLibrary = true,
+    isManga = true,
+    progression = 4.0 / 12,
+    chapterTitle = "Chapter 5: A title for it",
+    chapterIndex = 5,
+    chapterCount = 12,
+)
+
+@ScreenPreviews
+@Composable
+private fun BookDetailMangaPreview() {
+    AppTheme {
+        BookDetailContent(
+            state = BookDetailUiState(
+                loading = false,
+                book = PreviewManga,
+                chapters = MangaChaptersUiState(chapters = PreviewChapters),
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            actions = BookDetailActions(),
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun BookDetailFoundMangaPreview() {
+    AppTheme {
+        BookDetailContent(
+            state = BookDetailUiState(
+                loading = false,
+                book = PreviewManga.copy(
+                    acquisition = Acquisition.WISHLIST,
+                    inLibrary = false,
+                    progression = 0.0,
+                    chapterTitle = null,
+                    chapterIndex = null,
+                    chapterCount = null,
+                ),
+                chapters = MangaChaptersUiState(chapters = PreviewChapters.map { it.copy(read = false, lastPageRead = 0) }),
+            ),
+            snackbarHostState = remember { SnackbarHostState() },
+            actions = BookDetailActions(),
+            onAdd = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun BookDetailMangaChaptersFailedPreview() {
+    AppTheme {
+        BookDetailContent(
+            state = BookDetailUiState(
+                loading = false,
+                book = PreviewManga,
+                chapters = MangaChaptersUiState(error = LookupError.OFFLINE),
+            ),
             snackbarHostState = remember { SnackbarHostState() },
             actions = BookDetailActions(),
         )

@@ -42,6 +42,8 @@ class MetadataRepository(
 
     /** One page of a search of [source], the first being 1. [BookSearch] reads them in turn. */
     suspend fun search(source: MetadataSource, query: String, page: Int = 1): BookPage {
+        // Browsing is the point of a blank query there, and the extensions pace themselves.
+        if (source.isLive) return provider(source).search(query.trim(), page)
         val normalized = BookMatcher.normalize(query)
         if (normalized.length < MIN_QUERY_LENGTH) return BookPage()
         return cached(
@@ -85,6 +87,13 @@ class MetadataRepository(
 
     suspend fun clearCache() = cache.clear()
 
+    /**
+     * Whether the source answers from what is installed on the device right now. What it says
+     * depends on which source of it is picked, and there is no quota to protect, so it is neither
+     * cached nor spaced out.
+     */
+    private val MetadataSource.isLive: Boolean get() = this == MetadataSource.MANGA
+
     private fun provider(source: MetadataSource): MetadataProvider = providers.getValue(source)
 
     private suspend fun books(
@@ -105,6 +114,8 @@ class MetadataRepository(
         lifetime: (T) -> Duration,
         fetch: suspend () -> T,
     ): T {
+        if (source.isLive) return fetch()
+
         val fullKey = "${source.name}|$key"
         read(fullKey, serializer)?.let { return it }
 

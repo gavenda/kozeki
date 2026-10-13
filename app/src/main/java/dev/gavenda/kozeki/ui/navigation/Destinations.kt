@@ -20,6 +20,10 @@ data class BookRoute(val bookId: String)
 @Serializable
 data class ReaderRoute(val bookId: String)
 
+/** The chapter of a manga in the library with the URL [chapterUrl] on its source, being read. */
+@Serializable
+data class MangaReaderRoute(val bookId: String, val chapterUrl: String)
+
 @Serializable
 data object AddBookRoute
 

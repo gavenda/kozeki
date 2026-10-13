@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.backup.drive.DriveBackup
 import dev.gavenda.kozeki.data.backup.drive.DriveBackupState
+import dev.gavenda.kozeki.data.manga.MangaExtension
+import dev.gavenda.kozeki.data.manga.MangaSources
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
@@ -36,6 +38,10 @@ data class SettingsUiState(
     val year: Int = 0,
     val yearlyGoalBooks: Int? = null,
     val cachedLookups: Int = 0,
+    /** The Mihon extensions installed on the device, or null until they have been looked for. */
+    val extensions: List<MangaExtension>? = null,
+    /** Whether the library keeps manga apart from books and shows one kind at a time. */
+    val separateKinds: Boolean = true,
     val versionName: String = "",
     /** Today is Ui's birthday. */
     val birthday: Boolean = false,
@@ -53,6 +59,7 @@ class SettingsViewModel(
     private val hardcoverAuth: HardcoverAuth,
     private val hardcoverSignIn: HardcoverSignIn,
     private val driveBackup: DriveBackup,
+    private val mangaSources: MangaSources,
     versionName: String,
     clock: Clock,
 ) : ViewModel() {
@@ -65,12 +72,14 @@ class SettingsViewModel(
     private val accounts = combine(hardcoverAuth.account, hardcoverSignIn.status, driveBackup.state, ::Triple)
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        accounts,
+        combine(accounts, combine(mangaSources.extensions, settings.separateLibraryKinds, ::Pair), ::Pair),
         settings.themeMode,
         settings.dailyGoalMinutes,
         stats.observeYearlyGoal(today.year),
         metadata.observeCacheSize(),
-    ) { (hardcover, signIn, backup), themeMode, dailyGoal, yearlyGoal, cached ->
+    ) { (accountsState, mangaState), themeMode, dailyGoal, yearlyGoal, cached ->
+        val (hardcover, signIn, backup) = accountsState
+        val (extensions, separateKinds) = mangaState
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
@@ -81,6 +90,8 @@ class SettingsViewModel(
             year = today.year,
             yearlyGoalBooks = yearlyGoal,
             cachedLookups = cached,
+            extensions = extensions,
+            separateKinds = separateKinds,
             versionName = versionName,
             birthday = isUiBirthday(today),
         )
@@ -95,6 +106,16 @@ class SettingsViewModel(
             birthday = isUiBirthday(today),
         ),
     )
+
+    init {
+        // The list is what the section shows, so it is not left for the first time something searches.
+        viewModelScope.launch { mangaSources.ensureLoaded() }
+    }
+
+    /** Looks for the installed extensions again, for after one was installed or removed. */
+    fun refreshExtensions() {
+        viewModelScope.launch { mangaSources.refresh() }
+    }
 
     fun signIn() {
         viewModelScope.launch { eventChannel.send(SettingsEvent.OpenBrowser(hardcoverSignIn.begin())) }
@@ -128,6 +149,10 @@ class SettingsViewModel(
     fun restoreBackup() = driveBackup.restore()
 
     fun dismissBackupNotice() = driveBackup.dismiss()
+
+    fun setSeparateKinds(separate: Boolean) {
+        viewModelScope.launch { settings.setSeparateLibraryKinds(separate) }
+    }
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }

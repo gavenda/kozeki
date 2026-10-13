@@ -73,6 +73,11 @@ data class BookEntity(
     /** The book's page on the source, shown as a link back to it. */
     val sourceUrl: String? = null,
     val matchStatus: MatchStatus = MatchStatus.NONE,
+    /**
+     * What a Mihon source asked to have handed back with the manga, as JSON. Only manga have any, and
+     * a source that keeps none leaves it null.
+     */
+    val sourceMemo: String? = null,
 
     /** SHA-256 of the imported EPUB. Non-null means the book belongs in the Library. */
     val fileHash: String? = null,
@@ -97,6 +102,45 @@ data class BookEntity(
     /** Pages in the user's physical copy, when its edition does not have [pageCount] pages. */
     val physicalPageCount: Int? = null,
 
+    @Embedded val sync: SyncStamp,
+)
+
+/** Whether the book is a manga: read chapter by chapter through a Mihon source, with no file of its own. */
+val BookEntity.isManga: Boolean get() = source == MetadataSource.MANGA
+
+/** Whether the book is on the user's shelves: an EPUB was imported for it, or it is a manga being read online. */
+val BookEntity.isInLibrary: Boolean get() = fileHash != null || isManga
+
+/**
+ * A chapter of a manga, as its source listed it, with where the user is in it. Rows are written to a
+ * backup as they are, so a new column needs a default. Chapters are looked up in the source again
+ * whenever the book is opened, so what is kept for good is what the user did: [read] and [lastPageRead].
+ */
+@Entity(
+    tableName = "manga_chapters",
+    primaryKeys = ["bookId", "url"],
+    indices = [Index("bookId")],
+)
+@Serializable
+data class MangaChapterEntity(
+    val bookId: String,
+    /** The chapter's URL on its source, which is what the source knows it by. */
+    val url: String,
+    val name: String,
+    /** The number the source gives it, or -1 when it gives none. */
+    val chapterNumber: Float = -1f,
+    val scanlator: String? = null,
+    /** Epoch milliseconds the source says it was uploaded at, or 0 when it does not say. */
+    val uploadedAt: Long = 0L,
+    /** Place in the list the source returned it in, 0 being the first. Sources usually list the newest first. */
+    val sourceOrder: Int = 0,
+    val read: Boolean = false,
+    /** 0-based index of the last page reached. */
+    val lastPageRead: Int = 0,
+    /** Pages the chapter has, known once it has been opened. */
+    val pageCount: Int? = null,
+    /** What the source asked to have handed back with the chapter, as JSON, or null when it keeps none. */
+    val memo: String? = null,
     @Embedded val sync: SyncStamp,
 )
 

@@ -1,0 +1,6 @@
+The sources under src/main/kotlin/eu, src/main/kotlin/tachiyomi and src/main/kotlin/mihon are
+taken from Mihon (https://github.com/mihonapp/mihon), licensed under the Apache License 2.0
+(see https://www.apache.org/licenses/LICENSE-2.0). They are the API Mihon extensions are
+compiled against and keep their package names so those extensions can be loaded. Changes:
+Metro dependency injection, preferences, logging and string resources were removed; the
+NetworkHelper takes its settings from the constructor; AppInfo is filled in by the host app.

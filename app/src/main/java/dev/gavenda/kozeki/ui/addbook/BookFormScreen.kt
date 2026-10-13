@@ -1,31 +1,15 @@
 package dev.gavenda.kozeki.ui.addbook
 
 import android.net.Uri
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.painterResource
-import dev.gavenda.kozeki.data.model.Book
-import dev.gavenda.kozeki.ui.PreviewData
-import dev.gavenda.kozeki.ui.components.HistoryTextField
-import dev.gavenda.kozeki.ui.formatDate
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
-import org.koin.core.parameter.parametersOf
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +27,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,7 +50,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -71,16 +63,24 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.BookDraft
 import dev.gavenda.kozeki.data.model.Isbn
+import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.bookFormViewModel
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.HistoryTextField
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
+import dev.gavenda.kozeki.ui.formatDate
+import dev.gavenda.kozeki.ui.injektViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
-import org.koin.compose.viewmodel.koinViewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 
 /** Only pictures make a cover. */
 internal val CoverPhotoRequest = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -90,7 +90,7 @@ fun BookFormScreen(
     bookId: String?,
     onBack: () -> Unit,
     onAdded: (String) -> Unit,
-    viewModel: BookFormViewModel = koinViewModel(key = "book-form-$bookId") { parametersOf(bookId) },
+    viewModel: BookFormViewModel = injektViewModel(key = "book-form-$bookId") { bookFormViewModel(bookId) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 

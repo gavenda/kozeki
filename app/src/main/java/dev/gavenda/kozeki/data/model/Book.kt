@@ -39,8 +39,12 @@ data class Book(
     val sourceId: String? = null,
     val sourceUrl: String? = null,
     val matchStatus: MatchStatus = MatchStatus.NONE,
-    /** An EPUB was imported for this book. */
+    /** What a manga's source asked to have handed back with it, as JSON. */
+    val sourceMemo: String? = null,
+    /** An EPUB was imported for this book, or it is a manga being read online. */
     val inLibrary: Boolean = false,
+    /** A manga: read chapter by chapter through a Mihon source, with no file of its own. */
+    val isManga: Boolean = false,
     /** The EPUB is on this device. False after a restore, until the file is imported again. */
     val hasFile: Boolean = false,
     /** Readium locator of the last read position, as JSON. */
@@ -63,7 +67,7 @@ data class Book(
     /** What to hand to the image loader: the local file when there is one, else the remote cover. */
     val coverModel: Any? get() = coverPath?.let(::File) ?: coverUrl
 
-    val canRead: Boolean get() = inLibrary && hasFile
+    val canRead: Boolean get() = isManga || (inLibrary && hasFile)
 
     /** Reading a physical copy is tracked for any book the user has, with or without an EPUB. */
     val canTrackPhysical: Boolean get() = acquisition != Acquisition.WISHLIST

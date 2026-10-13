@@ -18,6 +18,9 @@ enum class LookupError(@param:StringRes val message: Int) {
     /** This build has an API key, and the source will not take it. */
     KEY_REJECTED(R.string.lookup_error_key_rejected),
 
+    /** No Mihon extension with a source is installed. */
+    NO_EXTENSIONS(R.string.lookup_error_no_extensions),
+
     /** Signed in, but before the app asked for what this lookup needs. */
     MISSING_PERMISSION(R.string.lookup_error_missing_permission),
     OTHER(R.string.lookup_error_other),
@@ -37,6 +40,7 @@ enum class LookupError(@param:StringRes val message: Int) {
         fun from(reason: MetadataProvider.Unavailable): LookupError = when (reason) {
             MetadataProvider.Unavailable.SIGNED_OUT -> SIGNED_OUT
             MetadataProvider.Unavailable.NOT_CONFIGURED -> NOT_CONFIGURED
+            MetadataProvider.Unavailable.NO_EXTENSIONS -> NO_EXTENSIONS
         }
     }
 }
