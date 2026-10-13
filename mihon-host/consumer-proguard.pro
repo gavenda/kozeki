@@ -30,3 +30,19 @@
 -keep,allowoptimization class eu.kanade.tachiyomi.network.interceptor.RateLimitInterceptorKt { public protected *; }
 -keep,allowoptimization class eu.kanade.tachiyomi.network.interceptor.SpecificHostRateLimitInterceptorKt { public protected *; }
 -keep,allowoptimization class eu.kanade.tachiyomi.util.JsoupExtensionsKt { public protected *; }
+
+# Libraries extensions load by name through the host's class loader. R8 cannot see those uses, so
+# whole packages stay: anything shrunk or renamed shows up as ClassNotFoundException in the
+# extension ("Didn't find class kotlin.Lazy").
+-keep class kotlin.** { *; }
+-keep class kotlinx.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
+-keep class org.jsoup.** { *; }
+-keep class rx.** { *; }
+-keep class uy.kohesive.injekt.** { *; }
+-keep class app.cash.quickjs.** { *; }
+-keep class nl.adaptivity.xmlutil.** { *; }
+-keep class androidx.preference.** { *; }
+-dontwarn kotlin.**
+-dontwarn kotlinx.**
