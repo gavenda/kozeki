@@ -50,6 +50,8 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -67,6 +69,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import dev.gavenda.kozeki.ui.components.CoverAspectRatio
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -157,6 +166,7 @@ class BookDetailActions(
     val onReadChapter: (String) -> Unit = {},
     val onSetChaptersRead: (List<String>, Boolean) -> Unit = { _, _ -> },
     val onRetryChapters: () -> Unit = {},
+    val onRefresh: () -> Unit = {},
     val onOpenTrack: () -> Unit = {},
     val track: TrackSheetActions = TrackSheetActions(),
 )
@@ -226,6 +236,7 @@ fun BookDetailScreen(
             onReadChapter = { onReadChapter(bookId, it) },
             onSetChaptersRead = viewModel::setChaptersRead,
             onRetryChapters = viewModel::retryChapters,
+            onRefresh = viewModel::refresh,
             onOpenTrack = viewModel::openTrackSheet,
             track = TrackSheetActions(
                 onQueryChange = viewModel::onTrackQueryChange,
@@ -452,9 +463,38 @@ fun BookDetailContent(
                     )
                 }
             }
+            // Only a manga of the user's own is asked of its source again by a pull.
+            val pullState = rememberPullToRefreshState()
+            PullToRefreshBox(
+                isRefreshing = state.refreshing,
+                onRefresh = actions.onRefresh,
+                enabled = owned && book.isManga && book.sourceId != null,
+                state = pullState,
+                indicator = {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = innerPadding.calculateTopPadding())
+                            .graphicsLayer {
+                                val shown = if (state.refreshing) 1f else pullState.distanceFraction.coerceIn(0f, 1f)
+                                alpha = shown
+                                translationY = (shown - 1f) * size.height
+                            },
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shadowElevation = 4.dp,
+                        ) {
+                            HaloLoadingIndicator(Modifier.padding(8.dp))
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            ) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.widthIn(max = 720.dp),
+                modifier = Modifier.widthIn(max = 720.dp).align(Alignment.TopCenter),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
@@ -564,6 +604,7 @@ fun BookDetailContent(
                     }
                 }
             }
+            }
         }
     }
 
@@ -641,8 +682,16 @@ private fun Header(
     onOpenAuthor: (AuthorRef) -> Unit,
     onTitleHeight: (Int) -> Unit,
 ) {
+    var coverFullscreen by rememberSaveable { mutableStateOf(false) }
+    if (coverFullscreen) {
+        CoverFullscreen(book, onDismiss = { coverFullscreen = false })
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        BookCover(book, Modifier.width(128.dp), shape = MaterialTheme.shapes.large)
+        BookCover(
+            book,
+            Modifier.width(128.dp).clip(MaterialTheme.shapes.large).clickable { coverFullscreen = true },
+            shape = MaterialTheme.shapes.large,
+        )
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 text = book.title,
@@ -671,6 +720,23 @@ private fun Header(
                     }
                 }
             }
+        }
+    }
+}
+
+/** The cover over the whole screen until it is tapped or backed out of. */
+@Composable
+private fun CoverFullscreen(book: Book, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.92f))
+                .clickable(interactionSource = null, indication = null, onClick = onDismiss)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            BookCover(book, Modifier.fillMaxWidth().widthIn(max = 560.dp), shape = MaterialTheme.shapes.large)
         }
     }
 }
@@ -1500,28 +1566,74 @@ private fun ReviewCard(review: BookReview) {
 /** Where the manga stands on AniList, and the way into the sheet that changes it. */
 @Composable
 private fun TrackingRow(tracking: TrackingUiState, onClick: () -> Unit) {
+    val uriHandler = LocalUriHandler.current
     val track = tracking.track
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.track_title))
-        OutlinedButton(onClick = onClick, shapes = ButtonDefaults.shapes(), modifier = Modifier.fillMaxWidth()) {
-            Text(
-                if (track == null) {
-                    stringResource(R.string.track_add)
-                } else {
-                    listOfNotNull(
-                        stringResource(
-                            when (track.status) {
-                                TrackStatus.CURRENT, TrackStatus.REPEATING -> R.string.track_status_current
-                                TrackStatus.PLANNING -> R.string.track_status_planning
-                                TrackStatus.COMPLETED -> R.string.track_status_completed
-                                TrackStatus.PAUSED -> R.string.track_status_paused
-                                TrackStatus.DROPPED -> R.string.track_status_dropped
-                            },
-                        ),
-                        track.totalChapters?.let { "${track.progress} / $it" } ?: track.progress.toString(),
-                    ).joinToString(" · ")
-                },
-            )
+        if (track == null) {
+            OutlinedButton(onClick = onClick, shapes = ButtonDefaults.shapes(), modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.track_add))
+            }
+        } else {
+            Card(
+                onClick = onClick,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        Modifier
+                            .width(48.dp)
+                            .aspectRatio(CoverAspectRatio)
+                            .clip(MaterialTheme.shapes.small)
+                            .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f)),
+                    ) {
+                        track.coverUrl?.let { url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(track.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = listOf(
+                                stringResource(
+                                    when (track.status) {
+                                        TrackStatus.CURRENT, TrackStatus.REPEATING -> R.string.track_status_current
+                                        TrackStatus.PLANNING -> R.string.track_status_planning
+                                        TrackStatus.COMPLETED -> R.string.track_status_completed
+                                        TrackStatus.PAUSED -> R.string.track_status_paused
+                                        TrackStatus.DROPPED -> R.string.track_status_dropped
+                                    },
+                                ),
+                                track.totalChapters?.let { "${track.progress} / $it" } ?: track.progress.toString(),
+                            ).joinToString(" · "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.75f),
+                        )
+                    }
+                    track.siteUrl?.let { url ->
+                        IconButton(onClick = { uriHandler.openUri(url) }) {
+                            Icon(
+                                painterResource(R.drawable.open_in_new_48px),
+                                contentDescription = stringResource(R.string.track_open),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

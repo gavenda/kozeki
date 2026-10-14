@@ -119,6 +119,8 @@ data class BookDetailUiState(
     /** Null for a book that is not a manga. */
     val tracking: TrackingUiState? = null,
     val loading: Boolean = true,
+    /** Whether a pull to refresh is waiting on the source. */
+    val refreshing: Boolean = false,
     val book: Book? = null,
     val notes: List<Note> = emptyList(),
     val readThroughs: List<ReadThrough> = emptyList(),
@@ -162,6 +164,7 @@ class BookDetailViewModel(
         val matching: Boolean,
         val chapters: List<MangaChapter>,
         val chaptersStatus: MangaChaptersUiState,
+        val refreshing: Boolean,
     )
 
     private data class BookData(
@@ -181,6 +184,7 @@ class BookDetailViewModel(
     /** Whether the source is being asked for chapters, and how that went. Its list is not in it. */
     private val chaptersStatus = MutableStateFlow(MangaChaptersUiState())
     private var chaptersJob: Job? = null
+    private val refreshing = MutableStateFlow(false)
     private var searchJob: Job? = null
     private var loadMoreJob: Job? = null
 
@@ -224,6 +228,7 @@ class BookDetailViewModel(
                 matchService.matching.map { bookId in it },
                 mangaChapters.observe(bookId),
                 chaptersStatus,
+                refreshing,
                 ::Activity,
             ),
             settings.lastCurrency,
@@ -247,6 +252,7 @@ class BookDetailViewModel(
                 matching = matching,
                 reviews = reviewsState,
                 importing = busy,
+                refreshing = activity.refreshing,
                 lastCurrency = currency,
                 purchaseLocations = locations,
             )
@@ -288,6 +294,37 @@ class BookDetailViewModel(
 
     /** Asks the source for its chapters again, after it failed or to see whether new ones came out. */
     fun retryChapters() = refreshChapters()
+
+    /**
+     * Asks the source for the manga's details and chapters together, for a pull to refresh. What it
+     * says of the manga replaces what is kept; a failure shows as the chapters' error.
+     */
+    fun refresh() {
+        if (refreshing.value) return
+        chaptersJob?.cancel()
+        chaptersJob = viewModelScope.launch {
+            val book = library.observeBook(bookId).first() ?: return@launch
+            val sourceId = book.sourceId ?: return@launch
+            refreshing.value = true
+            try {
+                val update = mangaChapters.fetch(sourceId, book.title, book.sourceMemo, details = true)
+                update.details?.let { library.applyMetadata(bookId, it) }
+                mangaChapters.sync(bookId, update.chapters.orEmpty())
+                chaptersStatus.value = MangaChaptersUiState()
+                try {
+                    tracker.refresh(bookId)
+                } catch (_: MetadataException) {
+                }
+            } catch (e: MetadataException) {
+                chaptersStatus.value = MangaChaptersUiState(
+                    error = LookupError.from(e),
+                    captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: book.sourceUrl },
+                )
+            } finally {
+                refreshing.value = false
+            }
+        }
+    }
 
     private fun refreshChapters() {
         chaptersJob?.cancel()

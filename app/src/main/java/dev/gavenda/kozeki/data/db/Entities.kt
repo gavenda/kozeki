@@ -261,6 +261,8 @@ data class MangaTrackEntity(
     /** The title AniList knows it by. */
     val title: String,
     val siteUrl: String? = null,
+    /** Its cover on AniList. Null for a track made before covers were kept, until it is refreshed. */
+    val coverUrl: String? = null,
     /** Null while its publication is going on and AniList does not know the end. */
     val totalChapters: Int? = null,
     val status: TrackStatus = TrackStatus.PLANNING,

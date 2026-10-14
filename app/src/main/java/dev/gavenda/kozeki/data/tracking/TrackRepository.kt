@@ -74,6 +74,7 @@ class TrackRepository(
                 entryId = entry?.id,
                 title = media.title,
                 siteUrl = media.siteUrl,
+                coverUrl = media.coverUrl,
                 totalChapters = media.chapters,
                 status = entry?.status ?: TrackStatus.of(book.state),
                 progress = entry?.progress ?: 0,
@@ -111,6 +112,7 @@ class TrackRepository(
             var next = track.copy(
                 title = media.title,
                 siteUrl = media.siteUrl ?: track.siteUrl,
+                coverUrl = media.coverUrl ?: track.coverUrl,
                 totalChapters = media.chapters,
             )
             if (entry == null) {

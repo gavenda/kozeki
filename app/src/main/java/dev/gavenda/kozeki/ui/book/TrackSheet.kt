@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,24 +18,31 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import dev.gavenda.kozeki.ui.components.CoverAspectRatio
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -110,25 +118,45 @@ private fun TrackSearch(state: TrackingUiState, actions: TrackSheetActions) {
             sheet.results.isEmpty() -> SheetNote(stringResource(R.string.search_no_results))
             else -> LazyColumn {
                 items(sheet.results, key = { it.id }) { media ->
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { actions.onBind(media) }
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                            .padding(horizontal = 24.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(media.title, style = MaterialTheme.typography.bodyLarge)
-                        val detail = listOfNotNull(
-                            media.format?.replace('_', ' ')?.lowercase()?.replaceFirstChar(Char::uppercase),
-                            media.year?.toString(),
-                            media.chapters?.let { stringResource(R.string.track_chapters_total, it) },
-                            media.entry?.let { stringResource(R.string.track_already_listed) },
-                        ).joinToString(" · ")
-                        if (detail.isNotEmpty()) {
-                            Text(
-                                detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                        Box(
+                            Modifier
+                                .width(48.dp)
+                                .aspectRatio(CoverAspectRatio)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                        ) {
+                            media.coverUrl?.let { url ->
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(media.title, style = MaterialTheme.typography.bodyLarge)
+                            val detail = listOfNotNull(
+                                media.format?.replace('_', ' ')?.lowercase()?.replaceFirstChar(Char::uppercase),
+                                media.year?.toString(),
+                                media.chapters?.let { stringResource(R.string.track_chapters_total, it) },
+                                media.entry?.let { stringResource(R.string.track_already_listed) },
+                            ).joinToString(" · ")
+                            if (detail.isNotEmpty()) {
+                                Text(
+                                    detail,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
@@ -139,14 +167,11 @@ private fun TrackSearch(state: TrackingUiState, actions: TrackSheetActions) {
 
 @Composable
 private fun TrackEntry(track: MangaTrackEntity, state: TrackingUiState, actions: TrackSheetActions) {
-    val uriHandler = LocalUriHandler.current
     val sheet = state.sheet
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(track.title, style = MaterialTheme.typography.titleLargeEmphasized)
-
         // The statuses of AniList, in the order it lists them. Repeating is something only it sets.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             for (status in STATUSES) {
@@ -196,17 +221,19 @@ private fun TrackEntry(track: MangaTrackEntity, state: TrackingUiState, actions:
             )
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            track.siteUrl?.let { url ->
-                Button(onClick = { uriHandler.openUri(url) }, shapes = ButtonDefaults.shapes()) {
-                    Text(stringResource(R.string.track_open))
-                }
-            }
-            TextButton(onClick = { actions.onUntrack(false) }, enabled = !sheet.working) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = { actions.onUntrack(false) }, enabled = !sheet.working, shapes = ButtonDefaults.shapes()) {
                 Text(stringResource(R.string.track_stop))
             }
-            TextButton(onClick = { actions.onUntrack(true) }, enabled = !sheet.working) {
-                Text(stringResource(R.string.track_remove), color = MaterialTheme.colorScheme.error)
+            FilledIconButton(
+                onClick = { actions.onUntrack(true) },
+                enabled = !sheet.working,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = stringResource(R.string.track_remove), modifier = Modifier.size(24.dp))
             }
         }
         Box(Modifier.padding(bottom = 16.dp))

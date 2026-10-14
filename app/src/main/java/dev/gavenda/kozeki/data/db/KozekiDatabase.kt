@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MangaChapterEntity::class,
         MangaTrackEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -48,6 +48,7 @@ abstract class KozekiDatabase : RoomDatabase() {
                     AddPurchaseMemo,
                     AddMangaChapters,
                     AddMangaTracks,
+                    AddTrackCovers,
                 )
                 .build()
 
@@ -144,6 +145,13 @@ abstract class KozekiDatabase : RoomDatabase() {
                         "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, " +
                         "`syncedAt` INTEGER, PRIMARY KEY(`bookId`))",
                 )
+            }
+        }
+
+        /** What is followed on AniList shows its cover there. Those already followed get it on their next refresh. */
+        private val AddTrackCovers = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE manga_tracks ADD COLUMN coverUrl TEXT")
             }
         }
 
