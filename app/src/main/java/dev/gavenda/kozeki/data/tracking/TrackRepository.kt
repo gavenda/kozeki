@@ -76,6 +76,7 @@ class TrackRepository(
                 siteUrl = media.siteUrl,
                 coverUrl = media.coverUrl,
                 totalChapters = media.chapters,
+                publication = media.publication,
                 status = entry?.status ?: TrackStatus.of(book.state),
                 progress = entry?.progress ?: 0,
                 score = entry?.score ?: 0,
@@ -114,6 +115,7 @@ class TrackRepository(
                 siteUrl = media.siteUrl ?: track.siteUrl,
                 coverUrl = media.coverUrl ?: track.coverUrl,
                 totalChapters = media.chapters,
+                publication = media.publication ?: track.publication,
             )
             if (entry == null) {
                 // Taken off the list there; the next chapter read puts it back.

@@ -9,6 +9,7 @@ import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
+import dev.gavenda.kozeki.data.model.PublicationStatus
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.TrackStatus
@@ -97,6 +98,10 @@ data class BookEntity(
     val chapterIndex: Int? = null,
     val chapterCount: Int? = null,
     val lastReadAt: Long? = null,
+    /** Chapters of a manga that came out since its page was last opened. Opening the page puts it back to 0. */
+    @ColumnInfo(defaultValue = "0") val newChapters: Int = 0,
+    /** Epoch milliseconds a manga's source was last asked for its chapters in the background, or 0 for never. */
+    @ColumnInfo(defaultValue = "0") val chaptersCheckedAt: Long = 0L,
 
     /** Page reached in a physical copy, entered by hand and kept apart from the EPUB position above. */
     val physicalPage: Int? = null,
@@ -265,6 +270,8 @@ data class MangaTrackEntity(
     val coverUrl: String? = null,
     /** Null while its publication is going on and AniList does not know the end. */
     val totalChapters: Int? = null,
+    /** Whether it is still coming out. Null for a track made before this was kept, until it is refreshed. */
+    val publication: PublicationStatus? = null,
     val status: TrackStatus = TrackStatus.PLANNING,
     /** The highest chapter read, as a whole number. */
     val progress: Int = 0,

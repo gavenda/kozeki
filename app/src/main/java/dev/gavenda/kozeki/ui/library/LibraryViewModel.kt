@@ -11,6 +11,7 @@ import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.data.manga.MangaChapterRepository
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import java.time.LocalDate
@@ -173,6 +174,8 @@ data class LibraryUiState(
     val importing: Boolean = false,
     /** The books whose details are being looked up right now. */
     val matching: Set<String> = emptySet(),
+    /** The sources of followed manga are being asked for new chapters. */
+    val refreshing: Boolean = false,
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
     val selection: LibrarySelection = LibrarySelection(),
@@ -208,6 +211,7 @@ class LibraryViewModel(
     private val settings: SettingsRepository,
     matchService: MatchService,
     private val incoming: IncomingEpubs,
+    private val chapters: MangaChapterRepository,
     private val scheduleMatching: () -> Unit,
 ) : ViewModel() {
 
@@ -216,6 +220,7 @@ class LibraryViewModel(
     // A count, as an EPUB from another app can arrive while the files of an earlier import are still coming in.
     private val importsRunning = MutableStateFlow(0)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
+    private val refreshing = MutableStateFlow(false)
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
     val events: Flow<LibraryEvent> = eventChannel.receiveAsFlow()
@@ -247,7 +252,9 @@ class LibraryViewModel(
 
     private val view = combine(chosenFilter, sort, display, kind, settings.separateLibraryKinds, ::ViewOptions)
 
-    private val busy = combine(importsRunning, matchService.matching) { imports, matching -> (imports > 0) to matching }
+    private val busy = combine(importsRunning, matchService.matching, refreshing) { imports, matching, refreshing ->
+        Triple(imports > 0, matching, refreshing)
+    }
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
@@ -256,7 +263,7 @@ class LibraryViewModel(
             val (filter, sort, display) = Triple(view.filter, view.sort, view.display)
             // One kind at a time, unless the user has asked for everything together.
             val books = if (view.separateKinds) allBooks.filter(view.kind::matches) else allBooks
-            val (importing, matching) = busy
+            val (importing, matching, checking) = busy
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
             val shown = sort.sorted(books.filter(filter::matches))
@@ -273,12 +280,26 @@ class LibraryViewModel(
                 libraryBooks = allBooks.size,
                 importing = importing,
                 matching = matching,
+                refreshing = checking,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
                 selection = LibrarySelection(shown.filter { it.id in selected }),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
+
+    /** Asks the sources of the manga being followed for new chapters, for a pull to refresh. */
+    fun checkForUpdates() {
+        if (refreshing.value) return
+        viewModelScope.launch {
+            refreshing.value = true
+            try {
+                chapters.checkForUpdates(pauseMs = 500)
+            } finally {
+                refreshing.value = false
+            }
+        }
+    }
 
     fun selectFilter(filter: LibraryFilter) {
         chosenFilter.value = filter

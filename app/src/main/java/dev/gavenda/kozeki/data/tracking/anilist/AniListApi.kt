@@ -2,6 +2,7 @@ package dev.gavenda.kozeki.data.tracking.anilist
 
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.await
+import dev.gavenda.kozeki.data.model.PublicationStatus
 import dev.gavenda.kozeki.data.model.TrackStatus
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ data class AniListMedia(
     val title: String,
     val siteUrl: String?,
     val chapters: Int?,
+    val publication: PublicationStatus?,
     val coverUrl: String?,
     val year: Int?,
     val format: String?,
@@ -150,6 +152,7 @@ class AniListApi(private val client: OkHttpClient) {
             title = title,
             siteUrl = media["siteUrl"].text(),
             chapters = media["chapters"].number()?.toInt(),
+            publication = media["status"].text()?.let { name -> PublicationStatus.entries.firstOrNull { it.name == name } },
             coverUrl = (media["coverImage"] as? JsonObject)?.get("large").text(),
             year = ((media["startDate"] as? JsonObject)?.get("year")).number()?.toInt(),
             format = media["format"].text(),
@@ -194,7 +197,7 @@ class AniListApi(private val client: OkHttpClient) {
 
         const val ENTRY = "id status progress score(format: POINT_100) startedAt { year month day } " +
             "completedAt { year month day }"
-        const val MEDIA_FIELDS = "id title { userPreferred } siteUrl chapters format startDate { year } " +
+        const val MEDIA_FIELDS = "id title { userPreferred } siteUrl chapters status format startDate { year } " +
             "coverImage { large } mediaListEntry { $ENTRY }"
 
         const val VIEWER = "query { Viewer { name avatar { medium } mediaListOptions { scoreFormat } } }"

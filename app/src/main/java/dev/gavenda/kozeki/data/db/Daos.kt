@@ -71,8 +71,25 @@ interface BookDao {
     )
     fun observePublishers(): Flow<List<String>>
 
+    /** Manga worth asking their source about, the one asked longest ago first. */
+    @Query(
+        "SELECT * FROM books WHERE source = 'MANGA' AND deletedAt IS NULL AND sourceId IS NOT NULL " +
+            "AND acquisition != 'WISHLIST' AND state NOT IN ('COMPLETED', 'DROPPED') ORDER BY chaptersCheckedAt",
+    )
+    suspend fun getForUpdateCheck(): List<BookEntity>
+
+    @Query("UPDATE books SET chaptersCheckedAt = :now WHERE id = :id")
+    suspend fun markChaptersChecked(id: String, now: Long)
+
     @Upsert
     suspend fun upsert(book: BookEntity)
+
+    /**
+     * Counts chapters that came out, or with [count] of 0 clears the count. Not an edit of the book,
+     * so [BookEntity.sync] is left alone.
+     */
+    @Query("UPDATE books SET newChapters = CASE WHEN :count = 0 THEN 0 ELSE newChapters + :count END WHERE id = :id")
+    suspend fun addNewChapters(id: String, count: Int)
 
     /**
      * A manga's place, from how many of its chapters are read. Unlike [updateProgress] it leaves

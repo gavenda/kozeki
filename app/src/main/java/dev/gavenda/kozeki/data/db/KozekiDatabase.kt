@@ -20,7 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MangaChapterEntity::class,
         MangaTrackEntity::class,
     ],
-    version = 9,
+    version = 11,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -49,6 +49,8 @@ abstract class KozekiDatabase : RoomDatabase() {
                     AddMangaChapters,
                     AddMangaTracks,
                     AddTrackCovers,
+                    AddNewChapters,
+                    AddTrackPublication,
                 )
                 .build()
 
@@ -152,6 +154,21 @@ abstract class KozekiDatabase : RoomDatabase() {
         private val AddTrackCovers = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE manga_tracks ADD COLUMN coverUrl TEXT")
+            }
+        }
+
+        /** A track keeps whether its manga is still coming out. */
+        private val AddTrackPublication = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE manga_tracks ADD COLUMN publication TEXT")
+            }
+        }
+
+        /** A manga counts the chapters that came out since it was last opened, and when it was last checked. */
+        private val AddNewChapters = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN newChapters INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE books ADD COLUMN chaptersCheckedAt INTEGER NOT NULL DEFAULT 0")
             }
         }
 

@@ -32,7 +32,7 @@ inline fun <reified VM : ViewModel> koinViewModel(key: String? = null, crossinli
 
 private val koin get() = GlobalContext.get()
 
-fun libraryViewModel() = LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching())
+fun libraryViewModel() = LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching())
 
 fun addBookViewModel() = AddBookViewModel(koin.get(), koin.get(), koin.get(), koin.get())
 

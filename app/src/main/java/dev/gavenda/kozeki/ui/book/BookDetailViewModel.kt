@@ -263,6 +263,8 @@ class BookDetailViewModel(
         viewModelScope.launch {
             val book = library.observeBook(bookId).filterNotNull().first()
             if (book.isManga) {
+                // Opening the page is seeing what came out.
+                mangaChapters.clearNew(bookId)
                 refreshChapters()
                 // What was read on AniList meanwhile; not worth saying anything of when it cannot be asked.
                 try {

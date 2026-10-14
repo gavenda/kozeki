@@ -56,6 +56,8 @@ data class Book(
     val chapterIndex: Int? = null,
     val chapterCount: Int? = null,
     val lastReadAt: Long? = null,
+    /** Chapters that came out since the manga's page was last opened. */
+    val newChapters: Int = 0,
     /** Page reached in a physical copy, entered by hand. Null while no physical copy is tracked. */
     val physicalPage: Int? = null,
     /** Pages in the physical copy: what the user entered, else [pageCount]. */

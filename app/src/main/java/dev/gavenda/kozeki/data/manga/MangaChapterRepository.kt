@@ -18,6 +18,7 @@ import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -105,14 +106,44 @@ class MangaChapterRepository(
      * Takes over the chapters [remote] the source lists now. What the user did in the ones it
      * already had is kept, and chapters the source no longer lists are put away rather than lost,
      * in case they come back.
+     *
+     * With [countNew] the chapters that were not there before are added to the book's count of new
+     * ones, for a sync nobody is watching. One the user is looking at has nothing to announce.
      */
-    suspend fun sync(bookId: String, remote: List<SChapter>) {
+    suspend fun sync(bookId: String, remote: List<SChapter>, countNew: Boolean = false) {
         db.withTransaction {
-            val changed = mergeChapters(bookId, chapters.getAllForBook(bookId), remote, clock.millis())
+            val existing = chapters.getAllForBook(bookId)
+            val changed = mergeChapters(bookId, existing, remote, clock.millis())
             if (changed.isNotEmpty()) chapters.upsertAll(changed)
+            val arrived = newChapterCount(existing, changed)
+            if (countNew && arrived > 0) books.addNewChapters(bookId, arrived)
         }
         updateBookProgress(bookId)
     }
+
+    /**
+     * Asks the source of each manga being followed for its chapters, counting what is new. A source
+     * that cannot be reached is left for the next run. [pauseMs] is the wait between manga. Returns whether every manga was answered.
+     */
+    suspend fun checkForUpdates(pauseMs: Long = CHECK_PAUSE_MS): Boolean {
+        var complete = true
+        for (book in books.getForUpdateCheck()) {
+            val sourceId = book.sourceId ?: continue
+            try {
+                val update = fetch(sourceId, book.title, book.sourceMemo)
+                sync(book.id, update.chapters.orEmpty(), countNew = true)
+                books.markChaptersChecked(book.id, clock.millis())
+            } catch (e: MetadataException) {
+                complete = false
+            }
+            // A run over a long library is not a burst on any one source.
+            delay(pauseMs)
+        }
+        return complete
+    }
+
+    /** The user has seen what came out: the book's count of new chapters goes back to none. */
+    suspend fun clearNew(bookId: String) = books.addNewChapters(bookId, 0)
 
     /** Records how far the user got in a chapter. [read] is that it was finished. */
     suspend fun saveProgress(bookId: String, url: String, read: Boolean, lastPageRead: Int, pageCount: Int?) {
@@ -183,6 +214,18 @@ class MangaChapterRepository(
         pageCount = pageCount,
         memo = memo,
     )
+}
+
+private const val CHECK_PAUSE_MS = 2_000L
+
+/**
+ * How many of [changed], the rows [mergeChapters] made of [existing], are chapters the book did not
+ * have before. A book with no chapters yet is being added, and none of its chapters is news.
+ */
+internal fun newChapterCount(existing: List<MangaChapterEntity>, changed: List<MangaChapterEntity>): Int {
+    if (existing.isEmpty()) return 0
+    val known = existing.mapTo(HashSet()) { it.url }
+    return changed.count { it.url !in known && it.sync.deletedAt == null && !it.read }
 }
 
 /**

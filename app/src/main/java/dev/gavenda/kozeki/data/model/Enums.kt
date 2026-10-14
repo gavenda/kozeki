@@ -69,6 +69,15 @@ enum class ReadOutcome {
     DROPPED,
 }
 
+/** Whether a manga is still coming out, as AniList has it. */
+enum class PublicationStatus {
+    RELEASING,
+    FINISHED,
+    HIATUS,
+    CANCELLED,
+    NOT_YET_RELEASED,
+}
+
 /** Where a manga stands on the user's AniList, which names its states differently from the app. */
 enum class TrackStatus {
     CURRENT,

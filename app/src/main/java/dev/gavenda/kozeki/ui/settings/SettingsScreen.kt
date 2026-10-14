@@ -162,6 +162,7 @@ fun SettingsScreen(
         backupActions = backupActions,
         onRefreshExtensions = viewModel::refreshExtensions,
         onSetSeparateKinds = viewModel::setSeparateKinds,
+        onSetUpdateInterval = viewModel::setUpdateInterval,
         onAniListSignIn = viewModel::signInToAniList,
         onAniListSignOut = viewModel::signOutOfAniList,
         onDismissAniListError = viewModel::dismissAniListError,
@@ -183,6 +184,7 @@ fun SettingsContent(
     modifier: Modifier = Modifier,
     onRefreshExtensions: () -> Unit = {},
     onSetSeparateKinds: (Boolean) -> Unit = {},
+    onSetUpdateInterval: (Int) -> Unit = {},
     onAniListSignIn: () -> Unit = {},
     onAniListSignOut: () -> Unit = {},
     onDismissAniListError: () -> Unit = {},
@@ -223,6 +225,7 @@ fun SettingsContent(
                 item(key = "manga") {
                     Section(title = stringResource(R.string.settings_manga_title)) {
                         MangaSourcesSetting(state.extensions, onRefreshExtensions)
+                        UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
                     }
                 }
                 item(key = "tracking") {
@@ -594,6 +597,30 @@ internal fun AccountAvatar(url: String?) {
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier.requiredSize(AVATAR_SIZE).clip(CircleShape),
+    )
+}
+
+private val UPDATE_INTERVALS = listOf(0, 6, 12, 24)
+
+/** How often the manga being followed are asked for new chapters, which the library then shows. */
+@Composable
+private fun UpdateIntervalSetting(hours: Int, onSet: (Int) -> Unit) {
+    SettingRow(
+        icon = painterResource(R.drawable.refresh_48px),
+        title = stringResource(R.string.settings_updates_title),
+        subtitle = stringResource(R.string.settings_updates_description),
+    )
+    // A period kept from elsewhere that is none of the choices shows as the nearest one.
+    val selected = UPDATE_INTERVALS.indexOf(hours).takeIf { it >= 0 }
+        ?: UPDATE_INTERVALS.indices.minBy { kotlin.math.abs(UPDATE_INTERVALS[it] - hours) }
+    ConnectedButtonGroup(
+        options = UPDATE_INTERVALS.map {
+            if (it == 0) stringResource(R.string.settings_updates_off) else stringResource(R.string.settings_updates_hours, it)
+        },
+        selectedIndex = selected,
+        onSelect = { onSet(UPDATE_INTERVALS[it]) },
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+        optionColors = UPDATE_INTERVALS.map { OptionColor.VIOLET.toggleButtonColors() },
     )
 }
 

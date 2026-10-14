@@ -46,6 +46,8 @@ data class SettingsUiState(
     val extensions: List<MangaExtension>? = null,
     /** Whether the library keeps manga apart from books and shows one kind at a time. */
     val separateKinds: Boolean = true,
+    /** Hours between the checks of followed manga for new chapters, 0 being never. */
+    val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
     val versionName: String = "",
     /** Today is Ui's birthday. */
     val birthday: Boolean = false,
@@ -60,6 +62,7 @@ sealed interface SettingsEvent {
 private data class LibrarySettings(
     val extensions: List<MangaExtension>?,
     val separateKinds: Boolean,
+    val updateIntervalHours: Int,
     val aniList: AniListAccount,
     val aniListSignIn: AniListAuth.Status,
 )
@@ -90,6 +93,7 @@ class SettingsViewModel(
             combine(
                 mangaSources.extensions,
                 settings.separateLibraryKinds,
+                settings.updateIntervalHours,
                 aniListAuth.account,
                 aniListAuth.status,
                 ::LibrarySettings,
@@ -102,7 +106,7 @@ class SettingsViewModel(
         metadata.observeCacheSize(),
     ) { (accountsState, mangaState), themeMode, dailyGoal, yearlyGoal, cached ->
         val (hardcover, signIn, backup) = accountsState
-        val (extensions, separateKinds, aniList, aniListSignIn) = mangaState
+        val (extensions, separateKinds, updateIntervalHours, aniList, aniListSignIn) = mangaState
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
@@ -117,6 +121,7 @@ class SettingsViewModel(
             cachedLookups = cached,
             extensions = extensions,
             separateKinds = separateKinds,
+            updateIntervalHours = updateIntervalHours,
             versionName = versionName,
             birthday = isUiBirthday(today),
         )
@@ -190,6 +195,10 @@ class SettingsViewModel(
 
     fun setSeparateKinds(separate: Boolean) {
         viewModelScope.launch { settings.setSeparateLibraryKinds(separate) }
+    }
+
+    fun setUpdateInterval(hours: Int) {
+        viewModelScope.launch { settings.setUpdateIntervalHours(hours) }
     }
 
     fun setThemeMode(mode: ThemeMode) {

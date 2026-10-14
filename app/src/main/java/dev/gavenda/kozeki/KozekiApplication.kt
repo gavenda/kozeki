@@ -8,7 +8,9 @@ import dev.gavenda.kozeki.data.manga.MangaCoverFetcher
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
+import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.work.MatchWorker
+import dev.gavenda.kozeki.data.work.UpdateWorker
 import eu.kanade.tachiyomi.AppInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -40,5 +42,9 @@ class KozekiApplication : Application() {
         }
         // Picks up books imported offline, or left pending because no source was configured yet.
         MatchWorker.enqueue(this)
+        // New chapters of the manga being followed, found while the app is not open.
+        koin.get<CoroutineScope>().launch {
+            koin.get<SettingsRepository>().updateIntervalHours.collect { UpdateWorker.schedule(this@KozekiApplication, it) }
+        }
     }
 }

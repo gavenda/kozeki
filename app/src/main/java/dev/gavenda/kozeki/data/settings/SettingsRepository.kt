@@ -96,6 +96,10 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     val separateLibraryKinds: Flow<Boolean> =
         store.data.map { it[Keys.SeparateLibraryKinds] ?: true }.distinctUntilChanged()
 
+    /** Hours between the checks of followed manga for new chapters, or 0 for none. */
+    val updateIntervalHours: Flow<Int> =
+        store.data.map { it[Keys.UpdateIntervalHours] ?: DEFAULT_UPDATE_INTERVAL_HOURS }.distinctUntilChanged()
+
     // Opened here, ahead of its first use, so that reading it later does not wait for the disk.
     private val searchPreferences = context.applicationContext.getSharedPreferences("search", Context.MODE_PRIVATE)
 
@@ -188,6 +192,10 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.SeparateLibraryKinds] = separate }
     }
 
+    suspend fun setUpdateIntervalHours(hours: Int) {
+        store.edit { it[Keys.UpdateIntervalHours] = hours.coerceAtLeast(0) }
+    }
+
     suspend fun setLibraryDisplay(name: String) {
         store.edit { it[Keys.LibraryDisplay] = name }
     }
@@ -202,10 +210,12 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val LibraryKind = stringPreferencesKey("library_kind")
         val SeparateLibraryKinds = booleanPreferencesKey("separate_library_kinds")
         val DriveLink = stringPreferencesKey("drive_link")
+        val UpdateIntervalHours = intPreferencesKey("update_interval_hours")
     }
 
     companion object {
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
+        const val DEFAULT_UPDATE_INTERVAL_HOURS = 12
         private const val SEARCH_SOURCE = "source"
         private const val MANGA_SOURCE = "manga_source"
     }

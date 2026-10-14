@@ -102,6 +102,7 @@ import dev.gavenda.kozeki.data.model.MangaChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
+import dev.gavenda.kozeki.data.model.PublicationStatus
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
@@ -1606,6 +1607,21 @@ private fun TrackingRow(tracking: TrackingUiState, onClick: () -> Unit) {
                     }
                     Column(Modifier.weight(1f)) {
                         Text(track.title, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        track.publication?.let { publication ->
+                            Text(
+                                text = stringResource(
+                                    when (publication) {
+                                        PublicationStatus.RELEASING -> R.string.track_publication_releasing
+                                        PublicationStatus.FINISHED -> R.string.track_publication_finished
+                                        PublicationStatus.HIATUS -> R.string.track_publication_hiatus
+                                        PublicationStatus.CANCELLED -> R.string.track_publication_cancelled
+                                        PublicationStatus.NOT_YET_RELEASED -> R.string.track_publication_upcoming
+                                    },
+                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.75f),
+                            )
+                        }
                         Text(
                             text = listOf(
                                 stringResource(

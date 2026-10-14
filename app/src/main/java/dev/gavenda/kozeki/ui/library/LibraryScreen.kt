@@ -59,6 +59,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleFloatingActionButton
@@ -79,6 +81,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -191,6 +194,7 @@ fun LibraryScreen(
             )
         },
         onSettingsClick = onOpenSettings,
+        onRefresh = viewModel::checkForUpdates,
     )
 }
 
@@ -233,6 +237,7 @@ fun LibraryContent(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
     onKindToggle: () -> Unit = {},
+    onRefresh: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyGridState()
@@ -374,7 +379,33 @@ fun LibraryContent(
                     val list = state.display == LibraryDisplay.LIST
                     // A row brings its own margins, which the tint of a picked one fills.
                     val edge = if (list) 8.dp else 16.dp
-                    Box(Modifier.fillMaxSize()) {
+                    val pullState = rememberPullToRefreshState()
+                    PullToRefreshBox(
+                        isRefreshing = state.refreshing,
+                        onRefresh = onRefresh,
+                        enabled = !state.selecting,
+                        state = pullState,
+                        indicator = {
+                            Box(
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .graphicsLayer {
+                                        val shown = if (state.refreshing) 1f else pullState.distanceFraction.coerceIn(0f, 1f)
+                                        alpha = shown
+                                        translationY = (shown - 1f) * size.height
+                                    },
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    shadowElevation = 4.dp,
+                                ) {
+                                    HaloLoadingIndicator(Modifier.padding(8.dp))
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
                         LazyVerticalGrid(
                             columns = if (list) {
                                 AdaptiveColumns(minColumns = 1, minCellWidth = 360.dp)
@@ -807,6 +838,8 @@ private fun LibraryBookItem(
                     Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
             }
+            // Chapters that came out since the manga was opened take the corner a pick would, which wins.
+            if (book.newChapters > 0 && !selected) NewChaptersBadge(book.newChapters, Modifier.align(Alignment.TopStart).padding(6.dp))
             val (badgeIcon, badgeLabel) = ownershipBadge(book)
             // How the book is had goes in the lower left, with the heart above it.
             Column(
@@ -921,6 +954,9 @@ private fun LibraryBookRow(
             if (matching) {
                 MatchingOverlay(MaterialTheme.shapes.small, Modifier.matchParentSize(), indicatorSize = 32.dp)
             }
+            if (book.newChapters > 0 && !selected) {
+                NewChaptersBadge(book.newChapters, Modifier.align(Alignment.TopStart).padding(2.dp))
+            }
             if (selected) {
                 Surface(
                     modifier = Modifier.align(Alignment.Center),
@@ -1017,6 +1053,24 @@ private fun MatchingOverlay(shape: Shape, modifier: Modifier = Modifier, indicat
         contentAlignment = Alignment.Center,
     ) {
         HaloLoadingIndicator(Modifier.size(indicatorSize), glow = true)
+    }
+}
+
+/** How many chapters of a manga are new, on a backing in the colours that call for a look. */
+@Composable
+private fun NewChaptersBadge(count: Int, modifier: Modifier = Modifier) {
+    val description = pluralStringResource(R.plurals.new_chapters, count, count)
+    Surface(
+        modifier = modifier.semantics { contentDescription = description },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+    ) {
+        Text(
+            text = if (count > 99) "99+" else count.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
     }
 }
 

@@ -933,6 +933,7 @@ class LibraryRepository(
         chapterIndex = chapterIndex,
         chapterCount = chapterCount,
         lastReadAt = lastReadAt,
+        newChapters = newChapters,
         physicalPage = physicalPage,
         physicalPageCount = physicalPageCount ?: pageCount,
         addedAt = sync.createdAt,
