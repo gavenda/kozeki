@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import dev.gavenda.kozeki.data.manga.PageImages
@@ -36,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -61,6 +64,7 @@ import kotlinx.coroutines.withContext
  * screen are ever decoded: a page of a webtoon can be many times taller than the largest bitmap a
  * phone will hold, and shrinking it to fit would make it blurry.
  */
+@Immutable
 internal sealed interface StripItem {
     /** The chapter the item belongs to, by its URL on the source. */
     val chapter: String
@@ -84,6 +88,7 @@ internal sealed interface StripItem {
     }
 
     /** The rows [top] until [bottom] of the image in [file], which is [width] by [height] pixels. */
+    @Immutable
     data class Slice(
         override val chapter: String,
         override val page: Int,
@@ -240,12 +245,10 @@ internal class StripState {
         }.getOrDefault(false)
         return if (sliceable) Arrived.Image(file, bounds.outWidth, bounds.outHeight) else Arrived.Unsliceable(file)
     }
-
-    private companion object {
-        /** How many rows of the image a slice has. A slice is a fraction of the largest bitmap there can be. */
-        const val SLICE_PX = 2048
-    }
 }
+
+/** How many rows of the image a slice has. A slice is a fraction of the largest bitmap there can be. */
+private const val SLICE_PX = 2048
 
 /** The place in the list of the first item of [page] of [chapter]. */
 internal fun List<StripItem>.firstIndexOf(chapter: String, page: Int): Int =
@@ -391,8 +394,9 @@ private fun SliceImage(slice: StripItem.Slice, widthPx: Int) {
     val bottomPx = (slice.bottom * scale).roundToInt()
     val height = with(LocalDensity.current) { (bottomPx - topPx).coerceAtLeast(1).toDp() }
 
-    val bitmap by produceState<ImageBitmap?>(null, slice.file, slice.top, slice.bottom, widthPx) {
-        value = withContext(Dispatchers.IO) { decodeSlice(slice, widthPx) }
+    // A slice decoded before, or ahead of the scroll, is drawn in the first frame it is on screen.
+    val bitmap by produceState(StripSlices.cached(slice, widthPx), slice, widthPx) {
+        value = StripSlices.load(slice, widthPx)
     }
     Box(Modifier.fillMaxWidth().height(height)) {
         bitmap?.let {
@@ -407,29 +411,118 @@ private fun SliceImage(slice: StripItem.Slice, widthPx: Int) {
     }
 }
 
-/** Decodes the slice with the fewest pixels that is still as wide as the screen. */
-private fun decodeSlice(slice: StripItem.Slice, widthPx: Int): ImageBitmap? {
-    PageImages.sniff(slice.file)?.let { return decodeFromWhole(slice, it, widthPx) }
-    var sample = 1
-    if (widthPx > 0) while (slice.width / (sample * 2) >= widthPx) sample *= 2
-    val decoder = runCatching { BitmapRegionDecoder.newInstance(slice.file.path) }.getOrNull() ?: return null
-    return try {
-        val options = BitmapFactory.Options().apply { inSampleSize = sample }
-        decoder.decodeRegion(Rect(0, slice.top, slice.width, slice.bottom), options)?.asImageBitmap()
-    } catch (_: OutOfMemoryError) {
-        null
-    } finally {
-        decoder.recycle()
-    }
-}
+/**
+ * The slices decoded so far, kept so that one scrolled back to is not decoded again, and the
+ * decoders of the pages they are cut from, so that a page is opened once for all of its slices.
+ */
+internal object StripSlices {
 
-/** A slice of a page in a format decoded in software, which is decoded whole and cut. */
-private fun decodeFromWhole(slice: StripItem.Slice, format: PageImages.Format, widthPx: Int): ImageBitmap? {
-    val page = PageImages.decode(slice.file, format, widthPx.coerceAtLeast(1)) ?: return null
-    val scale = page.width.toFloat() / slice.width
-    val top = (slice.top * scale).roundToInt().coerceIn(0, page.height - 1)
-    val bottom = (slice.bottom * scale).roundToInt().coerceIn(top + 1, page.height)
-    return Bitmap.createBitmap(page, 0, top, page.width, bottom - top).asImageBitmap()
+    /** Decodes share a few threads, so a fling does not start more at once than the phone can take. */
+    private val dispatcher = Dispatchers.IO.limitedParallelism(3)
+
+    /**
+     * Room for two pages decoded in software, which come whole: the one being read and the next.
+     * A webtoon page of 14,000 rows is some 70 MB at a phone's width.
+     */
+    private val bitmaps = object : LruCache<String, ImageBitmap>(192 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: ImageBitmap) = value.asAndroidBitmap().byteCount
+    }
+
+    /** No more than a few pages are on screen or about to be at once. */
+    private val decoders = object : LruCache<String, BitmapRegionDecoder>(4) {
+        override fun entryRemoved(evicted: Boolean, key: String, oldValue: BitmapRegionDecoder, newValue: BitmapRegionDecoder?) {
+            oldValue.recycle()
+        }
+    }
+
+    /**
+     * A slice on screen and the same slice decoded ahead of it take the same one, so it is decoded
+     * once; so do all the slices of a page decoded in software, which is decoded once for them all.
+     */
+    private val locks = Array(8) { Any() }
+
+    private fun lock(key: String) = locks[(key.hashCode() and Int.MAX_VALUE) % locks.size]
+
+    private fun key(slice: StripItem.Slice, widthPx: Int) =
+        "${slice.file.path}|${slice.width}x${slice.height}|${slice.top}|$widthPx"
+
+    fun cached(slice: StripItem.Slice, widthPx: Int): ImageBitmap? = bitmaps.get(key(slice, widthPx))
+
+    /** The slice drawn [widthPx] wide, decoded if it has not been. Nothing before the strip is measured. */
+    suspend fun load(slice: StripItem.Slice, widthPx: Int): ImageBitmap? {
+        if (widthPx <= 0) return null
+        val key = key(slice, widthPx)
+        bitmaps.get(key)?.let { return it }
+        return withContext(dispatcher) {
+            val format = PageImages.sniff(slice.file)
+            synchronized(lock(if (format != null) slice.file.path else key)) {
+                bitmaps.get(key) ?: if (format != null) {
+                    decodePage(slice, format, widthPx)
+                } else {
+                    decodeRegion(slice, widthPx)?.let { fit(it, widthPx) }?.also { bitmaps.put(key, it) }
+                }
+            }
+        }
+    }
+
+    /** The bitmap at the screen's width, uploaded to the GPU before it is first drawn. */
+    private fun fit(bitmap: Bitmap, widthPx: Int): ImageBitmap {
+        // A power of two leaves most slices wider than the screen; drawn at its own width it costs less to upload.
+        val fitted = if (bitmap.width > widthPx) {
+            val height = (bitmap.height.toLong() * widthPx / bitmap.width).toInt().coerceAtLeast(1)
+            Bitmap.createScaledBitmap(bitmap, widthPx, height, true).also { if (it !== bitmap) bitmap.recycle() }
+        } else {
+            bitmap
+        }
+        fitted.prepareToDraw()
+        return fitted.asImageBitmap()
+    }
+
+    /** The slice with the fewest pixels a power of two allows that is still as wide as the screen. */
+    private fun decodeRegion(slice: StripItem.Slice, widthPx: Int): Bitmap? {
+        var sample = 1
+        while (slice.width / (sample * 2) >= widthPx) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        // A decoder pushed out of the cache by another page is closed, and opened again here.
+        repeat(2) {
+            val decoder = regionDecoder(slice.file) ?: return null
+            try {
+                return decoder.decodeRegion(Rect(0, slice.top, slice.width, slice.bottom), options)
+            } catch (_: IllegalStateException) {
+            } catch (_: OutOfMemoryError) {
+                return null
+            }
+        }
+        return null
+    }
+
+    private fun regionDecoder(file: File): BitmapRegionDecoder? = synchronized(decoders) {
+        decoders.get(file.path)
+            ?: runCatching { BitmapRegionDecoder.newInstance(file.path) }.getOrNull()?.also { decoders.put(file.path, it) }
+    }
+
+    /**
+     * A page in a format decoded in software, which can only be decoded whole: it is cut into all of
+     * its slices at once, and the page itself let go, so a page is never decoded twice while it is
+     * read. Gives [slice] of them.
+     */
+    private fun decodePage(slice: StripItem.Slice, format: PageImages.Format, widthPx: Int): ImageBitmap? {
+        val page = runCatching { PageImages.decode(slice.file.readBytes(), format, widthPx) }.getOrNull() ?: return null
+        val scale = page.width.toFloat() / slice.width
+        var wanted: ImageBitmap? = null
+        for ((index, top) in (0 until slice.height step SLICE_PX).withIndex()) {
+            val part = slice.copy(top = top, bottom = minOf(top + SLICE_PX, slice.height), index = index)
+            val y = (part.top * scale).roundToInt().coerceIn(0, page.height - 1)
+            val bottom = (part.bottom * scale).roundToInt().coerceIn(y + 1, page.height)
+            val image = Bitmap.createBitmap(page, 0, y, page.width, bottom - y).asImageBitmap()
+            bitmaps.put(key(part, widthPx), image)
+            if (part.top == slice.top) wanted = image
+        }
+        wanted?.prepareToDraw()
+        // A page of a single slice is that slice, and is kept.
+        if (wanted?.asAndroidBitmap() !== page) page.recycle()
+        return wanted
+    }
 }
 
 /** A page drawn whole, with the way to ask for it again if it will not decode. */

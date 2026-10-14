@@ -51,10 +51,16 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 17
-        versionName = "2.2.2"
+        versionCode = 18
+        versionName = "2.2.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // A phone and the x86_64 emulator. The 32-bit and x86 copies of the native libraries were
+        // about 20 MB of the APK.
+        ndk {
+            abiFilters += setOf("arm64-v8a", "x86_64")
+        }
 
         buildConfigField("String", "GOOGLE_BOOKS_API_KEY", "\"$googleBooksApiKey\"")
         buildConfigField("String", "HARDCOVER_CLIENT_ID", "\"$hardcoverClientId\"")

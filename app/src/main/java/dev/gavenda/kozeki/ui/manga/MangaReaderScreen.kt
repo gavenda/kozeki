@@ -84,8 +84,10 @@ import dev.gavenda.kozeki.ui.reader.ImmersiveMode
 import dev.gavenda.kozeki.ui.reader.KeepScreenOn
 import java.io.File
 import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
@@ -248,6 +250,50 @@ private fun MangaReaderReady(state: MangaReaderUiState.Ready, viewModel: MangaRe
             }
         }
 
+        // How wide the strip is drawn, which is how wide its slices are decoded.
+        var widthPx by remember { mutableIntStateOf(0) }
+        // The slices just past the screen, the way it is being scrolled, are decoded before they come
+        // into view, and so is the next page that way: a page decoded in software is decoded whole,
+        // which takes a second or so, and its slices come long after the screen has reached its top.
+        // Places in the list can be stale while pages arrive, which only means a slice decoded for nothing.
+        if (vertical) {
+            LaunchedEffect(Unit) {
+                var previous = listState.firstVisibleItemIndex
+                // The next page is decoded on its own, since the slices just past the screen would
+                // otherwise wait out the second it takes: a decode under way is not stopped by a scroll.
+                var nextPage: StripItem.Slice? = null
+                var nextPageJob: Job? = null
+                val effect = this
+                snapshotFlow {
+                    val visible = listState.layoutInfo.visibleItemsInfo
+                    Triple(visible.firstOrNull()?.index ?: 0, visible.lastOrNull()?.index ?: 0, widthPx)
+                }
+                    .distinctUntilChanged()
+                    .collectLatest { (first, last, width) ->
+                        val forward = first >= previous
+                        previous = first
+                        val items = itemsNow
+                        // The nearest slice of another page, which for a page decoded whole decodes all of it.
+                        val edge = items.getOrNull(if (forward) last else first)
+                        val beyond = if (forward) last + 1..minOf(last + PAGE_SEARCH_ITEMS, items.lastIndex)
+                        else first - 1 downTo maxOf(first - PAGE_SEARCH_ITEMS, 0)
+                        val next = beyond.firstNotNullOfOrNull { index ->
+                            (items[index] as? StripItem.Slice)
+                                ?.takeIf { it.chapter != edge?.chapter || it.page != edge.page }
+                        }
+                        if (next != null && next != nextPage) {
+                            nextPage = next
+                            nextPageJob?.cancel()
+                            nextPageJob = effect.launch { StripSlices.load(next, width) }
+                        }
+                        val ahead = if (forward) last + 1..last + PREFETCH_ITEMS else first - 1 downTo first - PREFETCH_ITEMS
+                        for (index in ahead) {
+                            (items.getOrNull(index) as? StripItem.Slice)?.let { StripSlices.load(it, width) }
+                        }
+                    }
+            }
+        }
+
         val scrollTo: (Int) -> Unit = { target ->
             scope.launch {
                 val index = target.coerceIn(0, pageCount)
@@ -265,7 +311,6 @@ private fun MangaReaderReady(state: MangaReaderUiState.Ready, viewModel: MangaRe
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             if (vertical) {
-                var widthPx by remember { mutableIntStateOf(0) }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
@@ -273,7 +318,7 @@ private fun MangaReaderReady(state: MangaReaderUiState.Ready, viewModel: MangaRe
                         .onSizeChanged { widthPx = it.width }
                         .pointerInput(Unit) { detectTapGestures(onTap = { toggleChrome() }) },
                 ) {
-                    items(items, key = { it.key }) { item ->
+                    items(items, key = { it.key }, contentType = { it::class }) { item ->
                         StripRow(
                             item = item,
                             widthPx = widthPx,
@@ -589,5 +634,11 @@ private val MangaReadingMode.labelRes: Int
 
 /** The share of a page's width at each edge that turns the page. */
 private const val EDGE_FRACTION = 0.3f
+
+/** How many items past the screen the strip decodes ahead: a few screens of slices. */
+private const val PREFETCH_ITEMS = 3
+
+/** How far past the screen the next page is looked for: past a page of 32 slices, some 65,000 rows. */
+private const val PAGE_SEARCH_ITEMS = 32
 private const val CHROME_ALPHA = 0.94f
 private val EndHeight = 320.dp

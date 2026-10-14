@@ -1,7 +1,6 @@
 package dev.gavenda.kozeki.data.manga
 
 import android.graphics.Bitmap
-import android.util.LruCache
 import android.util.Size
 import coil3.ImageLoader
 import coil3.asImage
@@ -32,11 +31,6 @@ internal object PageImages {
 
     /** The largest a page is decoded to: about 100 MB of pixels. */
     private const val MAX_PIXELS = 25_000_000L
-
-    /** Decoded pages, so the slices of one page are cut from a single decode. */
-    private val cache = object : LruCache<String, Bitmap>(96 * 1024 * 1024) {
-        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
-    }
 
     /** The format a file starting with [header] is, if it is one of these. */
     fun sniff(header: ByteArray): Format? {
@@ -69,23 +63,6 @@ internal object PageImages {
         Format.Avif -> avif.getSize(bytes)
         Format.Jxl -> JxlCoder.getSize(bytes)
     }?.takeIf { it.width > 0 && it.height > 0 }
-
-    /**
-     * The image of [file] as wide as [width], or as wide as it is if that is less. Kept, so that
-     * asking again for another slice of the page costs nothing.
-     */
-    fun decode(file: File, format: Format, width: Int): Bitmap? {
-        val key = "${file.path}|${file.lastModified()}|$width"
-        synchronized(cache) {
-            cache.get(key)?.let { return it }
-            val bitmap = runCatching {
-                val bytes = file.readBytes()
-                decode(bytes, format, width)
-            }.getOrNull() ?: return null
-            cache.put(key, bitmap)
-            return bitmap
-        }
-    }
 
     /** Decodes [bytes], no wider than [width] if given, and never past [MAX_PIXELS]. */
     fun decode(bytes: ByteArray, format: Format, width: Int? = null): Bitmap? {
