@@ -29,7 +29,11 @@ import dev.gavenda.kozeki.data.metadata.hardcover.TokenStore
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.tracking.TrackRepository
+import dev.gavenda.kozeki.data.tracking.anilist.AniListApi
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.work.MatchWorker
+import dev.gavenda.kozeki.data.work.TrackWorker
 import java.security.MessageDigest
 import java.time.Clock
 import java.util.concurrent.TimeUnit
@@ -170,6 +174,32 @@ fun appModule(app: Application) = module {
     single { MangaChapterRepository(get(), get(), get()) }
 
     single { MangaPages(app, get()) }
+
+    single { AniListApi(get()) }
+
+    single {
+        AniListAuth(
+            api = get(),
+            store = TokenStore(app, fileName = "anilist_session.bin", keyAlias = "kozeki_anilist_session"),
+            clock = get(),
+            scope = get(),
+            clientId = BuildConfig.ANILIST_CLIENT_ID,
+            redirectUri = BuildConfig.ANILIST_REDIRECT_URI,
+        )
+    }
+
+    single {
+        TrackRepository(
+            db = get(),
+            api = get(),
+            auth = get(),
+            chapters = get(),
+            library = get(),
+            clock = get(),
+            scope = get(),
+            scheduleRetry = { TrackWorker.enqueue(app) },
+        )
+    }
 
     single { MangaReaderPreferences(app) }
 }

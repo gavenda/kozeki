@@ -261,7 +261,7 @@ class BackupCodecTest {
         assertEquals(
             setOf(
                 "format", "schemaVersion", "createdAt", "appVersion", "device", "books", "readThroughs",
-                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "mangaChapters", "settings",
+                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "mangaChapters", "mangaTracks", "settings",
             ),
             written.keys,
         )

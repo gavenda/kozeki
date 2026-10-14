@@ -6,6 +6,8 @@ import coil3.SingletonImageLoader
 import dev.gavenda.kozeki.data.manga.PageImages
 import dev.gavenda.kozeki.data.manga.MangaCoverFetcher
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
+import dev.gavenda.kozeki.data.tracking.TrackRepository
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.work.MatchWorker
 import eu.kanade.tachiyomi.AppInfo
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +33,11 @@ class KozekiApplication : Application() {
                 .build()
         }
         koin.get<CoroutineScope>().launch { koin.get<HardcoverAuth>().restore() }
+        koin.get<CoroutineScope>().launch {
+            koin.get<AniListAuth>().restore()
+            // Listens for chapters read and sends them on, so it is made now and not when a screen asks.
+            koin.get<TrackRepository>()
+        }
         // Picks up books imported offline, or left pending because no source was configured yet.
         MatchWorker.enqueue(this)
     }

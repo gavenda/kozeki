@@ -18,8 +18,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         YearlyGoalEntity::class,
         MetadataCacheEntity::class,
         MangaChapterEntity::class,
+        MangaTrackEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,6 +34,7 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun yearlyGoalDao(): YearlyGoalDao
     abstract fun metadataCacheDao(): MetadataCacheDao
     abstract fun mangaChapterDao(): MangaChapterDao
+    abstract fun mangaTrackDao(): MangaTrackDao
     abstract fun backupDao(): BackupDao
 
     companion object {
@@ -45,6 +47,7 @@ abstract class KozekiDatabase : RoomDatabase() {
                     AddPhysicalReadings,
                     AddPurchaseMemo,
                     AddMangaChapters,
+                    AddMangaTracks,
                 )
                 .build()
 
@@ -127,6 +130,20 @@ abstract class KozekiDatabase : RoomDatabase() {
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_manga_chapters_bookId` ON `manga_chapters` (`bookId`)")
                 db.execSQL("ALTER TABLE books ADD COLUMN sourceMemo TEXT")
+            }
+        }
+
+        /** A manga can be followed on AniList, and what it was last told is kept. */
+        private val AddMangaTracks = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `manga_tracks` (`bookId` TEXT NOT NULL, `mediaId` INTEGER NOT NULL, " +
+                        "`entryId` INTEGER, `title` TEXT NOT NULL, `siteUrl` TEXT, `totalChapters` INTEGER, " +
+                        "`status` TEXT NOT NULL, `progress` INTEGER NOT NULL, `score` INTEGER NOT NULL, " +
+                        "`startedOn` INTEGER, `completedOn` INTEGER, `pendingPush` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, " +
+                        "`syncedAt` INTEGER, PRIMARY KEY(`bookId`))",
+                )
             }
         }
 

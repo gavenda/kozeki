@@ -19,6 +19,9 @@ import eu.kanade.tachiyomi.source.model.SManga
 import java.time.Clock
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,6 +35,11 @@ class MangaChapterRepository(
 
     private val chapters = db.mangaChapterDao()
     private val books = db.bookDao()
+
+    private val _chapterReads = MutableSharedFlow<String>(extraBufferCapacity = 16)
+
+    /** The ID of a book each time chapters of it were marked read or unread, or finished by reading. */
+    val chapterReads: SharedFlow<String> = _chapterReads.asSharedFlow()
 
     /** The chapters of [bookId] in the order the source listed them. */
     fun observe(bookId: String): Flow<List<MangaChapter>> =
@@ -112,12 +120,14 @@ class MangaChapterRepository(
         // The part of the chapter in hand that has been turned through counts towards the book too.
         val partial = if (!read && pageCount != null && pageCount > 0) (lastPageRead + 1.0) / pageCount else 0.0
         updateBookProgress(bookId, reading = true, currentUrl = url, partial = partial)
+        if (read) _chapterReads.tryEmit(bookId)
     }
 
     suspend fun markRead(bookId: String, urls: List<String>, read: Boolean) {
         if (urls.isEmpty()) return
         chapters.markRead(bookId, urls, read, clock.millis())
         updateBookProgress(bookId)
+        _chapterReads.tryEmit(bookId)
     }
 
     /**

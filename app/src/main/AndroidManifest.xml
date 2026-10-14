@@ -46,6 +46,17 @@
                     android:scheme="${hardcoverRedirectScheme}" />
             </intent-filter>
 
+            <!-- Where AniList sends the user back after they approve or deny the sign-in. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="${aniListRedirectHost}"
+                    android:path="${aniListRedirectPath}"
+                    android:scheme="${aniListRedirectScheme}" />
+            </intent-filter>
+
             <!-- Opening an EPUB from another app, such as a file manager or a browser's downloads. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />

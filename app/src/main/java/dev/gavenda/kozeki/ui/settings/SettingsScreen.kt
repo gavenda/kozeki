@@ -74,6 +74,8 @@ import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.manga.BrokenExtension
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
@@ -160,6 +162,9 @@ fun SettingsScreen(
         backupActions = backupActions,
         onRefreshExtensions = viewModel::refreshExtensions,
         onSetSeparateKinds = viewModel::setSeparateKinds,
+        onAniListSignIn = viewModel::signInToAniList,
+        onAniListSignOut = viewModel::signOutOfAniList,
+        onDismissAniListError = viewModel::dismissAniListError,
     )
 }
 
@@ -178,6 +183,9 @@ fun SettingsContent(
     modifier: Modifier = Modifier,
     onRefreshExtensions: () -> Unit = {},
     onSetSeparateKinds: (Boolean) -> Unit = {},
+    onAniListSignIn: () -> Unit = {},
+    onAniListSignOut: () -> Unit = {},
+    onDismissAniListError: () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -215,6 +223,11 @@ fun SettingsContent(
                 item(key = "manga") {
                     Section(title = stringResource(R.string.settings_manga_title)) {
                         MangaSourcesSetting(state.extensions, onRefreshExtensions)
+                    }
+                }
+                item(key = "tracking") {
+                    Section(title = stringResource(R.string.settings_tracking_title)) {
+                        AniListSetting(state, onAniListSignIn, onAniListSignOut, onDismissAniListError)
                     }
                 }
                 item(key = "library") {
@@ -385,6 +398,92 @@ private fun About(versionName: String, birthday: Boolean) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/** The AniList account manga are tracked on. Tapping it signs in, or offers to sign out once signed in. */
+@Composable
+private fun AniListSetting(
+    state: SettingsUiState,
+    onSignIn: () -> Unit,
+    onSignOut: () -> Unit,
+    onDismissError: () -> Unit,
+) {
+    val account = state.aniList
+    val working = state.aniListSignIn in AniListAuth.WORKING
+    var confirmSignOut by rememberSaveable { mutableStateOf(false) }
+
+    SettingRow(
+        leading = { AccountAvatar((account as? AniListAccount.SignedIn)?.avatarUrl) },
+        title = stringResource(R.string.source_anilist),
+        subtitle = when (account) {
+            AniListAccount.SignedOut -> stringResource(R.string.settings_anilist_signed_out)
+            is AniListAccount.SignedIn -> stringResource(R.string.settings_hardcover_signed_in_as, account.username)
+        },
+        modifier = Modifier.clickable(
+            enabled = !working,
+            onClickLabel = stringResource(
+                when (account) {
+                    AniListAccount.SignedOut -> R.string.settings_hardcover_sign_in
+                    is AniListAccount.SignedIn -> R.string.settings_hardcover_sign_out
+                },
+            ),
+            role = Role.Button,
+        ) {
+            when (account) {
+                AniListAccount.SignedOut -> onSignIn()
+                is AniListAccount.SignedIn -> confirmSignOut = true
+            }
+        },
+        trailing = if (working) {
+            { HaloLoadingIndicator(Modifier.size(24.dp)) }
+        } else {
+            null
+        },
+    )
+
+    val error = when (state.aniListSignIn) {
+        AniListAuth.Status.DENIED -> stringResource(R.string.settings_anilist_denied)
+        AniListAuth.Status.OFFLINE -> stringResource(R.string.lookup_error_offline)
+        AniListAuth.Status.REJECTED -> stringResource(R.string.settings_anilist_rejected)
+        AniListAuth.Status.IDLE,
+        AniListAuth.Status.AWAITING_REDIRECT,
+        AniListAuth.Status.EXCHANGING,
+        -> null
+    }
+    if (error != null) {
+        Column(Modifier.padding(start = 60.dp, end = 20.dp, bottom = 8.dp)) {
+            Text(error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            TextButton(onClick = onDismissError, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                Text(stringResource(R.string.action_ok))
+            }
+        }
+    }
+
+    if (confirmSignOut && account is AniListAccount.SignedIn) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            icon = { Icon(painterResource(R.drawable.logout_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+            iconContentColor = MaterialTheme.colorScheme.error,
+            title = { Text(stringResource(R.string.settings_anilist_sign_out_title)) },
+            text = { Text(stringResource(R.string.settings_anilist_sign_out_message)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmSignOut = false
+                        onSignOut()
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(R.string.settings_hardcover_sign_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmSignOut = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
         )
     }
 }

@@ -12,7 +12,7 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-/** What is kept between launches for the Hardcover sign-in. */
+/** What is kept between launches for a sign-in. */
 @Serializable
 data class StoredSession(
     val accessToken: String? = null,
@@ -22,6 +22,8 @@ data class StoredSession(
     val username: String? = null,
     val email: String? = null,
     val avatarUrl: String? = null,
+    /** How the AniList account scores, as AniList names it. */
+    val scoreFormat: String? = null,
     /** State and PKCE verifier of a sign-in that is waiting for the browser to come back. */
     val pendingState: String? = null,
     val pendingVerifier: String? = null,
@@ -34,9 +36,13 @@ data class StoredSession(
  * file lives in the no-backup directory: a restored copy could not be decrypted on another device
  * anyway, and a refresh token should not travel through cloud backups.
  */
-class TokenStore(context: Context) {
+class TokenStore(
+    context: Context,
+    fileName: String = "hardcover_session.bin",
+    private val keyAlias: String = KEY_ALIAS,
+) {
 
-    private val file = File(context.noBackupFilesDir, "hardcover_session.bin")
+    private val file = File(context.noBackupFilesDir, fileName)
     private val json = Json { ignoreUnknownKeys = true }
 
     fun read(): StoredSession {
@@ -74,10 +80,10 @@ class TokenStore(context: Context) {
 
     private fun key(): SecretKey {
         val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
-        (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
+        (keyStore.getKey(keyAlias, null) as? SecretKey)?.let { return it }
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
         generator.init(
-            KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+            KeyGenParameterSpec.Builder(keyAlias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
@@ -86,11 +92,11 @@ class TokenStore(context: Context) {
         return generator.generateKey()
     }
 
-    private companion object {
-        const val KEYSTORE = "AndroidKeyStore"
+    companion object {
+        private const val KEYSTORE = "AndroidKeyStore"
         const val KEY_ALIAS = "kozeki_hardcover_session"
-        const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val IV_BYTES = 12
-        const val TAG_BITS = 128
+        private const val TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val IV_BYTES = 12
+        private const val TAG_BITS = 128
     }
 }

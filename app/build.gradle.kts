@@ -35,6 +35,12 @@ val hardcoverScopes = localProperty(
     "read:catalog read:social read:library:public read:users read:me:content read:me:email",
 )
 
+// AniList OAuth client. The implicit grant has no secret, so the ID is all the app holds.
+val aniListClientId = localProperty("anilist.clientId", "53791")
+
+// Must be the redirect URL registered on the AniList developer client exactly.
+val aniListRedirectUri = URI(localProperty("anilist.redirectUri", "kozeki://oauth/anilist"))
+
 android {
     namespace = "dev.gavenda.kozeki"
     compileSdk {
@@ -45,8 +51,8 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 14
-        versionName = "2.1.4"
+        versionCode = 15
+        versionName = "2.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -54,6 +60,13 @@ android {
         buildConfigField("String", "HARDCOVER_CLIENT_ID", "\"$hardcoverClientId\"")
         buildConfigField("String", "HARDCOVER_REDIRECT_URI", "\"$hardcoverRedirectUri\"")
         buildConfigField("String", "HARDCOVER_SCOPES", "\"$hardcoverScopes\"")
+
+        buildConfigField("String", "ANILIST_CLIENT_ID", "\"$aniListClientId\"")
+        buildConfigField("String", "ANILIST_REDIRECT_URI", "\"$aniListRedirectUri\"")
+
+        manifestPlaceholders["aniListRedirectScheme"] = aniListRedirectUri.scheme
+        manifestPlaceholders["aniListRedirectHost"] = aniListRedirectUri.host.orEmpty()
+        manifestPlaceholders["aniListRedirectPath"] = aniListRedirectUri.path.orEmpty()
 
         manifestPlaceholders["hardcoverRedirectScheme"] = hardcoverRedirectUri.scheme
         manifestPlaceholders["hardcoverRedirectHost"] = hardcoverRedirectUri.host.orEmpty()

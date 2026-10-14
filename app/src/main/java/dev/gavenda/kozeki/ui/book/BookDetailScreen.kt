@@ -96,6 +96,7 @@ import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.data.model.TrackStatus
 import dev.gavenda.kozeki.ui.CaptchaActivity
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.PreviewData
@@ -156,6 +157,8 @@ class BookDetailActions(
     val onReadChapter: (String) -> Unit = {},
     val onSetChaptersRead: (List<String>, Boolean) -> Unit = { _, _ -> },
     val onRetryChapters: () -> Unit = {},
+    val onOpenTrack: () -> Unit = {},
+    val track: TrackSheetActions = TrackSheetActions(),
 )
 
 @Composable
@@ -223,6 +226,15 @@ fun BookDetailScreen(
             onReadChapter = { onReadChapter(bookId, it) },
             onSetChaptersRead = viewModel::setChaptersRead,
             onRetryChapters = viewModel::retryChapters,
+            onOpenTrack = viewModel::openTrackSheet,
+            track = TrackSheetActions(
+                onQueryChange = viewModel::onTrackQueryChange,
+                onSearch = viewModel::searchTrack,
+                onBind = viewModel::bindTrack,
+                onEdit = viewModel::editTrack,
+                onUntrack = viewModel::untrack,
+                onDismiss = viewModel::closeTrackSheet,
+            ),
         )
     }
 
@@ -482,6 +494,9 @@ fun BookDetailContent(
                     item(key = "match") { MatchNoticeCard(notice, state.matching, actions) }
                 }
                 item(key = "about") { AboutSection(book) }
+                state.tracking?.takeIf { owned && (it.signedIn || it.track != null) }?.let { tracking ->
+                    item(key = "tracking") { TrackingRow(tracking, onClick = actions.onOpenTrack) }
+                }
                 state.chapters?.let { chapters ->
                     chaptersSection(
                         state = chapters,
@@ -603,6 +618,7 @@ fun BookDetailContent(
                 onDismiss = { editingNoteId = null },
             )
         }
+        state.tracking?.takeIf { it.sheet.open }?.let { TrackSheet(it, actions.track) }
         if (state.match.open) {
             MatchSheet(
                 state = state.match,
@@ -1477,6 +1493,35 @@ private fun ReviewCard(review: BookReview) {
                 review.likes.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.reviews_likes, it, it) },
             ).joinToString(" · ")
             if (footer.isNotEmpty()) MutedText(footer)
+        }
+    }
+}
+
+/** Where the manga stands on AniList, and the way into the sheet that changes it. */
+@Composable
+private fun TrackingRow(tracking: TrackingUiState, onClick: () -> Unit) {
+    val track = tracking.track
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionTitle(stringResource(R.string.track_title))
+        OutlinedButton(onClick = onClick, shapes = ButtonDefaults.shapes(), modifier = Modifier.fillMaxWidth()) {
+            Text(
+                if (track == null) {
+                    stringResource(R.string.track_add)
+                } else {
+                    listOfNotNull(
+                        stringResource(
+                            when (track.status) {
+                                TrackStatus.CURRENT, TrackStatus.REPEATING -> R.string.track_status_current
+                                TrackStatus.PLANNING -> R.string.track_status_planning
+                                TrackStatus.COMPLETED -> R.string.track_status_completed
+                                TrackStatus.PAUSED -> R.string.track_status_paused
+                                TrackStatus.DROPPED -> R.string.track_status_dropped
+                            },
+                        ),
+                        track.totalChapters?.let { "${track.progress} / $it" } ?: track.progress.toString(),
+                    ).joinToString(" · ")
+                },
+            )
         }
     }
 }

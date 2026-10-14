@@ -68,3 +68,34 @@ enum class ReadOutcome {
     COMPLETED,
     DROPPED,
 }
+
+/** Where a manga stands on the user's AniList, which names its states differently from the app. */
+enum class TrackStatus {
+    CURRENT,
+    PLANNING,
+    COMPLETED,
+    DROPPED,
+    PAUSED,
+    REPEATING,
+    ;
+
+    /** The state of the book that goes with it. */
+    val readingState: ReadingState
+        get() = when (this) {
+            CURRENT, REPEATING -> ReadingState.READING
+            PLANNING -> ReadingState.PLANNED
+            COMPLETED -> ReadingState.COMPLETED
+            DROPPED -> ReadingState.DROPPED
+            PAUSED -> ReadingState.PAUSED
+        }
+
+    companion object {
+        fun of(state: ReadingState): TrackStatus = when (state) {
+            ReadingState.PLANNED -> PLANNING
+            ReadingState.READING -> CURRENT
+            ReadingState.COMPLETED -> COMPLETED
+            ReadingState.DROPPED -> DROPPED
+            ReadingState.PAUSED -> PAUSED
+        }
+    }
+}

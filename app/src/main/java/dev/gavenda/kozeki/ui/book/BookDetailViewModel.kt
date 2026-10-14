@@ -3,6 +3,7 @@ package dev.gavenda.kozeki.ui.book
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.gavenda.kozeki.data.db.MangaTrackEntity
 import dev.gavenda.kozeki.data.manga.MangaChapterRepository
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
@@ -24,6 +25,11 @@ import dev.gavenda.kozeki.data.model.inReadingOrder
 import dev.gavenda.kozeki.data.model.resumeChapter
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.tracking.TrackRepository
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
+import dev.gavenda.kozeki.data.tracking.anilist.AniListMedia
+import dev.gavenda.kozeki.data.tracking.anilist.ScoreFormat
 import dev.gavenda.kozeki.ui.LookupError
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
@@ -86,9 +92,32 @@ data class MangaChaptersUiState(
     val started: Boolean get() = chapters.any { it.read || it.lastPageRead > 0 }
 }
 
+/** The sheet where a manga is bound to its page on AniList and its entry there is looked after. */
+data class TrackSheetUiState(
+    val open: Boolean = false,
+    val query: String = "",
+    val loading: Boolean = false,
+    val results: List<AniListMedia> = emptyList(),
+    /** Something is being sent to AniList. */
+    val working: Boolean = false,
+    val error: LookupError? = null,
+)
+
+/** A manga's place on AniList, for the page of a manga. */
+data class TrackingUiState(
+    /** Somebody is signed in to AniList, which tracking needs. */
+    val signedIn: Boolean = false,
+    val scoreFormat: ScoreFormat = ScoreFormat.POINT_10_DECIMAL,
+    /** Null while the manga is not followed there. */
+    val track: MangaTrackEntity? = null,
+    val sheet: TrackSheetUiState = TrackSheetUiState(),
+)
+
 data class BookDetailUiState(
     /** Null for a book that is not a manga. */
     val chapters: MangaChaptersUiState? = null,
+    /** Null for a book that is not a manga. */
+    val tracking: TrackingUiState? = null,
     val loading: Boolean = true,
     val book: Book? = null,
     val notes: List<Note> = emptyList(),
@@ -124,6 +153,8 @@ class BookDetailViewModel(
     private val settings: SettingsRepository,
     private val mangaChapters: MangaChapterRepository,
     private val scheduleMatching: () -> Unit,
+    private val tracker: TrackRepository,
+    private val aniListAuth: AniListAuth,
 ) : ViewModel() {
 
     private data class Activity(
@@ -144,6 +175,8 @@ class BookDetailViewModel(
     private val match = MutableStateFlow(MatchUiState())
     private val reviews = MutableStateFlow<ReviewsUiState?>(null)
     private val importing = MutableStateFlow(false)
+    private val trackSheet = MutableStateFlow(TrackSheetUiState())
+    private var trackSearchJob: Job? = null
 
     /** Whether the source is being asked for chapters, and how that went. Its list is not in it. */
     private val chaptersStatus = MutableStateFlow(MangaChaptersUiState())
@@ -173,10 +206,19 @@ class BookDetailViewModel(
         ::BookData,
     )
 
+    private val tracking = combine(tracker.observe(bookId), aniListAuth.account, trackSheet) { track, account, sheet ->
+        TrackingUiState(
+            signedIn = account is AniListAccount.SignedIn,
+            scoreFormat = (account as? AniListAccount.SignedIn)?.scoreFormat ?: ScoreFormat.POINT_10_DECIMAL,
+            track = track,
+            sheet = sheet,
+        )
+    }
+
     val uiState: StateFlow<BookDetailUiState> =
         combine(
             bookData,
-            combine(match, reviews, ::Pair),
+            combine(match, reviews, tracking, ::Triple),
             combine(
                 importing,
                 matchService.matching.map { bookId in it },
@@ -186,7 +228,7 @@ class BookDetailViewModel(
             ),
             settings.lastCurrency,
             library.observePurchaseLocations(),
-        ) { data, (matchState, reviewsState), activity, currency, locations ->
+        ) { data, (matchState, reviewsState, trackingState), activity, currency, locations ->
             val (busy, matching) = activity.importing to activity.matching
             BookDetailUiState(
                 loading = false,
@@ -195,6 +237,7 @@ class BookDetailViewModel(
                 } else {
                     null
                 },
+                tracking = trackingState.takeIf { data.book?.isManga == true },
                 book = data.book,
                 notes = data.notes,
                 readThroughs = data.readThroughs,
@@ -213,7 +256,14 @@ class BookDetailViewModel(
         // A manga's chapters are asked for again whenever its page is opened: new ones appear there.
         viewModelScope.launch {
             val book = library.observeBook(bookId).filterNotNull().first()
-            if (book.isManga) refreshChapters()
+            if (book.isManga) {
+                refreshChapters()
+                // What was read on AniList meanwhile; not worth saying anything of when it cannot be asked.
+                try {
+                    tracker.refresh(bookId)
+                } catch (_: MetadataException) {
+                }
+            }
         }
         // Reviews follow the link to the source: matching, re-matching or unlinking the book
         // changes which reviews, if any, belong on the screen.
@@ -254,6 +304,65 @@ class BookDetailViewModel(
                     // A source whose own address is not known is opened at the page the manga was found at.
                     captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: book.sourceUrl },
                 )
+            }
+        }
+    }
+
+    // ---- AniList ----------------------------------------------------------------------------
+
+    fun openTrackSheet() {
+        val book = uiState.value.book ?: return
+        val following = uiState.value.tracking?.track != null
+        trackSheet.value = TrackSheetUiState(open = true, query = book.title)
+        if (!following) searchTrack()
+    }
+
+    fun closeTrackSheet() {
+        trackSearchJob?.cancel()
+        trackSheet.value = TrackSheetUiState()
+    }
+
+    fun onTrackQueryChange(query: String) = trackSheet.update { it.copy(query = query) }
+
+    fun searchTrack() {
+        val query = trackSheet.value.query.trim()
+        if (query.isEmpty()) return
+        trackSearchJob?.cancel()
+        trackSearchJob = viewModelScope.launch {
+            trackSheet.update { it.copy(loading = true, error = null) }
+            try {
+                val results = tracker.search(query)
+                trackSheet.update { it.copy(loading = false, results = results) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: MetadataException) {
+                trackSheet.update { it.copy(loading = false, results = emptyList(), error = LookupError.from(e)) }
+            }
+        }
+    }
+
+    /** Follows the manga as [media]. */
+    fun bindTrack(media: AniListMedia) = changeTrack { tracker.bind(bookId, media) }
+
+    /** Changes the entry: its status, chapters read or score. */
+    fun editTrack(change: (MangaTrackEntity) -> MangaTrackEntity) = changeTrack { tracker.edit(bookId, change) }
+
+    /** Stops following the manga, and takes it off the list on AniList too when [fromList]. */
+    fun untrack(fromList: Boolean) = changeTrack {
+        tracker.unbind(bookId, fromList)
+        trackSheet.value = TrackSheetUiState()
+    }
+
+    private fun changeTrack(work: suspend () -> Unit) {
+        viewModelScope.launch {
+            trackSheet.update { it.copy(working = true, error = null) }
+            try {
+                work()
+                trackSheet.update { it.copy(working = false) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: MetadataException) {
+                trackSheet.update { it.copy(working = false, error = LookupError.from(e)) }
             }
         }
     }

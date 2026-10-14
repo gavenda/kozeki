@@ -11,6 +11,7 @@ import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.data.model.TrackStatus
 import kotlinx.serialization.Serializable
 
 /**
@@ -246,4 +247,31 @@ data class MetadataCacheEntity(
     val payload: String,
     val fetchedAt: Long,
     val expiresAt: Long,
+)
+
+/** A manga as it stands on the user's AniList. The progress and status here are what AniList was last told or told us. */
+@Entity(tableName = "manga_tracks")
+@Serializable
+data class MangaTrackEntity(
+    @PrimaryKey val bookId: String,
+    /** The manga's ID on AniList. */
+    val mediaId: Long,
+    /** The user's list entry for it, once there is one. */
+    val entryId: Long? = null,
+    /** The title AniList knows it by. */
+    val title: String,
+    val siteUrl: String? = null,
+    /** Null while its publication is going on and AniList does not know the end. */
+    val totalChapters: Int? = null,
+    val status: TrackStatus = TrackStatus.PLANNING,
+    /** The highest chapter read, as a whole number. */
+    val progress: Int = 0,
+    /** 0 to 100 whatever scale the account shows, 0 for none. */
+    val score: Int = 0,
+    /** Epoch day. */
+    val startedOn: Long? = null,
+    val completedOn: Long? = null,
+    /** AniList has not been told the latest, because it could not be reached. */
+    val pendingPush: Boolean = false,
+    @Embedded val sync: SyncStamp,
 )

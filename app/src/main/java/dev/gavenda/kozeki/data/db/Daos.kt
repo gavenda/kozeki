@@ -174,6 +174,22 @@ interface MangaChapterDao {
 }
 
 @Dao
+interface MangaTrackDao {
+
+    @Query("SELECT * FROM manga_tracks WHERE bookId = :bookId AND deletedAt IS NULL")
+    fun observe(bookId: String): Flow<MangaTrackEntity?>
+
+    @Query("SELECT * FROM manga_tracks WHERE bookId = :bookId AND deletedAt IS NULL")
+    suspend fun get(bookId: String): MangaTrackEntity?
+
+    @Query("SELECT * FROM manga_tracks WHERE pendingPush = 1 AND deletedAt IS NULL")
+    suspend fun pending(): List<MangaTrackEntity>
+
+    @Upsert
+    suspend fun upsert(track: MangaTrackEntity)
+}
+
+@Dao
 interface ReadThroughDao {
 
     @Query("SELECT * FROM read_throughs WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY number DESC")
@@ -377,6 +393,15 @@ interface BackupDao {
 
     @Query("SELECT * FROM manga_chapters WHERE deletedAt IS NULL")
     suspend fun mangaChapters(): List<MangaChapterEntity>
+
+    @Query("SELECT * FROM manga_tracks WHERE deletedAt IS NULL")
+    suspend fun mangaTracks(): List<MangaTrackEntity>
+
+    @Query("DELETE FROM manga_tracks")
+    suspend fun clearMangaTracks()
+
+    @Upsert
+    suspend fun putMangaTracks(rows: List<MangaTrackEntity>)
 
     @Query("DELETE FROM books")
     suspend fun clearBooks()

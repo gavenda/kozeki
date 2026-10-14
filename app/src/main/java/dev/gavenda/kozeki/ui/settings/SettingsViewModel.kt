@@ -13,6 +13,8 @@ import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.repository.StatsRepository
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.ui.isUiBirthday
@@ -32,6 +34,8 @@ data class SettingsUiState(
     val signIn: HardcoverSignIn.Status = HardcoverSignIn.Status.IDLE,
     /** Shown so a mismatch with what is registered on Hardcover is easy to spot. */
     val hardcoverRedirectUri: String = "",
+    val aniList: AniListAccount = AniListAccount.SignedOut,
+    val aniListSignIn: AniListAuth.Status = AniListAuth.Status.IDLE,
     val backup: DriveBackupState = DriveBackupState(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dailyGoalMinutes: Int = SettingsRepository.DEFAULT_DAILY_GOAL_MINUTES,
@@ -52,12 +56,21 @@ sealed interface SettingsEvent {
     data class OpenBrowser(val uri: Uri) : SettingsEvent
 }
 
+/** What the screen reads from the sources of manga and the tracker, held together to be combined. */
+private data class LibrarySettings(
+    val extensions: List<MangaExtension>?,
+    val separateKinds: Boolean,
+    val aniList: AniListAccount,
+    val aniListSignIn: AniListAuth.Status,
+)
+
 class SettingsViewModel(
     private val settings: SettingsRepository,
     private val metadata: MetadataRepository,
     private val stats: StatsRepository,
     private val hardcoverAuth: HardcoverAuth,
     private val hardcoverSignIn: HardcoverSignIn,
+    private val aniListAuth: AniListAuth,
     private val driveBackup: DriveBackup,
     private val mangaSources: MangaSources,
     versionName: String,
@@ -72,18 +85,30 @@ class SettingsViewModel(
     private val accounts = combine(hardcoverAuth.account, hardcoverSignIn.status, driveBackup.state, ::Triple)
 
     val uiState: StateFlow<SettingsUiState> = combine(
-        combine(accounts, combine(mangaSources.extensions, settings.separateLibraryKinds, ::Pair), ::Pair),
+        combine(
+            accounts,
+            combine(
+                mangaSources.extensions,
+                settings.separateLibraryKinds,
+                aniListAuth.account,
+                aniListAuth.status,
+                ::LibrarySettings,
+            ),
+            ::Pair,
+        ),
         settings.themeMode,
         settings.dailyGoalMinutes,
         stats.observeYearlyGoal(today.year),
         metadata.observeCacheSize(),
     ) { (accountsState, mangaState), themeMode, dailyGoal, yearlyGoal, cached ->
         val (hardcover, signIn, backup) = accountsState
-        val (extensions, separateKinds) = mangaState
+        val (extensions, separateKinds, aniList, aniListSignIn) = mangaState
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
             hardcoverRedirectUri = hardcoverAuth.redirectUri,
+            aniList = aniList,
+            aniListSignIn = aniListSignIn,
             backup = backup,
             themeMode = themeMode,
             dailyGoalMinutes = dailyGoal,
@@ -122,13 +147,26 @@ class SettingsViewModel(
     }
 
     /** The screen is in front again, with or without the browser having redirected back. */
-    fun onResumed() = hardcoverSignIn.browserClosed()
+    fun onResumed() {
+        hardcoverSignIn.browserClosed()
+        aniListAuth.browserClosed()
+    }
 
     fun dismissSignInError() = hardcoverSignIn.dismissFailure()
 
     fun signOut() {
         viewModelScope.launch { hardcoverAuth.signOut() }
     }
+
+    fun signInToAniList() {
+        eventChannel.trySend(SettingsEvent.OpenBrowser(aniListAuth.beginSignIn()))
+    }
+
+    fun signOutOfAniList() {
+        viewModelScope.launch { aniListAuth.signOut() }
+    }
+
+    fun dismissAniListError() = aniListAuth.dismissFailure()
 
     fun signInToDrive() = driveBackup.signIn()
 

@@ -49,7 +49,9 @@ fun statisticsViewModel(initialDate: LocalDate?) = StatisticsViewModel(koin.get(
 fun foundBookViewModel(result: BookMetadata) = FoundBookViewModel(result, koin.get(), koin.get(), koin.get())
 
 fun bookDetailViewModel(bookId: String) =
-    BookDetailViewModel(bookId, koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching())
+    BookDetailViewModel(
+        bookId, koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), koin.get(), koin.get(),
+    )
 
 fun readerViewModel(bookId: String) = ReaderViewModel(
     bookId,
@@ -77,6 +79,7 @@ fun settingsViewModel() = SettingsViewModel(
     stats = koin.get(),
     hardcoverAuth = koin.get(),
     hardcoverSignIn = koin.get(),
+    aniListAuth = koin.get(),
     driveBackup = koin.get(),
     mangaSources = koin.get(),
     versionName = BuildConfig.VERSION_NAME,

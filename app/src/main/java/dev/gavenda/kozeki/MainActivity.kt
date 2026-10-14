@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.data.files.IncomingEpubs
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
+import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.ui.KozekiApp
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity(), KoinComponent {
 
     private val hardcoverAuth: HardcoverAuth by inject()
     private val hardcoverSignIn: HardcoverSignIn by inject()
+    private val aniListAuth: AniListAuth by inject()
     private val incomingEpubs: IncomingEpubs by inject()
     private val settings: SettingsRepository by inject()
 
@@ -79,6 +81,8 @@ class MainActivity : ComponentActivity(), KoinComponent {
         val uri = intent?.data ?: return
         if (intent.action == Intent.ACTION_VIEW && hardcoverAuth.isRedirect(uri)) {
             hardcoverSignIn.complete(uri)
+        } else if (intent.action == Intent.ACTION_VIEW && aniListAuth.isRedirect(uri)) {
+            aniListAuth.complete(uri)
         }
     }
 

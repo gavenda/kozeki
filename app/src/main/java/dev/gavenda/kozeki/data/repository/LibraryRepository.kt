@@ -51,6 +51,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
@@ -72,6 +75,11 @@ class LibraryRepository(
     private val notes = db.noteDao()
     private val mangaChapters = db.mangaChapterDao()
     private val importLock = Mutex()
+
+    private val _stateChanges = MutableSharedFlow<Pair<String, ReadingState>>(extraBufferCapacity = 16)
+
+    /** A book and the state it was just asked to be in, which is how a tracker hears of the user's choices. */
+    val stateChanges: SharedFlow<Pair<String, ReadingState>> = _stateChanges.asSharedFlow()
 
     init {
         appScope.launch {
@@ -596,6 +604,7 @@ class LibraryRepository(
                 ),
             )
         }
+        _stateChanges.tryEmit(bookId to newState)
     }
 
     /** Starts a new read-through from the beginning, leaving earlier ones and their sessions intact. */
