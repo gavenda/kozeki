@@ -34,6 +34,14 @@ class NetworkHelper(
                 maxSize = 5L * 1024 * 1024, // 5 MiB
             ),
         )
+        // Extensions make their requests with the library's default `Cache-Control: max-age=600`, which some
+        // Cloudflare zones answer with a challenge a browser would never be shown. The cache has read it by the
+        // time a network interceptor runs, so it only has to stay off the wire.
+        .addNetworkInterceptor { chain ->
+            val request = chain.request()
+            val maxAge = request.header("Cache-Control")?.startsWith("max-age=") == true
+            chain.proceed(if (maxAge) request.newBuilder().removeHeader("Cache-Control").build() else request)
+        }
         .addInterceptor(UncaughtExceptionInterceptor())
         .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
 
