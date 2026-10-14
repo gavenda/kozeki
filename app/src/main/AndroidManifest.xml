@@ -93,6 +93,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.CaptchaActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.settings.SourcePreferencesActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

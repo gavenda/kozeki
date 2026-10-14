@@ -35,7 +35,7 @@ sealed interface MangaReaderUiState {
     data object Loading : MangaReaderUiState
 
     /** [error] is null when the book or the chapter is no longer there. */
-    data class Failed(val error: LookupError?) : MangaReaderUiState
+    data class Failed(val error: LookupError?, val captchaUrl: String? = null) : MangaReaderUiState
 
     data class Ready(
         val bookTitle: String,
@@ -67,7 +67,7 @@ private data class Unsaved(val chapterUrl: String, val page: Int, val pageCount:
 
 class MangaReaderViewModel(
     private val bookId: String,
-    private val initialChapterUrl: String,
+    initialChapterUrl: String,
     private val library: LibraryRepository,
     private val chapters: MangaChapterRepository,
     private val pages: MangaPages,
@@ -303,7 +303,7 @@ class MangaReaderViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: MetadataException) {
-                _uiState.value = MangaReaderUiState.Failed(LookupError.from(e))
+                _uiState.value = MangaReaderUiState.Failed(LookupError.from(e), (e as? MetadataException.Captcha)?.url)
                 return@launch
             }
 

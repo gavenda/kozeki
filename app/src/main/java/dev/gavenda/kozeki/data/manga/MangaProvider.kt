@@ -34,32 +34,32 @@ class MangaProvider(
     }
 
     /** A blank [query] lists what the source finds most popular. */
-    override suspend fun search(query: String, page: Int): BookPage = guardSource {
+    override suspend fun search(query: String, page: Int): BookPage = guardSource(site = { pickedSource().id.let { sources.siteOf(it) } }) {
         val source = pickedSource()
         val result = if (query.isBlank()) {
             source.getPopularManga(page)
         } else {
             source.getSearchManga(page, query.trim(), source.getFilterList())
         }
-        BookPage(books = result.mangas.map { it.toMetadata(source) }, hasMore = result.hasNextPage)
+        BookPage(books = result.mangas.filter { it.hasUrl() }.map { it.toMetadata(source) }, hasMore = result.hasNextPage)
     }
 
     override suspend fun findByIsbn(isbn13: String): List<BookMetadata> = emptyList()
 
-    override suspend fun book(sourceId: String): BookMetadata? = guardSource {
+    override suspend fun book(sourceId: String): BookMetadata? = guardSource(site = { parseSourceId(sourceId)?.let { sources.siteOf(it.first) } }) {
         val (id, url) = parseSourceId(sourceId) ?: return@guardSource null
         val source = sources.get(id) ?: return@guardSource null
         val stub = SManga.create().apply { this.url = url }
         val update = source.getMangaUpdate(stub, emptyList(), fetchDetails = true, fetchChapters = false)
         // Some sources hand back details without the fields they were asked about.
-        update.manga.also { if (it.url.isEmpty()) it.url = url }.toMetadata(source)
+        update.manga.withUrl(url).toMetadata(source)
     }
 
     override suspend fun author(authorId: String, page: Int): AuthorPage = AuthorPage()
 
     override suspend fun reviews(sourceId: String): BookReviews = BookReviews()
 
-    private suspend fun searchable(): List<CatalogueSource> =
+    private fun searchable(): List<CatalogueSource> =
         sources.extensions.value.orEmpty().filterIsInstance<LoadedExtension>().flatMap { it.sources }
 
     /** The source the user picked, or the first one while that is not installed or nothing was picked. */
@@ -93,6 +93,12 @@ class MangaProvider(
                 .filter { it.isNotEmpty() }
                 .distinct()
 
+        /** Extensions that build a manga without a URL leave it unset, and reading it then throws. */
+        fun SManga.hasUrl(): Boolean = runCatching { url.isNotEmpty() }.getOrDefault(false)
+
+        /** This manga with [fallback] as its URL when the source left it unset or empty. */
+        fun SManga.withUrl(fallback: String): SManga = also { if (!it.hasUrl()) it.url = fallback }
+
         fun SManga.toMetadata(source: CatalogueSource): BookMetadata = BookMetadata(
             source = MetadataSource.MANGA,
             sourceId = sourceId(source.id, url),
@@ -110,22 +116,61 @@ class MangaProvider(
 
 private const val TAG = "MangaSource"
 
-/** Extensions fail in their own ways. Whatever one throws is put in terms the lookup screens know. */
-internal suspend fun <T> guardSource(block: suspend () -> T): T = try {
+/** The address a captcha of [sourceId] is solved at: its site, when it is a web one. */
+internal suspend fun MangaSources.siteOf(sourceId: Long): String? {
+    val source = get(sourceId)
+    val url = (source as? HttpSource)?.let { runCatching { it.baseUrl }.getOrNull() }?.takeIf { it.isNotBlank() }
+    if (url == null) Log.w(TAG, "No site address for source $sourceId (${source?.let { it::class.java.name }})")
+    return url
+}
+
+/** Whether [e], or what caused it, says that the site wants a captcha solved. */
+private fun isCaptcha(e: Throwable): Boolean = generateSequence(e) { it.cause }.take(6).any {
+    (it is HttpException && (it.code == 403 || it.code == 503)) ||
+        it.message.orEmpty().let { m ->
+            m.contains("captcha", ignoreCase = true) ||
+                m.contains("cloudflare", ignoreCase = true) ||
+                m.contains("webview", ignoreCase = true)
+        }
+}
+
+/**
+ * Extensions fail in their own ways. Whatever one throws is put in terms the lookup screens know.
+ * [site] says where a captcha is solved, and is only asked when one is wanted.
+ */
+internal suspend fun <T> guardSource(site: suspend () -> String? = { null }, block: suspend () -> T): T = try {
     block()
 } catch (e: CancellationException) {
     throw e
 } catch (e: MetadataException) {
     throw e
-} catch (e: HttpException) {
-    Log.w(TAG, "A manga source answered HTTP ${e.code}", e)
-    throw if (e.code == 429) MetadataException.RateLimited() else MetadataException.Server(e.code, e.message.orEmpty())
-} catch (e: IOException) {
-    Log.w(TAG, "A manga source could not be reached", e)
-    throw MetadataException.Network(e)
 } catch (e: Exception) {
-    Log.w(TAG, "A manga source failed", e)
-    throw MetadataException.Server(0, "${e::class.simpleName}: ${e.message}")
+    if (isCaptcha(e)) {
+        Log.w(TAG, "A manga source wants a captcha solved", e)
+        val url = try {
+            site()
+        } catch (c: CancellationException) {
+            throw c
+        } catch (t: Throwable) {
+            Log.w(TAG, "No site address for the captcha", t)
+            null
+        }
+        throw MetadataException.Captcha(url)
+    }
+    when (e) {
+        is HttpException -> {
+            Log.w(TAG, "A manga source answered HTTP ${e.code}", e)
+            throw if (e.code == 429) MetadataException.RateLimited() else MetadataException.Server(e.code, e.message.orEmpty())
+        }
+        is IOException -> {
+            Log.w(TAG, "A manga source could not be reached", e)
+            throw MetadataException.Network(e)
+        }
+        else -> {
+            Log.w(TAG, "A manga source failed", e)
+            throw MetadataException.Server(0, "${e::class.simpleName}: ${e.message}")
+        }
+    }
 } catch (e: LinkageError) {
     // An extension built against an API this app does not have.
     Log.w(TAG, "A manga source does not fit this app", e)

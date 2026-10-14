@@ -5,6 +5,7 @@ import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.db.MangaChapterEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
 import dev.gavenda.kozeki.data.manga.MangaProvider.Companion.toMetadata
+import dev.gavenda.kozeki.data.manga.MangaProvider.Companion.withUrl
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataProvider
@@ -52,7 +53,7 @@ class MangaChapterRepository(
         memo: String?,
         details: Boolean = false,
         chapters: Boolean = true,
-    ): Update = guardSource {
+    ): Update = guardSource(site = { MangaProvider.mihonSourceOf(sourceId)?.let { sources.siteOf(it) } }) {
         val (id, url) = MangaProvider.parseSourceId(sourceId)
             ?: throw MetadataException.Server(0, "Not a manga: $sourceId")
         // A manga whose extension was removed can be browsed but not asked for chapters.
@@ -66,7 +67,7 @@ class MangaChapterRepository(
         updateLocks.getOrPut(sourceId) { Mutex() }.withLock {
             val update = source.getMangaUpdate(stub, emptyList(), fetchDetails = details, fetchChapters = chapters)
             Update(
-                details = if (details) update.manga.also { if (it.url.isEmpty()) it.url = url }.toMetadata(source) else null,
+                details = if (details) update.manga.withUrl(url).toMetadata(source) else null,
                 chapters = if (chapters) update.chapters else null,
             )
         }

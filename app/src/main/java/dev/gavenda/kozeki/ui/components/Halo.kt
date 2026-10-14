@@ -3,6 +3,7 @@ package dev.gavenda.kozeki.ui.components
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -60,6 +61,10 @@ fun HaloMark(
  * The halo at work, shown while something loads. It stands in for the stock loading indicator and
  * is the same 48dp unless given another size.
  *
+ * With a [progress], from 0 to 1, the hands stop wandering and show how far along it is: the
+ * first goes round once as the work is done, the second kept a quarter turn ahead of it. While
+ * [progress] is null, or has no value yet, it is the plain wait. The rings drift either way.
+ *
  * The rings drift one way while the hands go round the other, as a clock's would: with each
  * quarter turn of the first, the second laps it once. Every quarter turn so ends on the halo as it
  * is at rest, only turned.
@@ -68,7 +73,10 @@ fun HaloMark(
 fun HaloLoadingIndicator(
     modifier: Modifier = Modifier,
     glow: Boolean = false,
+    progress: (() -> Float?)? = null,
 ) {
+    val known = progress?.invoke()?.coerceIn(0f, 1f)
+    val shown = animateFloatAsState(known ?: 0f, label = "progress")
     val transition = rememberInfiniteTransition(label = "halo")
     val quarterTurns = transition.animateFloat(
         initialValue = 0f,
@@ -82,10 +90,16 @@ fun HaloLoadingIndicator(
         glow = glow,
         dial = true,
         ringDegrees = { -90f * quarterTurns.value },
-        firstHandDegrees = { 90f * (floor(quarterTurns.value) + quarterTurnProgress(quarterTurns.value)) },
+        firstHandDegrees = {
+            if (known != null) 360f * shown.value
+            else 90f * (floor(quarterTurns.value) + quarterTurnProgress(quarterTurns.value))
+        },
         secondHandDegrees = {
-            val progress = quarterTurnProgress(quarterTurns.value)
-            90f + 90f * (floor(quarterTurns.value) + progress) + 360f * progress
+            if (known != null) 360f * shown.value + 90f
+            else {
+                val turn = quarterTurnProgress(quarterTurns.value)
+                90f + 90f * (floor(quarterTurns.value) + turn) + 360f * turn
+            }
         },
     )
 }

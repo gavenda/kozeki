@@ -39,6 +39,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import eu.kanade.tachiyomi.network.JavaScriptEngine
 import eu.kanade.tachiyomi.network.NetworkHelper
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
 import nl.adaptivity.xmlutil.XmlDeclMode
@@ -54,6 +55,7 @@ import uy.kohesive.injekt.api.addSingletonFactory
 private const val USER_AGENT = "Kozeki/${BuildConfig.VERSION_NAME} (Android)"
 
 /** The app's dependency graph. Singles are created lazily and live as long as the process. */
+@OptIn(ExperimentalSerializationApi::class)
 fun appModule(app: Application) = module {
     single { app }
     single<Context> { app }
@@ -177,6 +179,7 @@ fun appModule(app: Application) = module {
  * they cannot see Koin. This hands them the few types the extension API promises, each resolved
  * from Koin on first use so there is still only one instance. Call it before any extension loads.
  */
+@OptIn(ExperimentalSerializationApi::class)
 fun Koin.exposeToExtensions() {
     val koin = this
     Injekt.addSingletonFactory<Application> { koin.get() }

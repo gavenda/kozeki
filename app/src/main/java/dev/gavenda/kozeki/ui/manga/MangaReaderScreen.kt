@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.ui.manga
 
+import dev.gavenda.kozeki.data.metadata.MetadataException
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -67,9 +68,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.ui.CaptchaActivity
 import dev.gavenda.kozeki.data.manga.MangaChapterPages
 import dev.gavenda.kozeki.data.manga.MangaReadingMode
+import dev.gavenda.kozeki.data.manga.PageImages
 import dev.gavenda.kozeki.data.model.MangaChapter
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
@@ -118,6 +122,8 @@ private fun MangaReaderLoading() {
 
 @Composable
 private fun MangaReaderFailed(state: MangaReaderUiState.Failed, onBack: () -> Unit, onRetry: () -> Unit) {
+    // Once the captcha is solved the chapter is asked for again.
+    val solve = rememberLauncherForActivityResult(CaptchaActivity.Contract()) { solved -> if (solved) onRetry() }
     Surface(Modifier.fillMaxSize()) {
         Box(contentAlignment = Alignment.Center) {
             EmptyState(
@@ -127,7 +133,11 @@ private fun MangaReaderFailed(state: MangaReaderUiState.Failed, onBack: () -> Un
                 message = stringResource(state.error?.message ?: R.string.manga_reader_chapter_missing),
                 action = {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (state.error != null) {
+                        if (state.captchaUrl != null) {
+                            Button(onClick = { solve.launch(state.captchaUrl) }) {
+                                Text(stringResource(R.string.action_open_webview))
+                            }
+                        } else if (state.error != null) {
                             FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
                         }
                         Button(onClick = onBack) { Text(stringResource(R.string.action_back)) }
@@ -184,7 +194,7 @@ private fun MangaReaderReady(state: MangaReaderUiState.Ready, viewModel: MangaRe
         val reached: () -> Pair<String, Int> = {
             val info = listState.layoutInfo
             val first = info.visibleItemsInfo.firstOrNull()?.let { itemsByKey[it.key] }
-            var chapter = first?.chapter ?: latest.chapter.url
+            val chapter = first?.chapter ?: latest.chapter.url
             var at = first?.page ?: 0
             // The last item of this chapter in view, which is not the last in view when the next chapter has begun.
             val visible = info.visibleItemsInfo.lastOrNull { itemsByKey[it.key]?.chapter == chapter }
@@ -267,6 +277,7 @@ private fun MangaReaderReady(state: MangaReaderUiState.Ready, viewModel: MangaRe
                         StripRow(
                             item = item,
                             widthPx = widthPx,
+                            progress = strip::progressOf,
                             onRetry = { chapter, page ->
                                 state.segments.firstOrNull { it.chapter.url == chapter }?.pages?.retry(page)
                             },
@@ -332,6 +343,9 @@ private fun rememberPageImage(file: File): State<Boolean> =
 
 /** Whether the image is more than twice as tall as it is wide. Only its size is read. */
 private fun isTall(file: File): Boolean {
+    PageImages.sniff(file)?.let { format ->
+        return PageImages.size(file, format)?.let { it.height > it.width * 2 } ?: false
+    }
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(file.path, bounds)
     return bounds.outWidth > 0 && bounds.outHeight > bounds.outWidth * 2
@@ -343,9 +357,14 @@ private fun FramedPage(pages: MangaChapterPages, index: Int, onTap: (Float) -> U
     val state by pages.state(index).collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (val loaded = state) {
-            MangaChapterPages.State.Queue, MangaChapterPages.State.Loading -> HaloLoadingIndicator()
+            MangaChapterPages.State.Queue -> HaloLoadingIndicator()
+            is MangaChapterPages.State.Loading -> HaloLoadingIndicator(progress = { loaded.progress })
             is MangaChapterPages.State.Error ->
-                PageFailed(onRetry = { pages.retry(index) }, modifier = Modifier.fillMaxSize())
+                PageFailed(
+                    onRetry = { pages.retry(index) },
+                    captchaUrl = (loaded.cause as? MetadataException.Captcha)?.url,
+                    modifier = Modifier.fillMaxSize(),
+                )
 
             is MangaChapterPages.State.Ready -> {
                 val tall by rememberPageImage(loaded.file)
@@ -365,7 +384,8 @@ private fun FramedPage(pages: MangaChapterPages, index: Int, onTap: (Float) -> U
 }
 
 @Composable
-private fun PageFailed(onRetry: () -> Unit, modifier: Modifier = Modifier) {
+private fun PageFailed(onRetry: () -> Unit, captchaUrl: String?, modifier: Modifier = Modifier) {
+    val solve = rememberLauncherForActivityResult(CaptchaActivity.Contract()) { solved -> if (solved) onRetry() }
     Column(
         modifier = modifier.padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
@@ -377,7 +397,9 @@ private fun PageFailed(onRetry: () -> Unit, modifier: Modifier = Modifier) {
             color = Color.White,
             textAlign = TextAlign.Center,
         )
-        OutlinedButton(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+        OutlinedButton(onClick = { if (captchaUrl != null) solve.launch(captchaUrl) else onRetry() }) {
+            Text(stringResource(if (captchaUrl != null) R.string.action_open_webview else R.string.action_retry))
+        }
     }
 }
 

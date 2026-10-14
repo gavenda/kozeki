@@ -1,5 +1,7 @@
 package dev.gavenda.kozeki.ui.addbook
 
+import dev.gavenda.kozeki.ui.CaptchaActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -207,6 +209,9 @@ fun AddBookContent(
                     )
                 }
 
+                val solveCaptcha = rememberLauncherForActivityResult(CaptchaActivity.Contract()) { solved ->
+                    if (solved) onSearch()
+                }
                 val results = state.results
                 when {
                     state.loading -> Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
@@ -230,7 +235,13 @@ fun AddBookContent(
                         icon = painterResource(R.drawable.error_fill_48px),
                         title = stringResource(R.string.add_book_error_title),
                         message = stringResource(state.error.message),
-                        action = if (state.error in SetupErrors) {
+                        action = if (state.captchaUrl != null) {
+                            {
+                                Button(onClick = { solveCaptcha.launch(state.captchaUrl) }) {
+                                    Text(stringResource(R.string.action_open_webview))
+                                }
+                            }
+                        } else if (state.error in SetupErrors) {
                             { Button(onClick = onOpenSettings) { Text(stringResource(R.string.settings_title)) } }
                         } else {
                             null

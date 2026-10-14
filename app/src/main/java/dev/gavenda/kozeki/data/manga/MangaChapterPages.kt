@@ -31,14 +31,15 @@ class MangaChapterPages internal constructor(
     sealed interface State {
         /** Not asked for yet, or put back after being dropped. */
         data object Queue : State
-        data object Loading : State
+        /** [progress] is how much of the page has come, from 0 to 1, or null while that cannot be told. */
+        data class Loading(val progress: Float? = null) : State
         data class Ready(val file: File) : State
         data class Error(val cause: Throwable) : State
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val states = refs.map { ref ->
-        MutableStateFlow<State>(store.cached(ref)?.let(State::Ready) ?: State.Queue)
+        MutableStateFlow(store.cached(ref)?.let(State::Ready) ?: State.Queue)
     }
     private val downloads = ConcurrentHashMap<Int, Job>()
     private val chunkLock = Any()
@@ -129,8 +130,8 @@ class MangaChapterPages internal constructor(
                 state.value = State.Ready(it)
                 return
             }
-            state.value = State.Loading
-            state.value = State.Ready(store.file(refs[index]))
+            state.value = State.Loading()
+            state.value = State.Ready(store.file(refs[index]) { state.value = State.Loading(it) })
         } catch (e: CancellationException) {
             // Every page turn drops the chain before it, so a dropped page is not a failed one.
             state.value = State.Queue

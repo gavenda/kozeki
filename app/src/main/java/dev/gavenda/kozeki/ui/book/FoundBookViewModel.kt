@@ -147,7 +147,10 @@ class FoundBookViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: MetadataException) {
-                MangaChaptersUiState(error = LookupError.from(e))
+                MangaChaptersUiState(
+                    error = LookupError.from(e),
+                    captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: result.infoUrl },
+                )
             }
         }
     }

@@ -23,6 +23,8 @@ enum class LookupError(@param:StringRes val message: Int) {
 
     /** Signed in, but before the app asked for what this lookup needs. */
     MISSING_PERMISSION(R.string.lookup_error_missing_permission),
+    /** The site wants a captcha solved in a WebView before it answers. */
+    CAPTCHA(R.string.lookup_error_captcha),
     OTHER(R.string.lookup_error_other),
     ;
 
@@ -30,6 +32,7 @@ enum class LookupError(@param:StringRes val message: Int) {
         fun from(error: Throwable): LookupError = when (error) {
             is MetadataException.Network -> OFFLINE
             is MetadataException.RateLimited -> RATE_LIMITED
+            is MetadataException.Captcha -> CAPTCHA
             is MetadataException.Unauthorized -> UNAUTHORIZED
             is MetadataException.KeyRejected -> KEY_REJECTED
             is MetadataException.MissingScope -> MISSING_PERMISSION

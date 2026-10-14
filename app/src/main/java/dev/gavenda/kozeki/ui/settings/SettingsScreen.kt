@@ -304,11 +304,14 @@ internal fun SettingRow(
     )
 }
 
-/** A [SettingRow] whose [leading] slot is not a plain icon. It is laid out in the icon's 24dp box. */
+/**
+ * A [SettingRow] whose [leading] slot is not a plain icon. It is laid out in the icon's 24dp box,
+ * and without one there is no box, so the text starts at the edge.
+ */
 @Composable
 internal fun SettingRow(
-    leading: @Composable () -> Unit,
     title: String,
+    leading: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     trailing: (@Composable () -> Unit)? = null,
@@ -318,7 +321,7 @@ internal fun SettingRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { leading() }
+        if (leading != null) Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { leading() }
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             if (subtitle != null) {

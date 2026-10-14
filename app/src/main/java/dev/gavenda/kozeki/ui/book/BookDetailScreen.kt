@@ -85,6 +85,7 @@ import dev.gavenda.kozeki.data.model.Note
 import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.ui.CaptchaActivity
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
@@ -726,8 +727,15 @@ private fun LazyListScope.chaptersSection(
         state.chapters.isEmpty() && state.error != null -> item(key = "chapters-status") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 MutedText(stringResource(state.error.message))
-                OutlinedButton(onClick = actions.onRetryChapters, shapes = ButtonDefaults.shapes()) {
-                    Text(stringResource(R.string.action_retry))
+                val solve = rememberLauncherForActivityResult(CaptchaActivity.Contract()) { solved ->
+                    if (solved) actions.onRetryChapters()
+                }
+                val captchaUrl = state.captchaUrl
+                OutlinedButton(
+                    onClick = { if (captchaUrl != null) solve.launch(captchaUrl) else actions.onRetryChapters() },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(if (captchaUrl != null) R.string.action_open_webview else R.string.action_retry))
                 }
             }
         }
@@ -761,7 +769,13 @@ private fun LazyListScope.chaptersSection(
                 item(key = "chapters-stale") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.weight(1f)) { MutedText(stringResource(state.error.message)) }
-                        TextButton(onClick = actions.onRetryChapters) { Text(stringResource(R.string.action_retry)) }
+                        val solve = rememberLauncherForActivityResult(CaptchaActivity.Contract()) { solved ->
+                            if (solved) actions.onRetryChapters()
+                        }
+                        val captchaUrl = state.captchaUrl
+                        TextButton(onClick = { if (captchaUrl != null) solve.launch(captchaUrl) else actions.onRetryChapters() }) {
+                            Text(stringResource(if (captchaUrl != null) R.string.action_open_webview else R.string.action_retry))
+                        }
                     }
                 }
             }

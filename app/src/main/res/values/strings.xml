@@ -252,6 +252,11 @@
     <string name="lookup_error_key_rejected">Google Books refused the API key this build of Kozeki was made with.</string>
     <string name="lookup_error_missing_permission">Kozeki has not been given access to this yet. Sign out of Hardcover in Settings and sign in again to allow it.</string>
     <string name="lookup_error_no_extensions">No manga source is installed on this device. Install a Mihon extension and its sources show up here.</string>
+    <string name="lookup_error_captcha">The site wants a captcha solved before it answers. Open it in a WebView, solve it, then try again.</string>
+    <string name="captcha_title">Solve the captcha</string>
+    <string name="captcha_done">Done</string>
+    <string name="captcha_continue">Continue</string>
+    <string name="action_open_webview">Open in WebView</string>
     <string name="lookup_error_other">The lookup failed. Try again later.</string>
 
     <!-- Reviews -->

@@ -42,6 +42,8 @@ data class AddBookUiState(
     val canLoadMore: Boolean = false,
     val loadingMore: Boolean = false,
     val error: LookupError? = null,
+    /** Where the captcha the source asks for is solved, when that is why [error] is set. */
+    val captchaUrl: String? = null,
     /** The results already among the user's own books, by source ID, so their rows can show it. */
     val owned: Map<String, Book> = emptyMap(),
     /** The manga sources the installed extensions provide. Only searched when [source] is manga. */
@@ -167,7 +169,7 @@ class AddBookViewModel(
             delay(debounceMs.milliseconds)
             searched = query
             val source = _uiState.value.source
-            _uiState.update { it.copy(loading = true, error = null) }
+            _uiState.update { it.copy(loading = true, error = null, captchaUrl = null) }
             try {
                 // A bare ISBN gets an exact lookup instead of a text search.
                 val isbn = if (source == MetadataSource.MANGA) null else Isbn.toIsbn13(query)
@@ -177,7 +179,13 @@ class AddBookViewModel(
                 _uiState.update { it.copy(loading = false, results = results, canLoadMore = search?.hasMore == true) }
             } catch (e: MetadataException) {
                 _uiState.update {
-                    it.copy(loading = false, results = null, canLoadMore = false, error = LookupError.from(e))
+                    it.copy(
+                        loading = false,
+                        results = null,
+                        canLoadMore = false,
+                        error = LookupError.from(e),
+                        captchaUrl = (e as? MetadataException.Captcha)?.url,
+                    )
                 }
             }
         }

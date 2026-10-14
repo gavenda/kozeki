@@ -42,7 +42,8 @@ class MangaPages(context: Context, private val sources: MangaSources) {
     private val locks = ConcurrentHashMap<String, Mutex>()
 
     /** The pages [chapter] of [sourceId] has, in reading order. */
-    suspend fun list(sourceId: Long, chapter: MangaChapter): List<MangaPageRef> = guardSource {
+    suspend fun list(sourceId: Long, chapter: MangaChapter): List<MangaPageRef> =
+        guardSource(site = { sources.siteOf(sourceId) }) {
         val key = "$sourceId|${chapter.url}"
         lists.get(key)?.let { return@guardSource it }
         val source = sources.get(sourceId)
@@ -73,8 +74,12 @@ class MangaPages(context: Context, private val sources: MangaSources) {
     internal fun cached(ref: MangaPageRef): File? =
         File(dir, hash(ref.key)).takeIf { it.isFile && it.length() > 0 }
 
-    /** The image of [ref], fetched first if it is not in the cache. Throws when the source refuses. */
-    internal suspend fun file(ref: MangaPageRef): File = withContext(Dispatchers.IO) {
+    /**
+     * The image of [ref], fetched first if it is not in the cache. Throws when the source refuses.
+     * [onProgress] hears how much has come, from 0 to 1 in whole percents, if the source says how big
+     * the image is.
+     */
+    internal suspend fun file(ref: MangaPageRef, onProgress: (Float) -> Unit = {}): File = withContext(Dispatchers.IO) {
         cached(ref)?.let {
             // Read recently, so it is the last to be dropped.
             it.setLastModified(System.currentTimeMillis())
@@ -83,13 +88,13 @@ class MangaPages(context: Context, private val sources: MangaSources) {
         val target = File(dir, hash(ref.key))
         locks.getOrPut(ref.key) { Mutex() }.withLock {
             if (target.isFile && target.length() > 0) return@withLock target
-            download(ref, target)
+            guardSource(site = { sources.siteOf(ref.sourceId) }) { download(ref, target, onProgress) }
             trim()
             target
         }
     }
 
-    private suspend fun download(ref: MangaPageRef, target: File) {
+    private suspend fun download(ref: MangaPageRef, target: File, onProgress: (Float) -> Unit) {
         val source = sources.get(ref.sourceId) as? HttpSource
             ?: throw IOException("Manga source ${ref.sourceId} is not installed")
         val page = ref.page
@@ -97,7 +102,26 @@ class MangaPages(context: Context, private val sources: MangaSources) {
         val temporary = File(dir, target.name + ".tmp")
         try {
             source.getImage(page).use { response ->
-                temporary.sink().buffer().use { sink -> sink.writeAll(response.body.source()) }
+                val body = response.body
+                val total = body.contentLength()
+                val source = body.source()
+                temporary.sink().buffer().use { sink ->
+                    var received = 0L
+                    var reported = -1
+                    while (true) {
+                        val read = source.read(sink.buffer, CHUNK_BYTES)
+                        if (read < 0) break
+                        sink.emitCompleteSegments()
+                        received += read
+                        if (total > 0) {
+                            val percent = (received * 100 / total).toInt().coerceIn(0, 100)
+                            if (percent != reported) {
+                                reported = percent
+                                onProgress(percent / 100f)
+                            }
+                        }
+                    }
+                }
             }
             if (temporary.length() == 0L) throw IOException("The source sent an empty image")
             if (!temporary.renameTo(target)) throw IOException("Could not keep the page")
@@ -123,6 +147,7 @@ class MangaPages(context: Context, private val sources: MangaSources) {
 
     private companion object {
         const val MAX_LISTS = 8
+        const val CHUNK_BYTES = 8L * 1024
         const val MAX_BYTES = 250L * 1024 * 1024
         const val KEEP_BYTES = 200L * 1024 * 1024
     }

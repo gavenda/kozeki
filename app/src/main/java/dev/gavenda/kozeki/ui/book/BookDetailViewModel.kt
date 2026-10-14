@@ -73,6 +73,8 @@ data class MangaChaptersUiState(
     /** Whether the source is being asked what chapters it has right now. */
     val loading: Boolean = false,
     val error: LookupError? = null,
+    /** Where the captcha the source asks for is solved, when that is why [error] is set. */
+    val captchaUrl: String? = null,
 ) {
     /** Where reading goes on from, which is the last chapter once every one is read. */
     val resume: MangaChapter? get() = chapters.resumeChapter() ?: chapters.lastOrNull()
@@ -247,7 +249,11 @@ class BookDetailViewModel(
                 mangaChapters.sync(bookId, mangaChapters.fetch(sourceId, book.title, book.sourceMemo).chapters.orEmpty())
                 MangaChaptersUiState()
             } catch (e: MetadataException) {
-                MangaChaptersUiState(error = LookupError.from(e))
+                MangaChaptersUiState(
+                    error = LookupError.from(e),
+                    // A source whose own address is not known is opened at the page the manga was found at.
+                    captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: book.sourceUrl },
+                )
             }
         }
     }

@@ -148,6 +148,9 @@ dependencies {
     // Pinch and double-tap zoom for a manga page, which can be far larger than the screen.
     implementation(libs.telephoto.zoomable.image.coil)
     implementation(libs.okhttp)
+    // Pages some sources serve as AVIF or JPEG XL, which the platform cannot decode at a webtoon's height.
+    implementation(libs.avif.coder)
+    implementation(libs.jxl.coder)
 
     // Asks Google for access to the user's Drive, which is where backups go.
     implementation(libs.play.services.auth)

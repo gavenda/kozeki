@@ -28,6 +28,7 @@ import dev.gavenda.kozeki.data.manga.ContentWarning
 import dev.gavenda.kozeki.data.manga.LoadedExtension
 import dev.gavenda.kozeki.data.manga.MangaExtension
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import eu.kanade.tachiyomi.source.ConfigurableSource
 
 /**
  * The Mihon extensions Kozeki found on the device, each with the sources it gives or the reason it
@@ -67,12 +68,35 @@ internal fun MangaSourcesSetting(extensions: List<MangaExtension>?, onRefresh: (
         )
     }
     if (expanded) {
+        val context = LocalContext.current
+        // An extension with several sources of its own settings (one per language) asks which.
+        var choosing by rememberSaveable { mutableStateOf<String?>(null) }
         extensions.forEach { extension ->
+            val configurable = (extension as? LoadedExtension)?.sources.orEmpty().filterIsInstance<ConfigurableSource>()
             SettingRow(
                 leading = { ExtensionIcon(extension.packageName) },
                 title = extension.name,
                 subtitle = extension.summary(),
+                modifier = Modifier.clickable(enabled = configurable.isNotEmpty()) {
+                    if (configurable.size == 1) {
+                        context.startActivity(SourcePreferencesActivity.intent(context, configurable.first().id))
+                    } else {
+                        choosing = if (choosing == extension.packageName) null else extension.packageName
+                    }
+                },
             )
+            if (choosing == extension.packageName) {
+                configurable.forEach { source ->
+                    SettingRow(
+                        icon = painterResource(R.drawable.auto_stories_48px),
+                        title = source.name,
+                        subtitle = source.lang,
+                        modifier = Modifier.clickable {
+                            context.startActivity(SourcePreferencesActivity.intent(context, source.id))
+                        },
+                    )
+                }
+            }
         }
     }
 }

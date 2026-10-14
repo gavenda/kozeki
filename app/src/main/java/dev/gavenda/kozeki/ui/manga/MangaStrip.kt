@@ -1,5 +1,12 @@
 package dev.gavenda.kozeki.ui.manga
 
+import dev.gavenda.kozeki.data.metadata.MetadataException
+import dev.gavenda.kozeki.ui.CaptchaActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.graphics.Bitmap
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
@@ -20,8 +27,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import dev.gavenda.kozeki.data.manga.PageImages
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -45,7 +52,6 @@ import java.io.File
 import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -68,7 +74,12 @@ internal sealed interface StripItem {
         override val key get() = "$chapter|$page|0"
     }
 
-    data class Failed(override val chapter: String, override val page: Int) : StripItem {
+    data class Failed(
+        override val chapter: String,
+        override val page: Int,
+        /** Where the captcha that stopped the page is solved, if one did. */
+        val captchaUrl: String? = null,
+    ) : StripItem {
         override val key get() = "$chapter|$page|0"
     }
 
@@ -126,7 +137,7 @@ internal sealed interface StripItem {
 private sealed interface Arrived {
     data class Image(val file: File, val width: Int, val height: Int) : Arrived
     data class Unsliceable(val file: File) : Arrived
-    data object Failed : Arrived
+    data class Failed(val captchaUrl: String?) : Arrived
 }
 
 /**
@@ -137,6 +148,11 @@ private sealed interface Arrived {
 internal class StripState {
 
     private val arrived = mutableStateMapOf<String, Arrived>()
+
+    /** How much of each page on its way has come, where its source says. Read as it is drawn. */
+    private val progress = mutableStateMapOf<String, Float>()
+
+    fun progressOf(chapter: String, page: Int): Float? = progress[key(chapter, page)]
 
     private fun key(chapter: String, page: Int) = "$chapter|$page"
 
@@ -153,7 +169,7 @@ internal class StripState {
                 for (page in 0 until segment.pages.size) {
                     when (val state = arrived[key(url, page)]) {
                         null -> add(StripItem.Placeholder(url, page))
-                        Arrived.Failed -> add(StripItem.Failed(url, page))
+                        is Arrived.Failed -> add(StripItem.Failed(url, page, state.captchaUrl))
                         is Arrived.Unsliceable -> add(StripItem.Whole(url, page, state.file))
                         is Arrived.Image -> {
                             var top = 0
@@ -184,10 +200,19 @@ internal class StripState {
                             is MangaChapterPages.State.Ready ->
                                 if (arrived[key] == null) arrived[key] = withContext(Dispatchers.IO) { measure(state.file) }
 
-                            is MangaChapterPages.State.Error -> arrived[key] = Arrived.Failed
+                            is MangaChapterPages.State.Error ->
+                                arrived[key] = Arrived.Failed((state.cause as? MetadataException.Captcha)?.url)
+                            is MangaChapterPages.State.Loading -> {
+                                state.progress?.let { progress[key] = it } ?: progress.remove(key)
+                                if (arrived[key] is Arrived.Failed) arrived.remove(key)
+                            }
                             // Dropped and asked for again: the failure goes with the retry.
-                            else -> if (arrived[key] == Arrived.Failed) arrived.remove(key)
+                            else -> {
+                                progress.remove(key)
+                                if (arrived[key] is Arrived.Failed) arrived.remove(key)
+                            }
                         }
+                        if (state is MangaChapterPages.State.Ready || state is MangaChapterPages.State.Error) progress.remove(key)
                     }
                 }
             }
@@ -195,12 +220,24 @@ internal class StripState {
     }
 
     private fun measure(file: File): Arrived {
+        PageImages.sniff(file)?.let { format ->
+            val size = PageImages.size(file, format) ?: return Arrived.Failed(null)
+            return Arrived.Image(file, size.width, size.height)
+        }
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return Arrived.Unsliceable(file)
         // Not every format the device can show can be cut into slices.
-        val sliceable = runCatching { BitmapRegionDecoder.newInstance(file.path)?.also { it.recycle() } != null }
-            .getOrDefault(false)
+        // Opening the decoder proves nothing: a format can open and then fail on every region.
+        val sliceable = runCatching {
+            val decoder = BitmapRegionDecoder.newInstance(file.path)
+            try {
+                val rows = minOf(bounds.outHeight, 16)
+                decoder.decodeRegion(Rect(0, 0, bounds.outWidth, rows), BitmapFactory.Options()) != null
+            } finally {
+                decoder.recycle()
+            }
+        }.getOrDefault(false)
         return if (sliceable) Arrived.Image(file, bounds.outWidth, bounds.outHeight) else Arrived.Unsliceable(file)
     }
 
@@ -223,12 +260,13 @@ internal fun StripRow(
     onRetry: (chapter: String, page: Int) -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit,
+    progress: (chapter: String, page: Int) -> Float? = { _, _ -> null },
 ) {
     when (item) {
         is StripItem.Placeholder -> Box(
             Modifier.fillMaxWidth().height(PlaceholderHeight),
             contentAlignment = Alignment.Center,
-        ) { HaloLoadingIndicator() }
+        ) { HaloLoadingIndicator(progress = { progress(item.chapter, item.page) }) }
 
         is StripItem.Failed -> Column(
             modifier = Modifier.fillMaxWidth().height(PlaceholderHeight).padding(24.dp),
@@ -241,15 +279,17 @@ internal fun StripRow(
                 color = Color.White,
                 textAlign = TextAlign.Center,
             )
-            OutlinedButton(onClick = { onRetry(item.chapter, item.page) }) { Text(stringResource(R.string.action_retry)) }
+            val solve = rememberLauncherForActivityResult(CaptchaActivity.Contract()) { solved ->
+                if (solved) onRetry(item.chapter, item.page)
+            }
+            OutlinedButton(
+                onClick = { if (item.captchaUrl != null) solve.launch(item.captchaUrl) else onRetry(item.chapter, item.page) },
+            ) {
+                Text(stringResource(if (item.captchaUrl != null) R.string.action_open_webview else R.string.action_retry))
+            }
         }
 
-        is StripItem.Whole -> AsyncImage(
-            model = item.file,
-            contentDescription = stringResource(R.string.manga_reader_page_description, item.page + 1),
-            contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        is StripItem.Whole -> WholePage(item, onRetry)
 
         is StripItem.Slice -> SliceImage(item, widthPx)
         is StripItem.Start -> StripBreak(
@@ -369,6 +409,7 @@ private fun SliceImage(slice: StripItem.Slice, widthPx: Int) {
 
 /** Decodes the slice with the fewest pixels that is still as wide as the screen. */
 private fun decodeSlice(slice: StripItem.Slice, widthPx: Int): ImageBitmap? {
+    PageImages.sniff(slice.file)?.let { return decodeFromWhole(slice, it, widthPx) }
     var sample = 1
     if (widthPx > 0) while (slice.width / (sample * 2) >= widthPx) sample *= 2
     val decoder = runCatching { BitmapRegionDecoder.newInstance(slice.file.path) }.getOrNull() ?: return null
@@ -379,6 +420,32 @@ private fun decodeSlice(slice: StripItem.Slice, widthPx: Int): ImageBitmap? {
         null
     } finally {
         decoder.recycle()
+    }
+}
+
+/** A slice of a page in a format decoded in software, which is decoded whole and cut. */
+private fun decodeFromWhole(slice: StripItem.Slice, format: PageImages.Format, widthPx: Int): ImageBitmap? {
+    val page = PageImages.decode(slice.file, format, widthPx.coerceAtLeast(1)) ?: return null
+    val scale = page.width.toFloat() / slice.width
+    val top = (slice.top * scale).roundToInt().coerceIn(0, page.height - 1)
+    val bottom = (slice.bottom * scale).roundToInt().coerceIn(top + 1, page.height)
+    return Bitmap.createBitmap(page, 0, top, page.width, bottom - top).asImageBitmap()
+}
+
+/** A page drawn whole, with the way to ask for it again if it will not decode. */
+@Composable
+private fun WholePage(item: StripItem.Whole, onRetry: (chapter: String, page: Int) -> Unit) {
+    var failed by remember(item.file) { mutableStateOf(false) }
+    if (failed) {
+        StripRow(StripItem.Failed(item.chapter, item.page), 0, onRetry, {}, {})
+    } else {
+        AsyncImage(
+            model = item.file,
+            contentDescription = stringResource(R.string.manga_reader_page_description, item.page + 1),
+            contentScale = ContentScale.FillWidth,
+            modifier = Modifier.fillMaxWidth(),
+            onError = { failed = true },
+        )
     }
 }
 

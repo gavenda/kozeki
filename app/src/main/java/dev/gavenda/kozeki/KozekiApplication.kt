@@ -3,6 +3,7 @@ package dev.gavenda.kozeki
 import android.app.Application
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import dev.gavenda.kozeki.data.manga.PageImages
 import dev.gavenda.kozeki.data.manga.MangaCoverFetcher
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.work.MatchWorker
@@ -22,7 +23,11 @@ class KozekiApplication : Application() {
         // Manga covers are fetched through their source, which a plain network fetch is refused by.
         SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
-                .components { add(MangaCoverFetcher.Factory { koin.get() }) }
+                .components {
+                    add(MangaCoverFetcher.Factory { koin.get() })
+                    // AVIF and JPEG XL pages, which the platform cannot decode at a webtoon's height.
+                    add(PageImages.CoilDecoder.Factory())
+                }
                 .build()
         }
         koin.get<CoroutineScope>().launch { koin.get<HardcoverAuth>().restore() }

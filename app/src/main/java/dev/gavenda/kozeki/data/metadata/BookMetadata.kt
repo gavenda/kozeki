@@ -150,6 +150,12 @@ sealed class MetadataException(message: String, cause: Throwable? = null) : Exce
     /** The quota is used up; worth retrying later, not now. */
     class RateLimited : MetadataException("Rate limit reached")
 
+    /**
+     * The site put a challenge in front of the request that the app could not pass by itself.
+     * Solving it in a WebView at [url] lets the next request through.
+     */
+    class Captcha(val url: String?) : MetadataException("The site asks for a captcha")
+
     class Network(cause: Throwable) : MetadataException("Network error: ${cause.message}", cause)
 
     class Server(val code: Int, message: String) : MetadataException("HTTP $code: $message")

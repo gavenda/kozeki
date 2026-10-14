@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The Mihon extensions installed on this device and the sources they provide. Nothing is loaded
@@ -83,12 +84,12 @@ class MangaSources(private val context: Context, private val scope: CoroutineSco
     private fun scheduleReload() {
         reloadJob?.cancel()
         reloadJob = scope.launch {
-            delay(RELOAD_DELAY_MS)
+            delay(RELOAD_DELAY)
             refresh()
         }
     }
 
     private companion object {
-        const val RELOAD_DELAY_MS = 500L
+        val RELOAD_DELAY = 500.milliseconds
     }
 }
