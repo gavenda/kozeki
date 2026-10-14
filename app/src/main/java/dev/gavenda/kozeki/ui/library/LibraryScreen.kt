@@ -775,6 +775,10 @@ private fun LibraryBookItem(
     val container by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
     )
+    // On a picked item's container the text takes the colours made for it.
+    val onContainer = MaterialTheme.colorScheme.onSecondaryContainer
+    val titleColor by animateColorAsState(if (selected) onContainer else MaterialTheme.colorScheme.onSurface)
+    val subtitleColor by animateColorAsState(if (selected) onContainer else MaterialTheme.colorScheme.onSurfaceVariant)
     // A picked cover steps back from the edge, so the tint behind it frames it.
     val inset by animateDpAsState(if (selected) 6.dp else 0.dp)
 
@@ -797,8 +801,8 @@ private fun LibraryBookItem(
                 Surface(
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
                 ) {
                     Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
@@ -846,6 +850,7 @@ private fun LibraryBookItem(
         Text(
             text = book.title,
             style = MaterialTheme.typography.labelLarge,
+            color = titleColor,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 4.dp, top = 6.dp, end = 4.dp),
@@ -861,13 +866,13 @@ private fun LibraryBookItem(
                 onOpenAuthor = onOpenAuthor,
                 modifier = authorModifier,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = subtitleColor,
             )
         } else {
             Text(
                 text = book.authorLine.ifEmpty { statusLine(book) },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = subtitleColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = authorModifier,
@@ -891,6 +896,10 @@ private fun LibraryBookRow(
     val container by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
     )
+    // On a picked item's container the text takes the colours made for it.
+    val onContainer = MaterialTheme.colorScheme.onSecondaryContainer
+    val titleColor by animateColorAsState(if (selected) onContainer else MaterialTheme.colorScheme.onSurface)
+    val subtitleColor by animateColorAsState(if (selected) onContainer else MaterialTheme.colorScheme.onSurfaceVariant)
 
     Row(
         modifier = modifier
@@ -916,8 +925,8 @@ private fun LibraryBookRow(
                 Surface(
                     modifier = Modifier.align(Alignment.Center),
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    color = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary,
                 ) {
                     Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
@@ -927,6 +936,7 @@ private fun LibraryBookRow(
             Text(
                 text = book.title,
                 style = MaterialTheme.typography.titleMedium,
+                color = titleColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -936,7 +946,7 @@ private fun LibraryBookRow(
                     Text(
                         text = book.authorLine,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = subtitleColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -946,13 +956,13 @@ private fun LibraryBookRow(
                         refs = book.authorRefs,
                         onOpenAuthor = onOpenAuthor,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = subtitleColor,
                     )
                 }
             }
             val (badgeIcon, badgeLabel) = ownershipBadge(book)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                val tint = MaterialTheme.colorScheme.onSurfaceVariant
+                val tint = subtitleColor
                 if (book.isFavorite) {
                     Icon(
                         painterResource(R.drawable.favorite_fill_48px),

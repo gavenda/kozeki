@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.ui.book
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -8,7 +9,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,7 +41,10 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +75,9 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -143,7 +154,7 @@ class BookDetailActions(
     val onRetryReviews: () -> Unit = {},
     /** Opens the chapter of a manga with this URL. For a manga not in the library yet, adds it first. */
     val onReadChapter: (String) -> Unit = {},
-    val onSetChapterRead: (String, Boolean) -> Unit = { _, _ -> },
+    val onSetChaptersRead: (List<String>, Boolean) -> Unit = { _, _ -> },
     val onRetryChapters: () -> Unit = {},
 )
 
@@ -210,7 +221,7 @@ fun BookDetailScreen(
             onCloseMatch = viewModel::closeMatch,
             onRetryReviews = viewModel::retryReviews,
             onReadChapter = { onReadChapter(bookId, it) },
-            onSetChapterRead = viewModel::setChapterRead,
+            onSetChaptersRead = viewModel::setChaptersRead,
             onRetryChapters = viewModel::retryChapters,
         )
     }
@@ -286,6 +297,9 @@ fun BookDetailContent(
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
     var showingAllReviews by rememberSaveable { mutableStateOf(false) }
     var showingAllChapters by rememberSaveable { mutableStateOf(false) }
+    // URLs of the chapters picked with a long press; none means no selection is going on.
+    var selectedChapters by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    BackHandler(enabled = selectedChapters.isNotEmpty()) { selectedChapters = emptyList() }
     val listState = rememberLazyListState()
     // The header carries the title, so the bar only takes it over once the header's copy, which
     // sits at the very top of the list, has scrolled under it.
@@ -406,6 +420,26 @@ fun BookDetailContent(
         }
 
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            // What is picked may have left the source's list since.
+            val pickedChapters = state.chapters?.chapters.orEmpty().filter { it.url in selectedChapters }
+            if (pickedChapters.isNotEmpty()) {
+                Box(
+                    Modifier.fillMaxSize().padding(innerPadding).zIndex(1f),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    ChapterSelectionToolbar(
+                        picked = pickedChapters,
+                        chapters = state.chapters?.chapters.orEmpty(),
+                        onSetRead = { urls, read ->
+                            actions.onSetChaptersRead(urls, read)
+                            selectedChapters = emptyList()
+                        },
+                        onSelectAll = { selectedChapters = state.chapters?.chapters.orEmpty().map(MangaChapter::url) },
+                        onClear = { selectedChapters = emptyList() },
+                        modifier = Modifier.padding(bottom = FloatingToolbarDefaults.ScreenOffset),
+                    )
+                }
+            }
             LazyColumn(
                 state = listState,
                 modifier = Modifier.widthIn(max = 720.dp),
@@ -449,9 +483,15 @@ fun BookDetailContent(
                 }
                 item(key = "about") { AboutSection(book) }
                 state.chapters?.let { chapters ->
-                    chaptersSection(chapters, owned, actions, showingAll = showingAllChapters) {
-                        showingAllChapters = true
-                    }
+                    chaptersSection(
+                        state = chapters,
+                        owned = owned,
+                        actions = actions,
+                        showingAll = showingAllChapters,
+                        selected = selectedChapters,
+                        onSelectedChange = { selectedChapters = it },
+                        onShowAll = { showingAllChapters = true },
+                    )
                 }
                 if (owned) {
                     item(key = "ownership") {
@@ -705,6 +745,8 @@ private fun LazyListScope.chaptersSection(
     owned: Boolean,
     actions: BookDetailActions,
     showingAll: Boolean,
+    selected: List<String>,
+    onSelectedChange: (List<String>) -> Unit,
     onShowAll: () -> Unit,
 ) {
     item(key = "chapters-header") {
@@ -747,14 +789,16 @@ private fun LazyListScope.chaptersSection(
         else -> {
             val shown = if (showingAll) newestFirst else newestFirst.take(CHAPTERS_PREVIEW)
             items(shown, key = { "chapter-${it.url}" }) { chapter ->
+                val isSelected = chapter.url in selected
+                fun toggle() = onSelectedChange(if (isSelected) selected - chapter.url else selected + chapter.url)
                 ChapterRow(
                     chapter = chapter,
-                    onClick = { actions.onReadChapter(chapter.url) },
-                    onToggleRead = if (owned) {
-                        { actions.onSetChapterRead(chapter.url, !chapter.read) }
-                    } else {
-                        null
+                    selected = isSelected,
+                    // Once picking has begun a tap picks too, as it does in a gallery.
+                    onClick = {
+                        if (selected.isNotEmpty()) toggle() else actions.onReadChapter(chapter.url)
                     },
+                    onLongClick = if (owned) ::toggle else null,
                 )
             }
             if (shown.size < newestFirst.size) {
@@ -783,23 +827,97 @@ private fun LazyListScope.chaptersSection(
     }
 }
 
+/** Floats over the chapters while some are picked, as the library's does for books. */
 @Composable
-private fun ChapterRow(chapter: MangaChapter, onClick: () -> Unit, onToggleRead: (() -> Unit)?) {
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+private fun ChapterSelectionToolbar(
+    picked: List<MangaChapter>,
+    chapters: List<MangaChapter>,
+    onSetRead: (urls: List<String>, read: Boolean) -> Unit,
+    onSelectAll: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val countLabel = pluralStringResource(R.plurals.selection_count, picked.size, picked.size)
+    val allRead = picked.all { it.read }
+    HorizontalFloatingToolbar(
+        expanded = true,
+        modifier = modifier,
+        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
+    ) {
+        IconButton(onClick = onClear) {
+            Icon(
+                painterResource(R.drawable.close_48px),
+                contentDescription = stringResource(R.string.selection_clear),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Text(
+            text = picked.size.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier
+                .align(Alignment.CenterVertically)
+                .padding(start = 4.dp, end = 12.dp)
+                .semantics { contentDescription = countLabel },
+        )
+        IconButton(onClick = onSelectAll, enabled = picked.size < chapters.size) {
+            Icon(
+                painterResource(R.drawable.select_all_48px),
+                contentDescription = stringResource(R.string.selection_select_all),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        // Marks them all read, or, once every one is, puts them back.
+        IconButton(onClick = { onSetRead(picked.map(MangaChapter::url), !allRead) }) {
+            Icon(
+                painterResource(if (allRead) R.drawable.check_circle_fill_48px else R.drawable.check_48px),
+                contentDescription = stringResource(if (allRead) R.string.manga_mark_unread else R.string.manga_mark_read),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        // "Below" is what comes before the chapter in reading order, in a list the newest heads.
+        val single = picked.singleOrNull()
+        if (single != null) {
+            val below = chapters.takeWhile { it.url != single.url }
+            IconButton(
+                onClick = { onSetRead(below.map(MangaChapter::url), true) },
+                enabled = below.any { !it.read },
+            ) {
+                Icon(
+                    painterResource(R.drawable.done_all_48px),
+                    contentDescription = stringResource(R.string.manga_mark_below_read),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ChapterRow(
+    chapter: MangaChapter,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+) {
+    // On the picked row's container the text takes the colours made for it.
+    val muted = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val onRow = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
     // Laid out by hand, as the rows of the search results are, for the same reason.
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick)
-            .padding(start = 8.dp),
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
             Text(
                 text = chapter.name,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (chapter.read) muted else MaterialTheme.colorScheme.onSurface,
+                color = if (chapter.read) muted else onRow,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -819,16 +937,15 @@ private fun ChapterRow(chapter: MangaChapter, onClick: () -> Unit, onToggleRead:
                 )
             }
         }
-        if (onToggleRead != null) {
-            IconToggleButton(checked = chapter.read, onCheckedChange = { onToggleRead() }) {
-                Icon(
-                    painterResource(if (chapter.read) R.drawable.check_circle_fill_48px else R.drawable.check_48px),
-                    contentDescription = stringResource(
-                        if (chapter.read) R.string.manga_mark_unread else R.string.manga_mark_read,
-                    ),
-                    tint = if (chapter.read) MaterialTheme.colorScheme.primary else muted,
-                    modifier = Modifier.size(24.dp),
-                )
+        if (selected) {
+            // The same badge the library puts on a picked book.
+            Surface(
+                modifier = Modifier.padding(start = 8.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+            ) {
+                Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
             }
         }
     }

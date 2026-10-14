@@ -233,8 +233,8 @@ class BookDetailViewModel(
         uiState.value.chapters?.chapters?.let { mangaChapters.markRead(bookId, it.map(MangaChapter::url), read = false) }
     }
 
-    /** Marks a chapter of a manga read, or puts it back to unread. */
-    fun setChapterRead(url: String, read: Boolean) = launch { mangaChapters.markRead(bookId, listOf(url), read) }
+    /** Marks chapters of a manga read, or puts them back to unread. */
+    fun setChaptersRead(urls: List<String>, read: Boolean) = launch { mangaChapters.markRead(bookId, urls, read) }
 
     /** Asks the source for its chapters again, after it failed or to see whether new ones came out. */
     fun retryChapters() = refreshChapters()
