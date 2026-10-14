@@ -34,7 +34,6 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -77,6 +76,7 @@ import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.OptionColor
@@ -423,7 +423,7 @@ private fun HardcoverSetting(
             }
         },
         trailing = if (working) {
-            { LoadingIndicator(Modifier.size(24.dp)) }
+            { HaloLoadingIndicator(Modifier.size(24.dp)) }
         } else {
             null
         },

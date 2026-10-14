@@ -52,7 +52,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -563,7 +562,7 @@ private fun AddBooksMenu(
                 modifier = Modifier.semantics { contentDescription = label },
             ) {
                 if (importing) {
-                    LoadingIndicator(Modifier.size(24.dp))
+                    HaloLoadingIndicator(Modifier.size(24.dp))
                 } else {
                     AnimatedContent(
                         targetState = toTop,

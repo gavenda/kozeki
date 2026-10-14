@@ -39,7 +39,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -643,7 +642,7 @@ private fun MangaAddActions(
             modifier = Modifier.weight(1f),
         ) {
             if (chapters?.loading == true) {
-                LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
+                HaloLoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
             } else {
                 Icon(painterResource(R.drawable.menu_book_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
             }
@@ -674,7 +673,7 @@ private fun MangaPrimaryAction(book: Book, chapters: MangaChaptersUiState?, acti
             modifier = Modifier.weight(1f),
         ) {
             if (chapters?.loading == true && resume == null) {
-                LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
+                HaloLoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
             } else {
                 Icon(painterResource(R.drawable.menu_book_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
             }
@@ -721,7 +720,7 @@ private fun LazyListScope.chaptersSection(
     val newestFirst = state.chapters.asReversed()
     when {
         state.chapters.isEmpty() && state.loading -> item(key = "chapters-status") {
-            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { LoadingIndicator() }
+            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { HaloLoadingIndicator() }
         }
 
         state.chapters.isEmpty() && state.error != null -> item(key = "chapters-status") {
@@ -886,7 +885,7 @@ private fun PrimaryAction(book: Book, chapters: MangaChaptersUiState?, importing
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (importing) {
-                        LoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
+                        HaloLoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
                     } else {
                         Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
                     }
@@ -1047,7 +1046,7 @@ private fun MatchNoticeCard(notice: MatchNotice, matching: Boolean, actions: Boo
     OutlinedCard {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (lookingUp) LoadingIndicator(Modifier.size(24.dp))
+                if (lookingUp) HaloLoadingIndicator(Modifier.size(24.dp))
                 Text(
                     text = stringResource(
                         when (notice) {

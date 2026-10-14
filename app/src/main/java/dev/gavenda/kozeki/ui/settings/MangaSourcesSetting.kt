@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,6 +27,7 @@ import dev.gavenda.kozeki.data.manga.BrokenExtension
 import dev.gavenda.kozeki.data.manga.ContentWarning
 import dev.gavenda.kozeki.data.manga.LoadedExtension
 import dev.gavenda.kozeki.data.manga.MangaExtension
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 
 /**
  * The Mihon extensions Kozeki found on the device, each with the sources it gives or the reason it
@@ -37,7 +37,7 @@ import dev.gavenda.kozeki.data.manga.MangaExtension
 internal fun MangaSourcesSetting(extensions: List<MangaExtension>?, onRefresh: () -> Unit) {
     if (extensions == null) {
         SettingRow(
-            leading = { LoadingIndicator(Modifier.size(24.dp)) },
+            leading = { HaloLoadingIndicator(Modifier.size(24.dp)) },
             title = stringResource(R.string.settings_manga_loading),
         )
         return

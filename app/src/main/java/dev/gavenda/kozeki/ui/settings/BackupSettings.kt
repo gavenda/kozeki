@@ -13,7 +13,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -44,6 +43,7 @@ import dev.gavenda.kozeki.data.backup.drive.DriveBackupState.Work
 import dev.gavenda.kozeki.ui.DialogPreviews
 import dev.gavenda.kozeki.ui.formatDateTime
 import dev.gavenda.kozeki.ui.theme.AppTheme
+import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 
 /** What the backup settings can ask for. */
 class BackupActions(
@@ -82,7 +82,7 @@ internal fun BackupSetting(state: DriveBackupState, actions: BackupActions) {
             if (link == null) actions.signIn() else confirmSignOut = true
         },
         trailing = if (working == Work.SIGNING_IN) {
-            { LoadingIndicator(Modifier.size(24.dp)) }
+            { HaloLoadingIndicator(Modifier.size(24.dp)) }
         } else {
             null
         },
@@ -101,7 +101,7 @@ internal fun BackupSetting(state: DriveBackupState, actions: BackupActions) {
             },
             subtitle = stringResource(R.string.settings_backup_contents),
             trailing = if (working != null && working != Work.SIGNING_IN) {
-                { LoadingIndicator(Modifier.size(24.dp)) }
+                { HaloLoadingIndicator(Modifier.size(24.dp)) }
             } else {
                 null
             },
