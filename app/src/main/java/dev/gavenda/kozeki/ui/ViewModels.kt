@@ -10,6 +10,7 @@ import dev.gavenda.kozeki.scheduleMatching
 import dev.gavenda.kozeki.ui.addbook.AddBookViewModel
 import dev.gavenda.kozeki.ui.addbook.BookFormViewModel
 import dev.gavenda.kozeki.ui.author.AuthorViewModel
+import dev.gavenda.kozeki.ui.series.SeriesViewModel
 import dev.gavenda.kozeki.ui.book.BookDetailViewModel
 import dev.gavenda.kozeki.ui.book.FoundBookViewModel
 import dev.gavenda.kozeki.ui.calendar.CalendarViewModel
@@ -32,7 +33,8 @@ inline fun <reified VM : ViewModel> koinViewModel(key: String? = null, crossinli
 
 private val koin get() = GlobalContext.get()
 
-fun libraryViewModel() = LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching())
+fun libraryViewModel() =
+    LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching())
 
 fun addBookViewModel() = AddBookViewModel(koin.get(), koin.get(), koin.get(), koin.get())
 
@@ -40,17 +42,20 @@ fun bookFormViewModel(bookId: String?) = BookFormViewModel(bookId, koin.get())
 
 fun authorViewModel(authorId: String, name: String) = AuthorViewModel(authorId, name, koin.get(), koin.get())
 
+fun seriesViewModel(name: String) = SeriesViewModel(name, koin.get(), koin.get())
+
 fun searchViewModel() = SearchViewModel(koin.get())
 
 fun calendarViewModel() = CalendarViewModel(koin.get(), koin.get())
 
 fun statisticsViewModel(initialDate: LocalDate?) = StatisticsViewModel(koin.get(), koin.get(), initialDate)
 
-fun foundBookViewModel(result: BookMetadata) = FoundBookViewModel(result, koin.get(), koin.get(), koin.get())
+fun foundBookViewModel(result: BookMetadata) =
+    FoundBookViewModel(result, koin.get(), koin.get(), koin.get())
 
 fun bookDetailViewModel(bookId: String) =
     BookDetailViewModel(
-        bookId, koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), koin.get(), koin.get(),
+        bookId, koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), koin.get(), koin.get(), koin.get(),
     )
 
 fun readerViewModel(bookId: String) = ReaderViewModel(

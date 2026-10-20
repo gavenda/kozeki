@@ -74,6 +74,7 @@ class LibraryRepository(
     private val physicalReadings = db.physicalReadingDao()
     private val notes = db.noteDao()
     private val comicChapters = db.comicChapterDao()
+    private val shelves = db.shelfDao()
     private val importLock = Mutex()
 
     private val _stateChanges = MutableSharedFlow<Pair<String, ReadingState>>(extraBufferCapacity = 16)
@@ -112,6 +113,9 @@ class LibraryRepository(
 
     /** The publishers of the books that are here, the one used last first. */
     fun observePublishers(): Flow<List<String>> = books.observePublishers().distinctUntilChanged()
+
+    /** The series the books here are in, the one used last first. */
+    fun observeSeries(): Flow<List<String>> = books.observeSeries().distinctUntilChanged()
 
     suspend fun getBook(id: String): Book? = books.get(id)?.toBook()
 
@@ -228,6 +232,8 @@ class LibraryRepository(
                         coverFile = cover ?: wanted.coverFile,
                         language = wanted.language ?: info.language,
                         isbn13 = wanted.isbn13 ?: info.isbn13,
+                        series = wanted.series ?: info.series,
+                        seriesNumber = if (wanted.series != null) wanted.seriesNumber else info.seriesNumber,
                         sync = wanted.sync.touched(now),
                     ),
                 )
@@ -244,6 +250,8 @@ class LibraryRepository(
                     authors = info.authors,
                     description = info.description,
                     publisher = info.publisher,
+                    series = info.series,
+                    seriesNumber = info.series?.let { info.seriesNumber },
                     publishedDate = info.publishedDate,
                     language = info.language,
                     isbn13 = info.isbn13,
@@ -302,6 +310,8 @@ class LibraryRepository(
                 authorRefs = metadata.authorRefs,
                 description = metadata.description,
                 publisher = metadata.publisher,
+                series = metadata.series,
+                seriesNumber = metadata.seriesNumber,
                 publishedDate = metadata.publishedDate,
                 language = metadata.language,
                 pageCount = metadata.pageCount,
@@ -340,6 +350,8 @@ class LibraryRepository(
                 authors = draft.authors.singleLines(),
                 description = draft.description.tidied(),
                 publisher = draft.publisher.tidied(),
+                series = draft.series.tidied(),
+                seriesNumber = draft.seriesNumber.takeIf { draft.series.tidied() != null },
                 publishedDate = draft.publishedDate.tidied(),
                 pageCount = draft.pageCount?.takeIf { it > 0 },
                 isbn10 = isbn13?.let(Isbn::toIsbn10),
@@ -370,6 +382,8 @@ class LibraryRepository(
             authorRefs = book.authorRefs.filter { it.name in authors },
             description = draft.description.tidied(),
             publisher = draft.publisher.tidied(),
+            series = draft.series.tidied(),
+            seriesNumber = draft.seriesNumber.takeIf { draft.series.tidied() != null },
             publishedDate = draft.publishedDate.tidied(),
             pageCount = draft.pageCount?.takeIf { it > 0 },
             isbn10 = isbn13?.let(Isbn::toIsbn10),
@@ -427,6 +441,10 @@ class LibraryRepository(
                     authorRefs = metadata.authorRefs,
                     description = metadata.description ?: book.description,
                     publisher = metadata.publisher ?: book.publisher,
+                    // A series the book already has, from its EPUB or typed in, is kept: sources name
+                    // theirs to tell formats apart, "(Light Novel)", which would split it from the rest.
+                    series = book.series ?: metadata.series,
+                    seriesNumber = if (book.series != null) book.seriesNumber else metadata.seriesNumber,
                     publishedDate = metadata.publishedDate ?: book.publishedDate,
                     language = book.language ?: metadata.language,
                     pageCount = metadata.pageCount ?: book.pageCount,
@@ -791,6 +809,7 @@ class LibraryRepository(
             physicalReadings.softDeleteForBook(bookId, now)
             notes.softDeleteForBook(bookId, now)
             comicChapters.softDeleteForBook(bookId, now)
+            shelves.removeBookEverywhere(bookId, now)
             books.upsert(book.copy(sync = book.sync.deleted(now)))
             cover = book.coverFile
         }
@@ -899,6 +918,8 @@ class LibraryRepository(
         authorRefs = authorRefs,
         description = description,
         publisher = publisher,
+        series = series,
+        seriesNumber = seriesNumber,
         publishedDate = publishedDate,
         language = language,
         pageCount = pageCount,

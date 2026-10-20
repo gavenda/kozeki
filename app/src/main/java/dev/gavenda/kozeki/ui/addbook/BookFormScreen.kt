@@ -174,6 +174,8 @@ private data class FormText(
     val authors: String,
     val subtitle: String,
     val publisher: String,
+    val series: String,
+    val seriesNumber: String,
     val published: String,
     val pages: String,
     val isbn: String,
@@ -184,6 +186,8 @@ private data class FormText(
         authors = book?.authors.orEmpty().joinToString(", "),
         subtitle = book?.subtitle.orEmpty(),
         publisher = book?.publisher.orEmpty(),
+        series = book?.series.orEmpty(),
+        seriesNumber = book?.seriesNumberText.orEmpty(),
         // As it is stored. Sources give some books only a year, which stays as it is until a date is picked.
         published = book?.publishedDate.orEmpty(),
         pages = book?.pageCount?.toString().orEmpty(),
@@ -210,6 +214,8 @@ private fun BookForm(
     var authors by rememberSaveable { mutableStateOf(initial.authors) }
     var subtitle by rememberSaveable { mutableStateOf(initial.subtitle) }
     var publisher by rememberSaveable { mutableStateOf(initial.publisher) }
+    var series by rememberSaveable { mutableStateOf(initial.series) }
+    var seriesNumber by rememberSaveable { mutableStateOf(initial.seriesNumber) }
     var published by rememberSaveable { mutableStateOf(initial.published) }
     var pages by rememberSaveable { mutableStateOf(initial.pages) }
     var isbn by rememberSaveable { mutableStateOf(initial.isbn) }
@@ -218,7 +224,7 @@ private fun BookForm(
     var confirmingDiscard by rememberSaveable { mutableStateOf(false) }
 
     val changed = cover != null || coverRemoved ||
-        FormText(title, authors, subtitle, publisher, published, pages, isbn, description) != initial
+        FormText(title, authors, subtitle, publisher, series, seriesNumber, published, pages, isbn, description) != initial
     // Not while saving: the form closes itself once the book is stored.
     BackHandler(enabled = changed && !saving) { confirmingDiscard = true }
 
@@ -239,6 +245,8 @@ private fun BookForm(
             authors = authorNames,
             description = description,
             publisher = publisher,
+            series = series,
+            seriesNumber = seriesNumber.toDoubleOrNull(),
             publishedDate = published,
             pageCount = pages.toIntOrNull(),
             isbn = isbn,
@@ -324,6 +332,26 @@ private fun BookForm(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HistoryTextField(
+                    value = series,
+                    onValueChange = { series = it },
+                    history = state.seriesHistory,
+                    label = stringResource(R.string.detail_series),
+                    keyboardOptions = words,
+                    singleLine = true,
+                    modifier = Modifier.weight(2.4f),
+                )
+                OutlinedTextField(
+                    value = seriesNumber,
+                    onValueChange = { typed -> seriesNumber = seriesNumberInput(typed) },
+                    label = { Text(stringResource(R.string.detail_series_number)) },
+                    enabled = series.isNotBlank(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
                     value = publishedDateOf(published)?.let(::formatDate) ?: published,
@@ -548,4 +576,12 @@ private fun BookFormEditPreview() {
             onSave = { _, _, _ -> },
         )
     }
+}
+
+/** What can be typed as a number in a series: digits, with one point for a book between two others. */
+private fun seriesNumberInput(typed: String): String {
+    val kept = typed.replace(',', '.').filter { it.isDigit() || it == '.' }
+    val point = kept.indexOf('.')
+    val single = if (point < 0) kept else kept.substring(0, point + 1) + kept.substring(point + 1).replace(".", "")
+    return single.take(7)
 }

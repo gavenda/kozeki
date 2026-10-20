@@ -169,7 +169,7 @@ The text reads as a librarian keeping the user's books. It is dry and short and 
 
 Where her face is shown, Ui speaks for herself in the first person, in either the title or the message. Away from her face the text is plain, and where someone has to be doing the work it names her: "Ui will look this book up once you are online and signed in to Hardcover."
 
-- Her line is usually the message under a plain title, as in "The shelves are empty" over "W-Welcome. Hand me an EPUB to start reading…". When a lookup fails, her apology is the title ("S-Sorry. I can't search right now.") and the reason under it stays plain.
+- Her line is usually the message under a plain title, as in "The library is empty" over "W-Welcome. Hand me an EPUB to start reading…". When a lookup fails, her apology is the title ("S-Sorry. I can't search right now.") and the reason under it stays plain.
 - Nothing under her face speaks of her in the third person, with one exception. On a day with nothing read she is asleep, so she is narrated: "Nothing was read, so Ui got some sleep."
 - A message shown both under her face and away from it is two strings. The reader says "I can't find this book's EPUB on this device." and the book's page says "Ui cannot find this book's EPUB on this device."
 - Two buttons say "I" for the user: "I want this" and "I own this". They are the user speaking.
@@ -179,10 +179,11 @@ Where her face is shown, Ui speaks for herself in the first person, in either th
 | Say | For |
 |---|---|
 | the catalogue | Where a book's details are looked up. Hardcover and Google Books are named only where it matters which one. |
-| your library, your shelves | The user's own books, wishlist and purchases included. |
+| your library | The user's own books, wishlist and purchases included. |
+| a shelf | A named collection the user makes in the library (Shelves, 2026-10-20). A book can be on any number of them. "Shelves" no longer means the whole library. Since 2026-10-20 they are the third stop of the library's kind toggle (comics, books, shelves): every shelf in turn, under a pinned name, each with its own reading-state groups. |
 | look up | Getting a book's details from the catalogue. |
 
-So the Settings heading is "Catalogue", a book offers "Look up in the catalogue", and a search that finds nothing is "Not on your shelves" in the library and "Not in the catalogue" online.
+So the Settings heading is "Catalogue", a book offers "Look up in the catalogue", and a search that finds nothing is "Not in your library" in the library and "Not in the catalogue" online.
 
 ### What comes from her story
 
@@ -222,7 +223,7 @@ Ui and this artwork are from Blue Archive. Her sheet credits her design and illu
 
 These were put forward and neither taken up nor turned down. Each has a label to ask for it by.
 
-- **T1.** "Shelve" in place of "import", through the button, the progress and the result: "Shelve an EPUB", "Shelving…", "Shelved “x”", "Shelved 3 of 4 files.", "already on your shelves", and "Shelved EPUB" for the badge. The button on a book's own page would become "Add the EPUB", which would also settle the message there that says "Add it again" over a button reading "Import". The share sheet's label would stay, being read outside the app. It is planned in full and waiting for a go-ahead.
+- **T1.** "Shelve" in place of "import", through the button, the progress and the result: "Shelve an EPUB", "Shelving…", "Shelved “x”", "Shelved 3 of 4 files.", "already on your shelves", and "Shelved EPUB" for the badge. The button on a book's own page would become "Add the EPUB", which would also settle the message there that says "Add it again" over a button reading "Import". The share sheet's label would stay, being read outside the app. It is planned in full and waiting for a go-ahead. **Clashes with Shelves** (2026-10-20): "shelve" and "on your shelves" now read as putting a book on a shelf, so T1 needs retiring or rewording before it is built.
 
 The rest are from her sheet, which also gave the bound cover and the gold and leather that are already built.
 

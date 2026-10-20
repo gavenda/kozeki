@@ -27,6 +27,7 @@ import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverProvider
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.metadata.hardcover.TokenStore
 import dev.gavenda.kozeki.data.repository.LibraryRepository
+import dev.gavenda.kozeki.data.repository.ShelfRepository
 import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.tracking.TrackRepository
@@ -94,6 +95,8 @@ fun appModule(app: Application) = module {
     }
 
     single { StatsRepository(get(), get(), get(), get()) }
+
+    single { ShelfRepository(get(), get()) }
 
     single {
         HardcoverAuth(

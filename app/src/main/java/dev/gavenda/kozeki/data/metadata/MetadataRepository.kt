@@ -76,6 +76,15 @@ class MetadataRepository(
             lifetime = { if (it.author == null) EMPTY_TTL else AUTHOR_TTL },
         ) { provider(source).author(authorId, page) }
 
+    /** The series named [name] on [source], with its books in order. */
+    suspend fun series(source: MetadataSource, name: String): SeriesPage =
+        cached(
+            source = source,
+            key = "series|$SEARCH_VERSION|${BookMatcher.normalize(name)}",
+            serializer = SeriesPage.serializer(),
+            lifetime = { if (it.name == null) EMPTY_TTL else AUTHOR_TTL },
+        ) { provider(source).series(name) }
+
     /** What the readers of [source] think of the book with [sourceId]. */
     suspend fun reviews(source: MetadataSource, sourceId: String): BookReviews =
         cached(source, "reviews|$sourceId", BookReviews.serializer(), { REVIEWS_TTL }) {
@@ -163,7 +172,7 @@ class MetadataRepository(
         const val MIN_REQUEST_GAP_MS = 400L
 
         /** Bumped when what a lookup returns changes, so answers cached under the old rules are not served. */
-        const val SEARCH_VERSION = 4
+        const val SEARCH_VERSION = 5
         val SEARCH_TTL: Duration = Duration.ofDays(7)
         val LOOKUP_TTL: Duration = Duration.ofDays(30)
         val EMPTY_TTL: Duration = Duration.ofDays(1)

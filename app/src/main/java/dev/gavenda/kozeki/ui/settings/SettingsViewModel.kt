@@ -44,8 +44,6 @@ data class SettingsUiState(
     val cachedLookups: Int = 0,
     /** The Mihon extensions installed on the device, or null until they have been looked for. */
     val extensions: List<ComicExtension>? = null,
-    /** Whether the library keeps comics apart from books and shows one kind at a time. */
-    val separateKinds: Boolean = true,
     /** Hours between the checks of followed comics for new chapters, 0 being never. */
     val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
     val versionName: String = "",
@@ -61,7 +59,6 @@ sealed interface SettingsEvent {
 /** What the screen reads from the sources of comics and the tracker, held together to be combined. */
 private data class LibrarySettings(
     val extensions: List<ComicExtension>?,
-    val separateKinds: Boolean,
     val updateIntervalHours: Int,
     val aniList: AniListAccount,
     val aniListSignIn: AniListAuth.Status,
@@ -92,7 +89,6 @@ class SettingsViewModel(
             accounts,
             combine(
                 comicSources.extensions,
-                settings.separateLibraryKinds,
                 settings.updateIntervalHours,
                 aniListAuth.account,
                 aniListAuth.status,
@@ -106,7 +102,7 @@ class SettingsViewModel(
         metadata.observeCacheSize(),
     ) { (accountsState, comicState), themeMode, dailyGoal, yearlyGoal, cached ->
         val (hardcover, signIn, backup) = accountsState
-        val (extensions, separateKinds, updateIntervalHours, aniList, aniListSignIn) = comicState
+        val (extensions, updateIntervalHours, aniList, aniListSignIn) = comicState
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
@@ -120,7 +116,6 @@ class SettingsViewModel(
             yearlyGoalBooks = yearlyGoal,
             cachedLookups = cached,
             extensions = extensions,
-            separateKinds = separateKinds,
             updateIntervalHours = updateIntervalHours,
             versionName = versionName,
             birthday = isUiBirthday(today),
@@ -192,10 +187,6 @@ class SettingsViewModel(
     fun restoreBackup() = driveBackup.restore()
 
     fun dismissBackupNotice() = driveBackup.dismiss()
-
-    fun setSeparateKinds(separate: Boolean) {
-        viewModelScope.launch { settings.setSeparateLibraryKinds(separate) }
-    }
 
     fun setUpdateInterval(hours: Int) {
         viewModelScope.launch { settings.setUpdateIntervalHours(hours) }

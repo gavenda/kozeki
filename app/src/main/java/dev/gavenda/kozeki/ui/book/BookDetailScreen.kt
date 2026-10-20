@@ -38,8 +38,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
@@ -98,6 +102,7 @@ import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.ui.library.ShelfChecklistSheet
 import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -141,6 +146,7 @@ class BookDetailActions(
     val onRead: () -> Unit = {},
     val onEdit: () -> Unit = {},
     val onOpenAuthor: (AuthorRef) -> Unit = {},
+    val onOpenSeries: (String) -> Unit = {},
     val onImportEpub: () -> Unit = {},
     val onChooseCover: () -> Unit = {},
     val onRemoveCover: () -> Unit = {},
@@ -169,6 +175,7 @@ class BookDetailActions(
     val onRetryChapters: () -> Unit = {},
     val onRefresh: () -> Unit = {},
     val onOpenTrack: () -> Unit = {},
+    val onOpenShelves: () -> Unit = {},
     val track: TrackSheetActions = TrackSheetActions(),
 )
 
@@ -180,11 +187,14 @@ fun BookDetailScreen(
     onReadChapter: (bookId: String, chapterUrl: String) -> Unit,
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
+    onOpenSeries: (String) -> Unit,
     /** Shown until the stored book has loaded, for a page that was already showing this book. */
     placeholder: Book? = null,
     viewModel: BookDetailViewModel = koinViewModel(key = bookId) { bookDetailViewModel(bookId) },
 ) {
     val loaded by viewModel.uiState.collectAsStateWithLifecycle()
+    val bookShelves by viewModel.shelves.collectAsStateWithLifecycle()
+    var choosingShelves by rememberSaveable { mutableStateOf(false) }
     val state = if (loaded.loading && placeholder != null) loaded.copy(loading = false, book = placeholder) else loaded
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
@@ -212,6 +222,7 @@ fun BookDetailScreen(
             onRead = { onRead(bookId) },
             onEdit = { onEdit(bookId) },
             onOpenAuthor = onOpenAuthor,
+            onOpenSeries = onOpenSeries,
             onImportEpub = { picker.launch(EpubMimeTypes) },
             onChooseCover = { coverPicker.launch(CoverPhotoRequest) },
             onRemoveCover = viewModel::removeCover,
@@ -239,6 +250,7 @@ fun BookDetailScreen(
             onRetryChapters = viewModel::retryChapters,
             onRefresh = viewModel::refresh,
             onOpenTrack = viewModel::openTrackSheet,
+            onOpenShelves = { choosingShelves = true },
             track = TrackSheetActions(
                 onQueryChange = viewModel::onTrackQueryChange,
                 onSearch = viewModel::searchTrack,
@@ -251,6 +263,15 @@ fun BookDetailScreen(
     }
 
     BookDetailContent(state, snackbarHostState, actions)
+    if (choosingShelves) {
+        ShelfChecklistSheet(
+            shelves = bookShelves.all,
+            memberCounts = bookShelves.on.associateWith { 1 },
+            picked = 1,
+            onApply = viewModel::changeShelves,
+            onDismiss = { choosingShelves = false },
+        )
+    }
 }
 
 /**
@@ -266,6 +287,7 @@ fun FoundBookScreen(
     onReadChapter: (bookId: String, chapterUrl: String) -> Unit,
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
+    onOpenSeries: (String) -> Unit,
     viewModel: FoundBookViewModel = koinViewModel(key = "found-${result.source}-${result.sourceId}") {
         foundBookViewModel(result)
     },
@@ -283,7 +305,7 @@ fun FoundBookScreen(
     }
 
     addedId?.let { bookId ->
-        BookDetailScreen(bookId, onBack, onRead, onReadChapter, onEdit, onOpenAuthor, placeholder = state.book)
+        BookDetailScreen(bookId, onBack, onRead, onReadChapter, onEdit, onOpenAuthor, onOpenSeries, placeholder = state.book)
         return
     }
 
@@ -291,6 +313,7 @@ fun FoundBookScreen(
         BookDetailActions(
             onBack = onBack,
             onOpenAuthor = onOpenAuthor,
+            onOpenSeries = onOpenSeries,
             onRetryReviews = viewModel::retryReviews,
             // Reading a chapter of a comic that is not the user's yet makes it theirs first.
             onReadChapter = viewModel::startReading,
@@ -379,13 +402,6 @@ fun BookDetailContent(
                                 )
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.book_form_edit_title)) },
-                                    onClick = {
-                                        menuOpen = false
-                                        actions.onEdit()
-                                    },
-                                )
                                 // A comic's details come from the source it is read from, with no EPUB to match.
                                 if (!book.isComic) {
                                     DropdownMenuItem(
@@ -509,6 +525,7 @@ fun BookDetailContent(
                         book = book,
                         onSetRating = actions.onSetRating.takeIf { owned },
                         onOpenAuthor = actions.onOpenAuthor,
+                        onOpenSeries = actions.onOpenSeries,
                         onTitleHeight = { titleHeight = it },
                     )
                 }
@@ -681,6 +698,7 @@ private fun Header(
     /** Null for a book that is not the user's own yet, which they have no rating for. */
     onSetRating: ((Float?) -> Unit)?,
     onOpenAuthor: (AuthorRef) -> Unit,
+    onOpenSeries: (String) -> Unit,
     onTitleHeight: (Int) -> Unit,
 ) {
     var coverFullscreen by rememberSaveable { mutableStateOf(false) }
@@ -701,6 +719,18 @@ private fun Header(
             )
             book.subtitle?.let {
                 Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            book.series?.let { series ->
+                val number = book.seriesNumberText
+                // A link, like the authors under it, to the rest of the series.
+                Text(
+                    text = if (number != null) stringResource(R.string.series_with_number, series, number) else series,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable(onClickLabel = stringResource(R.string.action_open_series)) {
+                        onOpenSeries(series)
+                    },
+                )
             }
             if (book.authors.isNotEmpty()) {
                 AuthorLinks(
@@ -816,6 +846,39 @@ private fun ComicPrimaryAction(book: Book, chapters: ComicChaptersUiState?, acti
                 Text(stringResource(R.string.book_read_again))
             }
         }
+        EditButton(actions.onEdit)
+        ShelfButton(actions.onOpenShelves)
+    }
+}
+
+/** Opens the form the book's details are corrected in. Sits to the left of the shelf button. */
+@Composable
+private fun EditButton(onClick: () -> Unit) {
+    FilledTonalButton(onClick = onClick, shapes = ButtonDefaults.shapes()) {
+        Icon(
+            painterResource(R.drawable.edit_note_fill_48px),
+            contentDescription = stringResource(R.string.book_form_edit_title),
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+        )
+    }
+}
+
+/** Puts the book on shelves, or takes it off them. Sits beside the button that opens the book. */
+@Composable
+private fun ShelfButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        shapes = ButtonDefaults.shapes(),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.tertiary,
+            contentColor = MaterialTheme.colorScheme.onTertiary,
+        ),
+    ) {
+        Icon(
+            painterResource(R.drawable.shelves_fill_48px),
+            contentDescription = stringResource(R.string.shelf_add_to),
+            modifier = Modifier.size(ButtonDefaults.IconSize),
+        )
     }
 }
 
@@ -1088,23 +1151,29 @@ private fun PrimaryAction(book: Book, chapters: ComicChaptersUiState?, importing
                         Text(stringResource(R.string.book_read_again))
                     }
                 }
+                EditButton(actions.onEdit)
+                ShelfButton(actions.onOpenShelves)
             }
 
             else -> {
                 if (book.inLibrary) MutedText(stringResource(R.string.book_file_missing_message))
-                OutlinedButton(
-                    onClick = actions.onImportEpub,
-                    enabled = !importing,
-                    shapes = ButtonDefaults.shapes(),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (importing) {
-                        HaloLoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
-                    } else {
-                        Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = actions.onImportEpub,
+                        enabled = !importing,
+                        shapes = ButtonDefaults.shapes(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (importing) {
+                            HaloLoadingIndicator(Modifier.size(ButtonDefaults.IconSize))
+                        } else {
+                            Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, Modifier.size(ButtonDefaults.IconSize))
+                        }
+                        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.import_epub))
                     }
-                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-                    Text(stringResource(R.string.import_epub))
+                    EditButton(actions.onEdit)
+                    ShelfButton(actions.onOpenShelves)
                 }
             }
         }
@@ -1115,21 +1184,32 @@ private fun PrimaryAction(book: Book, chapters: ComicChaptersUiState?, importing
 private fun StateSelector(current: ReadingState, onSetState: (ReadingState) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         SectionTitle(stringResource(R.string.book_status))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ReadingStateOrder.forEach { state ->
+        // One connected group, which wraps onto a second line where the states do not fit on one.
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            ReadingStateOrder.forEachIndexed { index, state ->
                 val selected = state == current
-                FilterChip(
-                    selected = selected,
-                    onClick = { onSetState(state) },
-                    label = { Text(stringResource(state.labelRes)) },
-                    leadingIcon = {
-                        Icon(
-                            painterResource(if (selected) R.drawable.check_48px else state.icon),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
+                ToggleButton(
+                    checked = selected,
+                    onCheckedChange = { onSetState(state) },
+                    shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        ReadingStateOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                     },
-                )
+                    modifier = Modifier.semantics { role = Role.RadioButton },
+                ) {
+                    Icon(
+                        painterResource(if (selected) R.drawable.check_48px else state.icon),
+                        contentDescription = null,
+                        modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+                    )
+                    Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
+                    Text(stringResource(state.labelRes))
+                }
             }
         }
     }
@@ -1320,6 +1400,13 @@ private fun AboutSection(book: Book) {
             )
         }
         val details = buildList {
+            book.series?.let { series ->
+                val number = book.seriesNumberText
+                add(
+                    stringResource(R.string.detail_series) to
+                        if (number != null) stringResource(R.string.series_with_number, series, number) else series,
+                )
+            }
             book.publisher?.let { add(stringResource(R.string.detail_publisher) to it) }
             book.publishedDate?.let { add(stringResource(R.string.detail_published) to it) }
             book.pageCount?.let { add(stringResource(R.string.detail_pages) to it.toString()) }

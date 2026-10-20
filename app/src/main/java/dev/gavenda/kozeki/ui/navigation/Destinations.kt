@@ -2,56 +2,62 @@ package dev.gavenda.kozeki.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.navigation3.runtime.NavKey
 import dev.gavenda.kozeki.R
 import kotlinx.serialization.Serializable
 
 @Serializable
-data object LibraryRoute
+data object LibraryRoute : NavKey
 
 @Serializable
-data object CalendarRoute
+data object CalendarRoute : NavKey
 
 @Serializable
-data object StatisticsRoute
+data object StatisticsRoute : NavKey
 
 @Serializable
-data class BookRoute(val bookId: String)
+data class BookRoute(val bookId: String) : NavKey
 
 @Serializable
-data class ReaderRoute(val bookId: String)
+data class ReaderRoute(val bookId: String) : NavKey
 
 /** The chapter of a comic in the library with the URL [chapterUrl] on its source, being read. */
 @Serializable
-data class ComicReaderRoute(val bookId: String, val chapterUrl: String)
+data class ComicReaderRoute(val bookId: String, val chapterUrl: String) : NavKey
 
+/** Finding a book online to add. */
 @Serializable
-data object AddBookRoute
+data object AddBookRoute : NavKey
 
 /** The form a book's details are typed into by hand: for a new book, or to edit the one with [bookId]. */
 @Serializable
-data class BookFormRoute(val bookId: String? = null)
+data class BookFormRoute(val bookId: String? = null) : NavKey
 
 /** An author's page on the metadata source, reached from a book found there or one in the library. */
 @Serializable
-data class AuthorRoute(val authorId: String, val name: String)
+data class AuthorRoute(val authorId: String, val name: String) : NavKey
+
+/** A series by its name: the user's books in it, then the rest of it on the metadata source. */
+@Serializable
+data class SeriesRoute(val name: String) : NavKey
 
 @Serializable
-data object SettingsRoute
+data object SettingsRoute : NavKey
 
 /**
  * A book found on a metadata source that is not among the user's own yet. [metadata] is the whole
  * [dev.gavenda.kozeki.data.metadata.BookMetadata] as JSON, since nothing is stored to look it up from.
  */
 @Serializable
-data class FoundBookRoute(val metadata: String)
+data class FoundBookRoute(val metadata: String) : NavKey
 
 /** Daily statistics for one specific day, reached from the calendar. */
 @Serializable
-data class DayRoute(val epochDay: Long)
+data class DayRoute(val epochDay: Long) : NavKey
 
 /** The three destinations in the navigation bar and rail. */
 enum class TopLevelDestination(
-    val route: Any,
+    val route: NavKey,
     @param:StringRes val label: Int,
     @param:DrawableRes val icon: Int,
     @param:DrawableRes val selectedIcon: Int,

@@ -1,6 +1,7 @@
 package dev.gavenda.kozeki.ui.library
 
 import android.net.Uri
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -14,7 +15,9 @@ import dev.gavenda.kozeki.data.model.LEGACY_COMICS
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.comic.ComicChapterRepository
 import dev.gavenda.kozeki.data.comic.UpdateCheckProgress
+import dev.gavenda.kozeki.data.model.Shelf
 import dev.gavenda.kozeki.data.repository.LibraryRepository
+import dev.gavenda.kozeki.data.repository.ShelfRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
@@ -25,6 +28,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -61,18 +66,19 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
     }
 }
 
-/** Which of the two kinds of thing in the library is shown, when they are kept apart. */
-enum class LibraryKind {
+/** What the library shows: the books, the comics or the shelves. */
+enum class LibraryKind(@param:StringRes val label: Int, @param:DrawableRes val icon: Int) {
     /** Books with an EPUB, books on paper, and the ones only wanted. */
-    BOOKS,
+    BOOKS(R.string.library_kind_books, R.drawable.library_books_fill_48px),
 
     /** Comics, read online through a Mihon source. */
-    COMICS,
+    COMICS(R.string.library_kind_comics, R.drawable.auto_stories_48px),
+
+    /** Every shelf in turn, with the books and comics on it. */
+    SHELVES(R.string.library_kind_shelves, R.drawable.shelves_fill_48px),
     ;
 
-    fun matches(book: Book): Boolean = book.isComic == (this == COMICS)
-
-    val other: LibraryKind get() = if (this == BOOKS) COMICS else BOOKS
+    fun matches(book: Book): Boolean = this == SHELVES || book.isComic == (this == COMICS)
 }
 
 /**
@@ -100,6 +106,12 @@ enum class LibrarySort(@param:StringRes val label: Int, val descending: Boolean)
      * books were bought in first, whichever way the prices run.
      */
     PRICE(R.string.sort_price, descending = true),
+
+    /**
+     * By series name, and within a series by the book's number in it, the ones without a number after
+     * the numbered ones and by title. Books in no series go at the end.
+     */
+    SERIES(R.string.sort_series, descending = false),
     ;
 
     /** Whether the books run from highest to lowest, once [reversed] is taken into account. */
@@ -125,6 +137,12 @@ enum class LibrarySort(@param:StringRes val label: Int, val descending: Boolean)
                         .then(compareByDescending<Book> { it.purchasePriceMinor }.flip(reversed)),
                 )
             }
+            SERIES -> placed.sortedWith(
+                compareBy<Book, String>(String.CASE_INSENSITIVE_ORDER) { it.series.orEmpty() }.flip(reversed)
+                    .thenBy { it.seriesNumber == null }
+                    .then(compareBy<Book> { it.seriesNumber }.flip(reversed))
+                    .thenBy(String.CASE_INSENSITIVE_ORDER) { it.title },
+            )
         }
         return ordered + unplaced
     }
@@ -137,6 +155,7 @@ enum class LibrarySort(@param:StringRes val label: Int, val descending: Boolean)
         AUTHOR -> book.authors.isNotEmpty()
         RATING -> book.rating != null
         PRICE -> book.purchasePriceMinor != null
+        SERIES -> book.series != null
     }
 
     private fun <T> Comparator<T>.flip(reversed: Boolean): Comparator<T> = if (reversed) reversed() else this
@@ -204,10 +223,7 @@ data class LibraryUiState(
     /** Whether [sort] runs the other way round from its usual direction. */
     val sortReversed: Boolean = false,
     val display: LibraryDisplay = LibraryDisplay.COVERS,
-    /** The kind shown, when [separateKinds]. */
     val kind: LibraryKind = LibraryKind.BOOKS,
-    /** Whether books and comics are kept apart. When not, everything is shown and [kind] means nothing. */
-    val separateKinds: Boolean = true,
     val sections: List<LibrarySection> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
     /** How many books are shown, whatever the filter. */
@@ -219,21 +235,39 @@ data class LibraryUiState(
     val matching: Set<String> = emptySet(),
     /** How far the sources of followed comics have been asked for new chapters, while they are. */
     val updateCheck: UpdateCheckProgress? = null,
+    /** The last check got through every followed comic, rather than being cancelled. */
+    val updateCheckFinished: Boolean = false,
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
     val selection: LibrarySelection = LibrarySelection(),
+    /** Every shelf, by name. */
+    val shelves: List<Shelf> = emptyList(),
+    /** The shelves with their books, when [kind] is the shelves. */
+    val shelfGroups: List<ShelfGroup> = emptyList(),
+    /** The shelf books are being picked for, if any. */
+    val addingTo: Shelf? = null,
+    /** The books of the library that are not on [addingTo]. */
+    val shelfCandidates: List<Book> = emptyList(),
 ) {
+    val inShelves: Boolean get() = kind == LibraryKind.SHELVES
     val selecting: Boolean get() = !selection.isEmpty
     /** The sources of followed comics are being asked for new chapters. */
     val refreshing: Boolean get() = updateCheck != null
-    /** Every book on screen, in the order shown. */
-    val books: List<Book> get() = sections.flatMap { it.books }
+    /** Every book on screen, in the order shown. One on several shelves counts once. */
+    val books: List<Book> get() =
+        if (inShelves) shelfGroups.flatMap { it.books }.distinctBy { it.id } else sections.flatMap { it.books }
 
-    val allSelected: Boolean get() = selection.size == sections.sumOf { it.books.size }
+    val allSelected: Boolean get() = selection.size == books.size
 
     val isLibraryEmpty: Boolean get() = !loading && (libraryBooks ?: totalBooks) == 0
-    val isFilterEmpty: Boolean get() = !loading && sections.isEmpty()
+    /** The shelves are shown and there are none yet, which has no filter to blame. */
+    val isShelvesEmpty: Boolean get() = !loading && inShelves && shelves.isEmpty()
+    val isFilterEmpty: Boolean get() =
+        !loading && !isShelvesEmpty && (if (inShelves) shelfGroups.isEmpty() else sections.isEmpty())
 }
+
+/** The shelves, what is on each, and the one books are being picked for. */
+private class ShelfData(val shelves: List<Shelf>, val memberships: Map<String, Set<String>>, val adding: String?)
 
 sealed interface LibraryEvent {
     data class ImportFinished(val results: List<ImportResult>) : LibraryEvent
@@ -253,6 +287,7 @@ internal fun bookToOpen(results: List<ImportResult>): String? = when (val result
 
 class LibraryViewModel(
     private val library: LibraryRepository,
+    private val shelves: ShelfRepository,
     private val settings: SettingsRepository,
     matchService: MatchService,
     private val incoming: IncomingEpubs,
@@ -261,11 +296,13 @@ class LibraryViewModel(
 ) : ViewModel() {
 
     private val chosenFilter = MutableStateFlow(LibraryFilter.ALL)
+    private val addingToShelf = MutableStateFlow<String?>(null)
 
     // A count, as an EPUB from another app can arrive while the files of an earlier import are still coming in.
     private val importsRunning = MutableStateFlow(0)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val updateCheck = MutableStateFlow<UpdateCheckProgress?>(null)
+    private val updateCheckFinished = MutableStateFlow(false)
     private var updateJob: Job? = null
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
@@ -295,24 +332,44 @@ class LibraryViewModel(
         val sort: Pair<LibrarySort, Boolean>,
         val display: LibraryDisplay,
         val kind: LibraryKind,
-        val separateKinds: Boolean,
     )
 
-    private val view = combine(chosenFilter, sort, display, kind, settings.separateLibraryKinds, ::ViewOptions)
+    private val view = combine(chosenFilter, sort, display, kind, ::ViewOptions)
 
-    private val busy = combine(importsRunning, matchService.matching, updateCheck) { imports, matching, check ->
-        Triple(imports > 0, matching, check)
+    private val busy = combine(
+        importsRunning,
+        matchService.matching,
+        updateCheck,
+        updateCheckFinished,
+    ) { imports, matching, check, finished ->
+        Busy(imports > 0, matching, check, finished)
     }
+
+    private class Busy(
+        val importing: Boolean,
+        val matching: Set<String>,
+        val checking: UpdateCheckProgress?,
+        val checkFinished: Boolean,
+    )
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
+    // A shelf that was deleted while books were being picked for it is simply not found.
+    private val shelfData: Flow<ShelfData> =
+        combine(shelves.observeShelves(), shelves.observeMemberships(), addingToShelf, ::ShelfData)
+
+    private val extras = combine(purchaseDefaults, shelfData, ::Pair)
+
     val uiState: StateFlow<LibraryUiState> =
-        combine(books, view, busy, selectedIds, purchaseDefaults) { allBooks, view, busy, selected, defaults ->
+        combine(books, view, busy, selectedIds, extras) { allBooks, view, busy, selected, extras ->
             val (filter, display) = view.filter to view.display
             val (sort, sortReversed) = view.sort
-            // One kind at a time, unless the user has asked for everything together.
-            val books = if (view.separateKinds) allBooks.filter(view.kind::matches) else allBooks
-            val (importing, matching, checking) = busy
+            val (defaults, shelfData) = extras
+            val inShelves = view.kind == LibraryKind.SHELVES
+            val ofKind = allBooks.filter(view.kind::matches)
+            // The shelves show the books that are on one, however many.
+            val shelved = if (inShelves) shelvedIds(shelfData.memberships) else null
+            val books = if (shelved == null) ofKind else ofKind.filter { it.id in shelved }
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
             val shown = sort.sorted(books.filter(filter::matches), sortReversed)
@@ -323,18 +380,25 @@ class LibraryViewModel(
                 sortReversed = sortReversed,
                 display = display,
                 kind = view.kind,
-                separateKinds = view.separateKinds,
-                sections = librarySections(filter, shown),
+                sections = if (inShelves) emptyList() else librarySections(filter, shown),
                 counts = counts,
                 totalBooks = books.size,
                 libraryBooks = allBooks.size,
-                importing = importing,
-                matching = matching,
-                updateCheck = checking,
+                importing = busy.importing,
+                matching = busy.matching,
+                updateCheck = busy.checking,
+                updateCheckFinished = busy.checkFinished,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
                 selection = LibrarySelection(shown.filter { it.id in selected }),
+                shelves = shelfData.shelves,
+                shelfGroups = if (inShelves) shelfGroups(shelfData.shelves, shelfData.memberships, shown, filter) else emptyList(),
+                addingTo = shelfData.shelves.firstOrNull { it.id == shelfData.adding },
+                shelfCandidates = shelfData.adding?.let { id ->
+                    val onShelf = shelfData.memberships[id].orEmpty()
+                    allBooks.filter { it.id !in onShelf }.sortedBy { b -> b.title.lowercase() }
+                } ?: emptyList(),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
@@ -342,9 +406,12 @@ class LibraryViewModel(
     fun checkForUpdates() {
         if (updateJob?.isActive == true) return
         updateCheck.value = UpdateCheckProgress(checked = 0, total = 0, current = null)
+        updateCheckFinished.value = false
         updateJob = viewModelScope.launch {
             try {
                 chapters.checkForUpdates(pauseMs = 500) { updateCheck.value = it }
+                // Not reached when cancelled.
+                updateCheckFinished.value = true
             } finally {
                 updateCheck.value = null
             }
@@ -361,6 +428,38 @@ class LibraryViewModel(
         clearSelection()
     }
 
+    /** Makes a shelf called [name]. */
+    fun createShelf(name: String) {
+        viewModelScope.launch { shelves.create(name) }
+    }
+
+    fun renameShelf(shelfId: String, name: String) {
+        viewModelScope.launch { shelves.rename(shelfId, name) }
+    }
+
+    fun deleteShelf(shelfId: String) {
+        viewModelScope.launch { shelves.delete(shelfId) }
+    }
+
+    /** For each shelf, how many of the picked books are on it. */
+    suspend fun shelvesOfSelection(): Map<String, Int> =
+        shelves.membershipCounts(uiState.value.selection.books.map { it.id })
+
+    /** Puts the picked books on the shelves in [change] to add and takes them off the ones to remove. */
+    fun changeShelves(change: ShelfChange) = withSelection { selection ->
+        shelves.apply(selection.books.map { it.id }, change.add, change.remove, change.create)
+    }
+
+    /** Starts picking books to put on the shelf [shelfId], or stops with null. */
+    fun pickBooksFor(shelfId: String?) {
+        addingToShelf.value = shelfId
+    }
+
+    /** Puts the books [bookIds] on the shelf [shelfId]. */
+    fun addToShelf(shelfId: String, bookIds: Collection<String>) {
+        viewModelScope.launch { shelves.addBooks(shelfId, bookIds) }
+    }
+
     /** Puts the library in [sort], or turns it the other way round when it is already in it. */
     fun selectSort(sort: LibrarySort) {
         val current = uiState.value
@@ -368,10 +467,10 @@ class LibraryViewModel(
         viewModelScope.launch { settings.setLibrarySort(sort.name, reversed) }
     }
 
-    /** Switches between the books and the comics. */
-    fun toggleKind() {
-        val next = uiState.value.kind.other
-        viewModelScope.launch { settings.setLibraryKind(next.name) }
+    /** Shows the books, the comics or the shelves. */
+    fun selectKind(kind: LibraryKind) {
+        if (kind == uiState.value.kind) return
+        viewModelScope.launch { settings.setLibraryKind(kind.name) }
         // What was picked among the other kind's books is not on screen any more.
         clearSelection()
     }

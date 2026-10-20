@@ -122,8 +122,10 @@ class ComicChapterRepository(
     }
 
     /**
-     * Asks the source of each comic being followed for its chapters, counting what is new. A source
-     * that cannot be reached is left for the next run. [pauseMs] is the wait between comics.
+     * Asks the source of each comic being followed for its chapters, counting what is new. A comic
+     * whose next chapter is not due yet, going by how often its chapters came out, is left alone:
+     * see [ReleaseSchedule]. A source that cannot be reached is left for the next run. [pauseMs] is
+     * the wait between comics.
      * [onProgress] hears of each comic before its source is asked, and once more when all are done.
      * Returns whether every comic was answered.
      */
@@ -132,10 +134,15 @@ class ComicChapterRepository(
         onProgress: (UpdateCheckProgress) -> Unit = {},
     ): Boolean {
         var complete = true
-        val followed = books.getForUpdateCheck().filter { it.sourceId != null }
+        val now = clock.millis()
+        val candidates = books.getForUpdateCheck().filter { it.sourceId != null }
+        val followed = candidates.filter { book ->
+            ReleaseSchedule.isDue(chapters.getUploadTimes(book.id), book.chaptersCheckedAt, now)
+        }
+        val skipped = candidates.size - followed.size
         for ((index, book) in followed.withIndex()) {
             val sourceId = book.sourceId ?: continue
-            onProgress(UpdateCheckProgress(checked = index, total = followed.size, current = book.title))
+            onProgress(UpdateCheckProgress(checked = index, total = followed.size, current = book.title, skipped = skipped))
             try {
                 val update = fetch(sourceId, book.title, book.sourceMemo)
                 sync(book.id, update.chapters.orEmpty(), countNew = true)
@@ -146,7 +153,7 @@ class ComicChapterRepository(
             // A run over a long library is not a burst on any one source.
             delay(pauseMs)
         }
-        onProgress(UpdateCheckProgress(checked = followed.size, total = followed.size, current = null))
+        onProgress(UpdateCheckProgress(checked = followed.size, total = followed.size, current = null, skipped = skipped))
         return complete
     }
 
@@ -278,5 +285,8 @@ internal fun mergeChapters(
     return changed
 }
 
-/** How far a check for new chapters has got: [checked] of [total] comics, with [current] being asked now. */
-data class UpdateCheckProgress(val checked: Int, val total: Int, val current: String?)
+/**
+ * How far a check for new chapters has got: [checked] of [total] comics, with [current] being asked
+ * now. [skipped] comics were left out because their next chapter is not due yet.
+ */
+data class UpdateCheckProgress(val checked: Int, val total: Int, val current: String?, val skipped: Int = 0)

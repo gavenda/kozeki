@@ -7,8 +7,10 @@ import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookPage
 import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
+import dev.gavenda.kozeki.data.metadata.BookMatcher
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataProvider
+import dev.gavenda.kozeki.data.metadata.SeriesPage
 import dev.gavenda.kozeki.data.metadata.await
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -109,6 +111,57 @@ class HardcoverProvider(
         )
     }
 
+    override suspend fun series(name: String): SeriesPage {
+        val wanted = name.trim().takeIf { it.isNotEmpty() } ?: return SeriesPage()
+        val series = seriesNamed(wanted) ?: seriesFound(wanted)?.let { seriesWithId(it) } ?: return SeriesPage()
+        val seriesName = series.string("name")?.singleLineOrNull() ?: return SeriesPage()
+        return SeriesPage(
+            name = seriesName,
+            infoUrl = series.string("slug")?.let { "https://hardcover.app/series/$it" },
+            books = (series["book_series"] as? JsonArray).orEmpty().mapNotNull { entry ->
+                val row = entry.asObject() ?: return@mapNotNull null
+                row["book"].asObject()?.let(::bookToMetadata)
+                    ?.copy(series = seriesName, seriesNumber = row.double("position"))
+            },
+        )
+    }
+
+    /**
+     * The series called exactly [name]. Of several, the one with the most books. The API refuses
+     * matching that ignores case, which is left to the search after this.
+     */
+    private suspend fun seriesNamed(name: String): JsonObject? {
+        val body = buildJsonObject {
+            put("query", SERIES_BY_NAME_QUERY)
+            putJsonObject("variables") { put("name", name) }
+        }.toString()
+        return (execute(body)["series"] as? JsonArray)?.firstOrNull()?.asObject()
+    }
+
+    /**
+     * The ID of the series a search for [name] puts first, as long as its name begins with [name]:
+     * a series named in an EPUB as "Tearmoon Empire" is "Tearmoon Empire (Light Novel)" here.
+     */
+    private suspend fun seriesFound(name: String): Int? {
+        val body = buildJsonObject {
+            put("query", SERIES_SEARCH_QUERY)
+            putJsonObject("variables") { put("query", name) }
+        }.toString()
+        val hits = execute(body)["search"].asObject()?.get("results").asObject()?.get("hits") as? JsonArray
+        val top = hits?.firstOrNull()?.asObject()?.get("document").asObject() ?: return null
+        val found = top.string("name")?.let(BookMatcher::normalize) ?: return null
+        if (!found.startsWith(BookMatcher.normalize(name))) return null
+        return top.string("id")?.toIntOrNull()
+    }
+
+    private suspend fun seriesWithId(id: Int): JsonObject? {
+        val body = buildJsonObject {
+            put("query", SERIES_BY_ID_QUERY)
+            putJsonObject("variables") { put("id", id) }
+        }.toString()
+        return (execute(body)["series"] as? JsonArray)?.firstOrNull()?.asObject()
+    }
+
     /** Whether a contribution in [role] is the writing of the book. The main author's has no role at all. */
     private fun isWriter(role: String?): Boolean = role.isNullOrBlank() || role.trim().lowercase() in WriterRoles
 
@@ -123,11 +176,15 @@ class HardcoverProvider(
             .distinct()
         val isbn13 = listOf("default_physical_edition", "default_ebook_edition")
             .firstNotNullOfOrNull { edition -> book[edition].asObject()?.string("isbn_13")?.let(Isbn::toIsbn13) }
+        val series = book["featured_book_series"].asObject()
+        val seriesName = series?.get("series").asObject()?.string("name")?.singleLineOrNull()
         return BookMetadata(
             source = MetadataSource.HARDCOVER,
             sourceId = id,
             title = title,
             subtitle = book.string("subtitle")?.singleLineOrNull(),
+            series = seriesName,
+            seriesNumber = seriesName?.let { series?.double("position") },
             authors = contributors.map { it.name },
             authorRefs = contributors,
             description = book.string("description")?.takeIf { it.isNotBlank() },
@@ -282,11 +339,16 @@ class HardcoverProvider(
         // A book's search document lists the ISBNs of all its editions; keep the one that was asked for.
         val isbn13 = queriedIsbn?.takeIf { it in isbns } ?: isbns.firstOrNull()
         val slug = document.string("slug")
+        // The series the book's page shows; a document without one carries an empty object.
+        val series = document["featured_series"].asObject()
+        val seriesName = series?.get("series").asObject()?.string("name")?.singleLineOrNull()
         return BookMetadata(
             source = MetadataSource.HARDCOVER,
             sourceId = id,
             title = title,
             subtitle = document.string("subtitle")?.singleLineOrNull(),
+            series = seriesName,
+            seriesNumber = seriesName?.let { series?.double("position") ?: document.double("featured_series_position") },
             authors = strings(document["author_names"]),
             authorRefs = (document["contributions"] as? JsonArray).orEmpty()
                 .mapNotNull { it.asObject()?.get("author").asObject()?.let(::toAuthorRef) }
@@ -315,6 +377,8 @@ class HardcoverProvider(
     // Ratings are numerics, which the API may send as a number or as a string.
     private fun JsonObject.float(key: String): Float? = (this[key] as? JsonPrimitive)?.contentOrNull?.toFloatOrNull()
 
+    private fun JsonObject.double(key: String): Double? = (this[key] as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+
     private companion object {
         const val SEARCH_PAGE_SIZE = 12
 
@@ -331,11 +395,31 @@ class HardcoverProvider(
         private const val AUTHOR_BOOK_FIELDS =
             "id title subtitle slug description release_date release_year pages rating compilation image { url } " +
                 "contributions { contribution author { id name } } " +
-                "default_physical_edition { isbn_13 } default_ebook_edition { isbn_13 }"
+                "default_physical_edition { isbn_13 } default_ebook_edition { isbn_13 } " +
+                "featured_book_series { position series { name } }"
 
         const val AUTHOR_QUERY = $$"query Author($id: Int!, $limit: Int!, $offset: Int!) { " +
             $$"authors_by_pk(id: $id) { name bio born_year death_year location books_count slug image { url } " +
             "$AUTHOR_BOOK_ROWS { contribution book { $AUTHOR_BOOK_FIELDS } } } }"
+
+        const val SERIES_BOOKS_LIMIT = 100
+
+        // One book for each place in the series, the most read of any duplicates, as on the series'
+        // page on Hardcover: no merged books, no part-books, no box sets of several.
+        private const val SERIES_FIELDS =
+            "id name slug book_series(distinct_on: position, " +
+                "order_by: [{ position: asc }, { book: { users_count: desc } }], " +
+                "where: { compilation: { _eq: false }, " +
+                "book: { canonical_id: { _is_null: true }, is_partial_book: { _eq: false } } }, " +
+                "limit: $SERIES_BOOKS_LIMIT) { position book { $AUTHOR_BOOK_FIELDS } }"
+
+        const val SERIES_BY_NAME_QUERY = $$"query Series($name: String!) { " +
+            $$"series(where: { name: { _eq: $name }, canonical_id: { _is_null: true }, books_count: { _gt: 0 } }, " +
+            "order_by: { books_count: desc }, limit: 1) { $SERIES_FIELDS } }"
+        const val SERIES_BY_ID_QUERY = $$"query Series($id: Int!) { " +
+            $$"series(where: { id: { _eq: $id } }, limit: 1) { $$SERIES_FIELDS } }"
+        const val SERIES_SEARCH_QUERY = $$"query SeriesSearch($query: String!) { " +
+            $$"search(query: $query, query_type: \"Series\", per_page: 1, page: 1) { results } }"
 
         const val BOOK_QUERY = $$"query Book($id: Int!) { books_by_pk(id: $id) { $$AUTHOR_BOOK_FIELDS } }"
 

@@ -17,6 +17,9 @@ data class EpubInfo(
     val authors: List<String>,
     val description: String?,
     val publisher: String?,
+    /** The first series the EPUB says it belongs to, as calibre and EPUB 3 collections write it. */
+    val series: String?,
+    val seriesNumber: Double?,
     val publishedDate: String?,
     val language: String?,
     val isbn13: String?,
@@ -35,6 +38,8 @@ suspend fun Publication.extractInfo(): EpubInfo {
         authors = metadata.authors.map { it.name }.singleLines(),
         description = metadata.description?.let(::plainText),
         publisher = metadata.publishers.firstOrNull()?.name?.singleLineOrNull(),
+        series = metadata.belongsToSeries.firstOrNull()?.name?.singleLineOrNull(),
+        seriesNumber = metadata.belongsToSeries.firstOrNull()?.position?.takeIf { it >= 0 },
         // ISO-8601 instant; the calendar date is all a book needs.
         publishedDate = metadata.published?.toString()?.take(10),
         language = metadata.languages.firstOrNull(),

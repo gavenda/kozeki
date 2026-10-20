@@ -1,11 +1,18 @@
 package dev.gavenda.kozeki.data.db
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Upsert
 import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
+
+/** A shelf with how many books of the library are on it. */
+data class ShelfRow(
+    @Embedded val shelf: ShelfEntity,
+    val bookCount: Int,
+)
 
 /** The authors column on its own, which Room reads as the list it holds. */
 data class BookAuthors(val authors: List<String>)
@@ -70,6 +77,13 @@ interface BookDao {
             "GROUP BY publisher COLLATE NOCASE ORDER BY MAX(updatedAt) DESC",
     )
     fun observePublishers(): Flow<List<String>>
+
+    /** Every series a book is in, the one used last first, as suggestions for the next one. */
+    @Query(
+        "SELECT series FROM books WHERE deletedAt IS NULL AND series IS NOT NULL AND series != '' " +
+            "GROUP BY series COLLATE NOCASE ORDER BY MAX(updatedAt) DESC",
+    )
+    fun observeSeries(): Flow<List<String>>
 
     /** Comics worth asking their source about, the one asked longest ago first. */
     @Query(
@@ -158,6 +172,13 @@ interface ComicChapterDao {
 
     @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
     suspend fun getForBook(bookId: String): List<ComicChapterEntity>
+
+    /** When the book's chapters were put up, latest first, for those whose source says. */
+    @Query(
+        "SELECT uploadedAt FROM comic_chapters WHERE bookId = :bookId AND deletedAt IS NULL AND uploadedAt > 0 " +
+            "ORDER BY uploadedAt DESC",
+    )
+    suspend fun getUploadTimes(bookId: String): List<Long>
 
     /** Every row of the book, the ones whose chapter left the source included. */
     @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId")
@@ -383,6 +404,67 @@ interface MetadataCacheDao {
     fun observeCount(): Flow<Int>
 }
 
+@Dao
+interface ShelfDao {
+
+    @Query(
+        "SELECT s.*, (SELECT COUNT(*) FROM shelf_books sb JOIN books b ON b.id = sb.bookId " +
+            "WHERE sb.shelfId = s.id AND sb.deletedAt IS NULL AND b.deletedAt IS NULL) AS bookCount " +
+            "FROM shelves s WHERE s.deletedAt IS NULL ORDER BY s.name COLLATE NOCASE",
+    )
+    fun observeShelves(): Flow<List<ShelfRow>>
+
+    @Query("SELECT bookId FROM shelf_books WHERE shelfId = :shelfId AND deletedAt IS NULL")
+    fun observeBookIds(shelfId: String): Flow<List<String>>
+
+    /** Every live pairing of a shelf and a book on it. */
+    @Query(
+        "SELECT sb.* FROM shelf_books sb JOIN shelves s ON s.id = sb.shelfId JOIN books b ON b.id = sb.bookId " +
+            "WHERE sb.deletedAt IS NULL AND s.deletedAt IS NULL AND b.deletedAt IS NULL",
+    )
+    fun observeMemberships(): Flow<List<ShelfBookEntity>>
+
+    @Query(
+        "SELECT sb.shelfId FROM shelf_books sb JOIN shelves s ON s.id = sb.shelfId " +
+            "WHERE sb.bookId = :bookId AND sb.deletedAt IS NULL AND s.deletedAt IS NULL",
+    )
+    fun observeShelfIdsFor(bookId: String): Flow<List<String>>
+
+    /** Which of [bookIds] are on which shelf, for telling what a set of books shares. */
+    @Query(
+        "SELECT sb.* FROM shelf_books sb JOIN shelves s ON s.id = sb.shelfId " +
+            "WHERE sb.bookId IN (:bookIds) AND sb.deletedAt IS NULL AND s.deletedAt IS NULL",
+    )
+    suspend fun membershipsOf(bookIds: List<String>): List<ShelfBookEntity>
+
+    @Query("SELECT * FROM shelves WHERE id = :id AND deletedAt IS NULL")
+    suspend fun get(id: String): ShelfEntity?
+
+    @Upsert
+    suspend fun upsert(shelf: ShelfEntity)
+
+    @Upsert
+    suspend fun putBooks(rows: List<ShelfBookEntity>)
+
+    @Query(
+        "UPDATE shelf_books SET deletedAt = :now, updatedAt = :now " +
+            "WHERE shelfId = :shelfId AND bookId IN (:bookIds) AND deletedAt IS NULL",
+    )
+    suspend fun removeBooks(shelfId: String, bookIds: List<String>, now: Long)
+
+    @Query("UPDATE shelf_books SET deletedAt = :now, updatedAt = :now WHERE shelfId = :shelfId AND deletedAt IS NULL")
+    suspend fun removeAllBooks(shelfId: String, now: Long)
+
+    @Query("UPDATE shelf_books SET deletedAt = :now, updatedAt = :now WHERE bookId = :bookId AND deletedAt IS NULL")
+    suspend fun removeBookEverywhere(bookId: String, now: Long)
+
+    @Query("UPDATE shelves SET name = :name, updatedAt = :now WHERE id = :id")
+    suspend fun rename(id: String, name: String, now: Long)
+
+    @Query("UPDATE shelves SET deletedAt = :now, updatedAt = :now WHERE id = :id")
+    suspend fun softDelete(id: String, now: Long)
+}
+
 /**
  * The library as a whole, for copying it into a backup and putting one back. Rows that were
  * removed are left out of a copy, and putting one back leaves none of what was here before.
@@ -413,6 +495,24 @@ interface BackupDao {
 
     @Query("SELECT * FROM comic_tracks WHERE deletedAt IS NULL")
     suspend fun comicTracks(): List<ComicTrackEntity>
+
+    @Query("SELECT * FROM shelves WHERE deletedAt IS NULL")
+    suspend fun shelves(): List<ShelfEntity>
+
+    @Query("SELECT * FROM shelf_books WHERE deletedAt IS NULL")
+    suspend fun shelfBooks(): List<ShelfBookEntity>
+
+    @Query("DELETE FROM shelves")
+    suspend fun clearShelves()
+
+    @Query("DELETE FROM shelf_books")
+    suspend fun clearShelfBooks()
+
+    @Upsert
+    suspend fun putShelves(rows: List<ShelfEntity>)
+
+    @Upsert
+    suspend fun putShelfBooks(rows: List<ShelfBookEntity>)
 
     @Query("DELETE FROM comic_tracks")
     suspend fun clearComicTracks()

@@ -95,13 +95,6 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     /** Name of the kind of book the library is showing, or null while the user has not picked one. */
     val libraryKind: Flow<String?> = store.data.map { it[Keys.LibraryKind] }.distinctUntilChanged()
 
-    /**
-     * Whether the library keeps comics apart from the books with an EPUB or a paper copy, showing
-     * one kind at a time. On unless the user turned it off.
-     */
-    val separateLibraryKinds: Flow<Boolean> =
-        store.data.map { it[Keys.SeparateLibraryKinds] ?: true }.distinctUntilChanged()
-
     /** Hours between the checks of followed comics for new chapters, or 0 for none. */
     val updateIntervalHours: Flow<Int> =
         store.data.map { it[Keys.UpdateIntervalHours] ?: DEFAULT_UPDATE_INTERVAL_HOURS }.distinctUntilChanged()
@@ -210,10 +203,6 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.LibraryKind] = name }
     }
 
-    suspend fun setSeparateLibraryKinds(separate: Boolean) {
-        store.edit { it[Keys.SeparateLibraryKinds] = separate }
-    }
-
     suspend fun setUpdateIntervalHours(hours: Int) {
         store.edit { it[Keys.UpdateIntervalHours] = hours.coerceAtLeast(0) }
     }
@@ -231,7 +220,6 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val LibrarySortReversed = booleanPreferencesKey("library_sort_reversed")
         val LibraryDisplay = stringPreferencesKey("library_display")
         val LibraryKind = stringPreferencesKey("library_kind")
-        val SeparateLibraryKinds = booleanPreferencesKey("separate_library_kinds")
         val DriveLink = stringPreferencesKey("drive_link")
         val UpdateIntervalHours = intPreferencesKey("update_interval_hours")
     }

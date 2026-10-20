@@ -14,6 +14,9 @@ data class Book(
     val authorRefs: List<AuthorRef> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
+    val series: String? = null,
+    /** Where the book stands in [series]. */
+    val seriesNumber: Double? = null,
     val publishedDate: String? = null,
     val language: String? = null,
     val pageCount: Int? = null,
@@ -66,6 +69,9 @@ data class Book(
 ) {
     val authorLine: String get() = authors.joinToString(", ")
 
+    /** [seriesNumber] as it is written: "3", or "1.5" for one between two books. */
+    val seriesNumberText: String? get() = seriesNumber?.let(::formatSeriesNumber)
+
     /** What to hand to the image loader: the local file when there is one, else the remote cover. */
     val coverModel: Any? get() = coverPath?.let(::File) ?: coverUrl
 
@@ -107,6 +113,9 @@ data class BookDraft(
     val authors: List<String> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
+    val series: String? = null,
+    /** Only kept along with a [series]. */
+    val seriesNumber: Double? = null,
     /** As on the book: "2019-05-21", or the "2019" or "2019-05" a source gave it. */
     val publishedDate: String? = null,
     val pageCount: Int? = null,
@@ -188,3 +197,6 @@ sealed interface ImportResult {
         enum class Reason { NOT_AN_EPUB, PROTECTED, UNREADABLE }
     }
 }
+
+/** A number in a series without a trailing ".0": "3", "1.5". */
+fun formatSeriesNumber(number: Double): String = number.toBigDecimal().stripTrailingZeros().toPlainString()

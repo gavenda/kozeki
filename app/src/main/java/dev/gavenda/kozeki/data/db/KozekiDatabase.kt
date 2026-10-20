@@ -19,8 +19,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         MetadataCacheEntity::class,
         ComicChapterEntity::class,
         ComicTrackEntity::class,
+        ShelfEntity::class,
+        ShelfBookEntity::class,
     ],
-    version = 12,
+    version = 14,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -35,6 +37,7 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun metadataCacheDao(): MetadataCacheDao
     abstract fun comicChapterDao(): ComicChapterDao
     abstract fun comicTrackDao(): ComicTrackDao
+    abstract fun shelfDao(): ShelfDao
     abstract fun backupDao(): BackupDao
 
     companion object {
@@ -52,6 +55,8 @@ abstract class KozekiDatabase : RoomDatabase() {
                     AddNewChapters,
                     AddTrackPublication,
                     RenameToComics,
+                    AddShelves,
+                    AddSeries,
                 )
                 .build()
 
@@ -177,6 +182,31 @@ abstract class KozekiDatabase : RoomDatabase() {
                         "WHERE coverUrl LIKE 'kozeki-manga://%'",
                 )
                 db.execSQL("DELETE FROM metadata_cache WHERE source = 'MANGA'")
+            }
+        }
+
+        /** The user can gather books and comics on named shelves. */
+        private val AddShelves = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `shelves` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, " +
+                        "`syncedAt` INTEGER, PRIMARY KEY(`id`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `shelf_books` (`shelfId` TEXT NOT NULL, `bookId` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `deletedAt` INTEGER, " +
+                        "`syncedAt` INTEGER, PRIMARY KEY(`shelfId`, `bookId`))",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_shelf_books_bookId` ON `shelf_books` (`bookId`)")
+            }
+        }
+
+        /** A book can belong to a series, at a number in it. */
+        private val AddSeries = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
+                db.execSQL("ALTER TABLE books ADD COLUMN seriesNumber REAL")
             }
         }
 

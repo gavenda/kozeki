@@ -27,6 +27,8 @@ data class BookFormUiState(
     val authorHistory: List<String> = emptyList(),
     /** Publishers of the books already here, offered again while typing. */
     val publisherHistory: List<String> = emptyList(),
+    /** Series of the books already here, offered again while typing. */
+    val seriesHistory: List<String> = emptyList(),
 )
 
 sealed interface BookFormEvent {
@@ -58,6 +60,9 @@ class BookFormViewModel(
         viewModelScope.launch {
             library.observePublishers().collect { names -> _uiState.update { it.copy(publisherHistory = names) } }
         }
+        viewModelScope.launch {
+            library.observeSeries().collect { names -> _uiState.update { it.copy(seriesHistory = names) } }
+        }
         if (bookId != null) {
             viewModelScope.launch {
                 val book = library.getBook(bookId)
@@ -69,7 +74,8 @@ class BookFormViewModel(
 
     /** Adds the book as owned: one typed in by hand is taken to be on the shelf already. */
     fun add(draft: BookDraft, cover: Uri?) = submit {
-        eventChannel.send(BookFormEvent.Added(library.addManually(draft, Acquisition.PURCHASED, cover)))
+        val id = library.addManually(draft, Acquisition.PURCHASED, cover)
+        eventChannel.send(BookFormEvent.Added(id))
     }
 
     /**

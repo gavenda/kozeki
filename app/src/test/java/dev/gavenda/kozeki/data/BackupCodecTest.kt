@@ -9,6 +9,8 @@ import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
 import dev.gavenda.kozeki.data.db.ReadingSessionEntity
+import dev.gavenda.kozeki.data.db.ShelfBookEntity
+import dev.gavenda.kozeki.data.db.ShelfEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
 import dev.gavenda.kozeki.data.db.YearlyGoalEntity
 import dev.gavenda.kozeki.data.metadata.AuthorRef
@@ -219,6 +221,26 @@ class BackupCodecTest {
         assertEquals(withChapters, BackupCodec.decode(BackupCodec.encode(withChapters), schemaVersion = 7))
     }
 
+    @Test
+    fun `shelves and what is on them are written and read back`() {
+        val shelved = sample.copy(
+            schemaVersion = 13,
+            shelves = listOf(ShelfEntity(id = "shelf-1", name = "Holiday reads", sync = stamp)),
+            shelfBooks = listOf(ShelfBookEntity(shelfId = "shelf-1", bookId = "book-1", sync = stamp)),
+        )
+
+        assertEquals(shelved, BackupCodec.decode(BackupCodec.encode(shelved), schemaVersion = 13))
+    }
+
+    @Test
+    fun `a backup made before shelves has none`() {
+        val file = javaClass.getResource("/backup-format-1.json")!!.readBytes()
+        val read = BackupCodec.decode(file, schemaVersion = 13)
+
+        assertTrue(read.shelves.isEmpty())
+        assertTrue(read.shelfBooks.isEmpty())
+    }
+
     /** Comics were called manga, and the backups made then say so. They are still read in full. */
     @Test
     fun `a backup made while comics were called manga is still read`() {
@@ -298,7 +320,8 @@ class BackupCodecTest {
         assertEquals(
             setOf(
                 "format", "schemaVersion", "createdAt", "appVersion", "device", "books", "readThroughs",
-                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "comicChapters", "comicTracks", "settings",
+                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "comicChapters", "comicTracks", "shelves", "shelfBooks",
+                "settings",
             ),
             written.keys,
         )

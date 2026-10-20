@@ -46,24 +46,28 @@
     <string name="filter_books">Filter books</string>
     <string name="display_as_list">Show as list</string>
     <string name="display_as_covers">Show as covers</string>
-    <string name="show_comic">Show comics</string>
-    <string name="show_books">Show books</string>
+    <string name="library_kind_books">Books</string>
+    <string name="library_kind_comics">Comics</string>
+    <string name="library_kind_shelves">Shelves</string>
+    <string name="library_kind_choose">Showing %1$s. Choose what to show</string>
     <string name="sort_recent">Recently read</string>
     <string name="sort_title">Title</string>
     <string name="sort_author">Author</string>
     <string name="sort_date_added">Date added</string>
     <string name="sort_rating">My rating</string>
     <string name="sort_price">Price</string>
+    <string name="sort_series">Series</string>
     <string name="sort_ascending">Ascending</string>
     <string name="sort_descending">Descending</string>
     <string name="library_favorites">Favorites</string>
-    <string name="library_empty_title">The shelves are empty</string>
+    <string name="library_empty_title">The library is empty</string>
     <string name="library_empty_message">W-Welcome. Hand me an EPUB to start reading, or ask for a book and I\'ll put it on your wishlist. I\'ll keep your place from there.</string>
     <string name="library_add">Add books</string>
     <string name="library_end_bubble">That\'s every book I have. I\'ve kept them all in order, so please, take your time.</string>
+    <string name="library_end_bubble_comics">That\'s every comic I\'m following. I\'ll keep watch for new chapters, so please, take your time.</string>
     <string name="library_scroll_to_top">Back to top</string>
     <string name="library_add_import">Import EPUB</string>
-    <string name="library_add_find">Find a book online</string>
+    <string name="library_add_find">Search online</string>
     <string name="library_add_manual">Add manually</string>
     <string name="library_imported_epub">Imported EPUB</string>
     <string name="selection_select">Select</string>
@@ -72,9 +76,14 @@
     <string name="settings_updates_off">Off</string>
     <string name="settings_updates_hours">%1$d h</string>
     <string name="update_check_title">Checking for new chapters</string>
+    <string name="update_check_done">Updated</string>
     <plurals name="update_check_count">
         <item quantity="one">%1$d of %2$d comic</item>
         <item quantity="other">%1$d of %2$d comics</item>
+    </plurals>
+    <plurals name="update_check_skipped">
+        <item quantity="one">%1$d more not due yet, left for later</item>
+        <item quantity="other">%1$d more not due yet, left for later</item>
     </plurals>
     <plurals name="new_chapters">
         <item quantity="one">%1$d new chapter</item>
@@ -87,7 +96,7 @@
     <string name="selection_clear">Clear selection</string>
     <string name="selection_select_all">Select all</string>
     <string name="selection_change_state">Change reading state</string>
-    <string name="library_filter_empty_title">Nothing on this shelf</string>
+    <string name="library_filter_empty_title">Nothing here</string>
     <string name="library_filter_empty_message">I have nothing filed under this one. Try another above.</string>
 
     <!-- Import -->
@@ -201,6 +210,10 @@
     <string name="book_view_on_source">View on %1$s</string>
     <string name="book_view_in_browser">Open in browser</string>
     <string name="detail_publisher">Publisher</string>
+    <string name="detail_series">Series</string>
+    <string name="detail_series_number">Number</string>
+    <!-- A series and where the book stands in it: "The Expanse #3". -->
+    <string name="series_with_number">%1$s #%2$s</string>
     <string name="detail_published">Published</string>
     <string name="detail_pages">Pages</string>
     <string name="detail_language">Language</string>
@@ -364,7 +377,7 @@
     <string name="search_books_hint">Search your books</string>
     <string name="search_comics_hint">Search your comics</string>
     <string name="search_books_prompt">Which one are you after? Give me a title or an author and I\'ll look through your library, wishlist and purchases.</string>
-    <string name="search_books_no_results_title">Not on your shelves</string>
+    <string name="search_books_no_results_title">Not in your library</string>
     <string name="search_books_no_results">I looked through your library, wishlist and purchases. Nothing matches “%1$s”.</string>
     <string name="search_clear">Clear search</string>
     <string name="search_group_count">%1$s · %2$d</string>
@@ -417,6 +430,16 @@
     <string name="author_years">%1$d–%2$d</string>
     <string name="author_born">Born %1$d</string>
     <string name="author_photo">Photo of %1$s</string>
+    <string name="series_your_books">Your books</string>
+    <string name="series_more">More in this series</string>
+    <string name="series_books">Books</string>
+    <!-- A book's place in a series, beside it in the series' list: "#3". -->
+    <string name="series_number">#%1$s</string>
+    <string name="series_error_title">S-Sorry. I can\'t fetch this series right now.</string>
+    <string name="series_not_found_title">Series unavailable</string>
+    <string name="series_not_found">Huh…? Hardcover has no page for this series.</string>
+    <string name="series_complete">Every book Hardcover lists in this series is in the library.</string>
+    <string name="action_open_series">Open series</string>
 
     <!-- Calendar -->
     <string name="calendar_title">Book Calendar</string>
@@ -571,9 +594,6 @@
     <string name="settings_backup_error_unreadable">The backup on Google Drive cannot be read.</string>
     <string name="settings_backup_error_too_new">This backup is from a newer version. Update the app.</string>
     <string name="settings_backup_error_other">That did not work. Try again later.</string>
-    <string name="settings_library_title">Library</string>
-    <string name="settings_library_separate_title">Keep comics apart</string>
-    <string name="settings_library_separate_description">Show books and comics separately</string>
     <string name="settings_cache_title">Looked up before</string>
     <string name="settings_cache_description">So nothing is looked up twice</string>
     <plurals name="settings_cache_entries">
@@ -609,4 +629,35 @@
     <string name="character_name">Ui</string>
     <string name="settings_about_keeper">Kept by %1$s, Magician of the Old Library</string>
     <string name="settings_about_illustrator">Character design and illustration by CHILD, from Blue Archive</string>
+    <!-- Shelves -->
+    <string name="shelves">Shelves</string>
+    <string name="shelf_new">New shelf</string>
+    <string name="shelf_name">Shelf name</string>
+    <string name="shelf_create">Create</string>
+    <string name="shelf_rename">Rename</string>
+    <string name="shelf_save">Save</string>
+    <string name="shelf_delete">Delete shelf</string>
+    <string name="shelf_delete_title">Delete “%1$s”?</string>
+    <string name="shelf_delete_message">The books stay in your library.</string>
+    <string name="shelf_more_actions">Shelf actions</string>
+    <plurals name="shelf_book_count">
+        <item quantity="one">%1$d book</item>
+        <item quantity="other">%1$d books</item>
+    </plurals>
+    <string name="shelf_add_to">Add to shelf</string>
+    <string name="shelf_add_to_title">Shelves</string>
+    <string name="shelf_done">Done</string>
+    <string name="shelf_add_books">Add books to this shelf</string>
+    <string name="shelf_add_books_search">Search the library</string>
+    <string name="shelf_add_books_none">Everything is on this shelf already.</string>
+    <plurals name="shelf_add_count">
+        <item quantity="one">Add %1$d book</item>
+        <item quantity="other">Add %1$d books</item>
+    </plurals>
+    <string name="shelf_empty_title">Nothing on this shelf yet</string>
+    <string name="shelf_empty_message">I haven\'t filed anything here. Pick books from the library and I\'ll set them on it.</string>
+    <string name="shelf_book_shelves">Shelves…</string>
+    <string name="shelves_empty_title">No shelves yet</string>
+    <string name="shelves_empty_message">I haven\'t made any shelves. Name one and I\'ll keep books together on it.</string>
+    <string name="shelf_on_none">On no shelf</string>
 </resources>

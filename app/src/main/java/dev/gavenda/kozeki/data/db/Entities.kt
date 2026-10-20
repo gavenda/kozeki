@@ -41,6 +41,10 @@ data class BookEntity(
     @ColumnInfo(defaultValue = "[]") val authorRefs: List<AuthorRef> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
+    /** The series the book belongs to, as the user or the EPUB names it. */
+    val series: String? = null,
+    /** Where the book stands in [series]: 1, 2, or 1.5 for one that goes between them. */
+    val seriesNumber: Double? = null,
     /** As given by the source: "2019", "2019-05" or "2019-05-21". */
     val publishedDate: String? = null,
     val language: String? = null,
@@ -282,5 +286,30 @@ data class ComicTrackEntity(
     val completedOn: Long? = null,
     /** AniList has not been told the latest, because it could not be reached. */
     val pendingPush: Boolean = false,
+    @Embedded val sync: SyncStamp,
+)
+
+/** A named collection of the user's books and comics. Written to a backup as it is, so a new column needs a default. */
+@Entity(tableName = "shelves")
+@Serializable
+data class ShelfEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    @Embedded val sync: SyncStamp,
+)
+
+/**
+ * A book being on a shelf. A removal is a tombstone like any other, and putting the book back
+ * writes the row over again.
+ */
+@Entity(
+    tableName = "shelf_books",
+    primaryKeys = ["shelfId", "bookId"],
+    indices = [Index("bookId")],
+)
+@Serializable
+data class ShelfBookEntity(
+    val shelfId: String,
+    val bookId: String,
     @Embedded val sync: SyncStamp,
 )

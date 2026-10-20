@@ -69,6 +69,8 @@ class BackupRepository(
                 yearlyGoals = dao.yearlyGoals(),
                 comicChapters = dao.comicChapters(),
                 comicTracks = dao.comicTracks(),
+                shelves = dao.shelves(),
+                shelfBooks = dao.shelfBooks(),
                 settings = savedSettings,
             )
         }
@@ -88,6 +90,8 @@ class BackupRepository(
             dao.clearYearlyGoals()
             dao.clearComicChapters()
             dao.clearComicTracks()
+            dao.clearShelves()
+            dao.clearShelfBooks()
             dao.putBooks(layout.books)
             // A row of a book the backup does not have would count in the statistics under no title.
             dao.putReadThroughs(backup.readThroughs.filter { it.bookId in bookIds })
@@ -97,6 +101,9 @@ class BackupRepository(
             dao.putYearlyGoals(backup.yearlyGoals)
             dao.putComicChapters(backup.comicChapters.filter { it.bookId in bookIds })
             dao.putComicTracks(backup.comicTracks.filter { it.bookId in bookIds })
+            dao.putShelves(backup.shelves)
+            val shelfIds = backup.shelves.mapTo(HashSet()) { it.id }
+            dao.putShelfBooks(backup.shelfBooks.filter { it.bookId in bookIds && it.shelfId in shelfIds })
         }
         storage.keepOnly(layout.epubs, layout.books.mapNotNullTo(HashSet()) { it.coverFile })
         settings.restore(backup.settings)

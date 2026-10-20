@@ -15,6 +15,10 @@ data class BookMetadata(
     val authorRefs: List<AuthorRef> = emptyList(),
     val description: String? = null,
     val publisher: String? = null,
+    /** The series the source puts the book in, when it puts it in one. */
+    val series: String? = null,
+    /** Where the book stands in [series]; only ever set along with it. */
+    val seriesNumber: Double? = null,
     val publishedDate: String? = null,
     val language: String? = null,
     val pageCount: Int? = null,
@@ -28,6 +32,18 @@ data class BookMetadata(
     val infoUrl: String? = null,
     /** What the source asked to have handed back with the book, as JSON. Only a Mihon source has any. */
     val sourceMemo: String? = null,
+)
+
+/**
+ * Books of a series together, the series by name and each in its order, the ones without a number
+ * after the numbered ones. Books in no series come last. Otherwise the order is kept, so the source's
+ * ranking still decides among equals.
+ */
+fun List<BookMetadata>.sortedBySeries(): List<BookMetadata> = sortedWith(
+    compareBy<BookMetadata> { it.series == null }
+        .thenBy(String.CASE_INSENSITIVE_ORDER) { it.series.orEmpty() }
+        .thenBy { it.seriesNumber == null }
+        .thenBy { it.seriesNumber },
 )
 
 /** An author by the ID the source knows them under. */
@@ -56,6 +72,16 @@ data class AuthorPage(
     /** Null when the source has no such author. */
     val author: Author? = null,
     val books: BookPage = BookPage(),
+)
+
+/** A series as a source lists it: its books in order, each with its number in [BookMetadata.seriesNumber]. */
+@Serializable
+data class SeriesPage(
+    /** The series' own name on the source; null when the source has no such series. */
+    val name: String? = null,
+    /** The series' page on the source. */
+    val infoUrl: String? = null,
+    val books: List<BookMetadata> = emptyList(),
 )
 
 /** One page of a search, and whether the source has more to give after it. */
@@ -115,6 +141,9 @@ interface MetadataProvider {
 
     /** Ratings and written reviews for the book with [sourceId] on this source. */
     suspend fun reviews(sourceId: String): BookReviews
+
+    /** The series named [name] and its books. Sources that keep no series answer that they have none. */
+    suspend fun series(name: String): SeriesPage = SeriesPage()
 
     enum class Unavailable {
         /** The source needs an account and nobody is signed in. */

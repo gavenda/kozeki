@@ -1,7 +1,6 @@
 package dev.gavenda.kozeki.ui.library
 
 import dev.gavenda.kozeki.data.model.Book
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -21,11 +20,5 @@ class LibraryKindTest {
     fun `comics are what is comic`() {
         assertTrue(LibraryKind.COMICS.matches(comic))
         assertFalse(LibraryKind.COMICS.matches(book))
-    }
-
-    @Test
-    fun `the other kind is the one a toggle leads to`() {
-        assertEquals(LibraryKind.COMICS, LibraryKind.BOOKS.other)
-        assertEquals(LibraryKind.BOOKS, LibraryKind.COMICS.other)
     }
 }

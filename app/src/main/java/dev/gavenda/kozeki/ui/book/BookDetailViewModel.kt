@@ -23,7 +23,10 @@ import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.inReadingOrder
 import dev.gavenda.kozeki.data.model.resumeChapter
+import dev.gavenda.kozeki.data.model.Shelf
 import dev.gavenda.kozeki.data.repository.LibraryRepository
+import dev.gavenda.kozeki.data.repository.ShelfRepository
+import dev.gavenda.kozeki.ui.library.ShelfChange
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
@@ -139,6 +142,9 @@ data class BookDetailUiState(
     val purchaseLocations: List<String> = emptyList(),
 )
 
+/** Every shelf, and the IDs of the ones a book is on. */
+data class BookShelves(val all: List<Shelf> = emptyList(), val on: Set<String> = emptySet())
+
 sealed interface BookDetailEvent {
     data object Deleted : BookDetailEvent
     data class ImportFinished(val result: ImportResult) : BookDetailEvent
@@ -157,6 +163,7 @@ class BookDetailViewModel(
     private val scheduleMatching: () -> Unit,
     private val tracker: TrackRepository,
     private val aniListAuth: AniListAuth,
+    private val shelfRepository: ShelfRepository,
 ) : ViewModel() {
 
     private data class Activity(
@@ -217,6 +224,16 @@ class BookDetailViewModel(
             track = track,
             sheet = sheet,
         )
+    }
+
+    /** The shelves the book is on, and every shelf there is, for choosing among them. */
+    val shelves: StateFlow<BookShelves> =
+        combine(shelfRepository.observeShelves(), shelfRepository.observeShelfIdsFor(bookId), ::BookShelves)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookShelves())
+
+    /** Puts the book on the shelves in [change] to add, takes it off the ones to remove, and on new ones to make. */
+    fun changeShelves(change: ShelfChange) = launch {
+        shelfRepository.apply(listOf(bookId), change.add, change.remove, change.create)
     }
 
     val uiState: StateFlow<BookDetailUiState> =

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
+import dev.gavenda.kozeki.data.metadata.sortedBySeries
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.OwnedBooks
@@ -180,7 +181,7 @@ class AddBookViewModel(
                 // A bare ISBN gets an exact lookup instead of a text search.
                 val isbn = if (source == MetadataSource.COMICS) null else Isbn.toIsbn13(query)
                 val search = if (isbn == null) BookSearch(metadata, source, query) else null
-                val results = search?.next() ?: metadata.findByIsbn(source, isbn!!)
+                val results = (search?.next() ?: metadata.findByIsbn(source, isbn!!)).sortedBySeries()
                 pager = search
                 _uiState.update { it.copy(loading = false, results = results, canLoadMore = search?.hasMore == true) }
             } catch (e: MetadataException) {
@@ -205,7 +206,10 @@ class AddBookViewModel(
             _uiState.update { it.copy(loadingMore = true) }
             try {
                 val more = search.next()
-                _uiState.update { it.copy(results = it.results.orEmpty() + more, canLoadMore = search.hasMore) }
+                // Sorted as a whole, so a volume on a later page joins the rest of its series.
+                _uiState.update {
+                    it.copy(results = (it.results.orEmpty() + more).sortedBySeries(), canLoadMore = search.hasMore)
+                }
             } catch (_: MetadataException) {
                 // What is on screen stays; scrolling back to the end asks again.
             } finally {

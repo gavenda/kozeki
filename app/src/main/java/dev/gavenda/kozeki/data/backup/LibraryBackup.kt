@@ -9,6 +9,8 @@ import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
 import dev.gavenda.kozeki.data.db.ReadingSessionEntity
+import dev.gavenda.kozeki.data.db.ShelfBookEntity
+import dev.gavenda.kozeki.data.db.ShelfEntity
 import dev.gavenda.kozeki.data.db.YearlyGoalEntity
 import dev.gavenda.kozeki.data.settings.SettingsSnapshot
 import java.io.ByteArrayOutputStream
@@ -53,6 +55,9 @@ data class LibraryBackup(
     /** Absent from backups made before comics could be tracked on AniList. */
     @JsonNames("mangaTracks")
     val comicTracks: List<ComicTrackEntity> = emptyList(),
+    /** Absent from backups made before books could be put on shelves. */
+    val shelves: List<ShelfEntity> = emptyList(),
+    val shelfBooks: List<ShelfBookEntity> = emptyList(),
     val settings: SettingsSnapshot = SettingsSnapshot(),
 ) {
     companion object {

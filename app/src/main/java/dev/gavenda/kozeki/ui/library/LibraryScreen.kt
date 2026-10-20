@@ -33,10 +33,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -52,8 +55,10 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -106,6 +111,7 @@ import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.data.model.Shelf
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.book.DeleteBooksDialog
@@ -175,7 +181,16 @@ fun LibraryScreen(
         onFilterSelected = viewModel::selectFilter,
         onSortSelected = viewModel::selectSort,
         onDisplaySelected = viewModel::selectDisplay,
-        onKindToggle = viewModel::toggleKind,
+        onKindSelected = viewModel::selectKind,
+        shelfActions = remember(viewModel) {
+            ShelfActions(
+                onCreate = viewModel::createShelf,
+                onRename = viewModel::renameShelf,
+                onDelete = viewModel::deleteShelf,
+                onPickBooksFor = viewModel::pickBooksFor,
+                onAddBooks = viewModel::addToShelf,
+            )
+        },
         onImportClick = { picker.launch(EpubMimeTypes) },
         onAddBook = onAddBook,
         onAddManually = onAddManually,
@@ -191,6 +206,8 @@ fun LibraryScreen(
                 onMarkPurchased = viewModel::markPurchased,
                 onUnmarkPurchased = viewModel::unmarkPurchased,
                 onDelete = viewModel::delete,
+                onShelvesOf = viewModel::shelvesOfSelection,
+                onChangeShelves = viewModel::changeShelves,
             )
         },
         onSettingsClick = onOpenSettings,
@@ -237,7 +254,8 @@ fun LibraryContent(
     selectionActions: SelectionActions,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onKindToggle: () -> Unit = {},
+    onKindSelected: (LibraryKind) -> Unit = {},
+    shelfActions: ShelfActions = ShelfActions(),
     onRefresh: () -> Unit = {},
     onCancelRefresh: () -> Unit = {},
 ) {
@@ -247,6 +265,10 @@ fun LibraryContent(
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     var updateSheetHidden by rememberSaveable { mutableStateOf(false) }
+    var shelfPrompt by remember { mutableStateOf<ShelfPrompt?>(null) }
+    // The shelves of the picked books, once asked for; the sheet waits on them.
+    var checklistCounts by remember { mutableStateOf<Map<String, Int>?>(null) }
+    val shelfScope = rememberCoroutineScope()
 
     // A filter that was just picked starts from its top. Left alone, the grid holds on to the book
     // it was showing, which on the way back to every book is somewhere in the middle. Remembered
@@ -298,6 +320,7 @@ fun LibraryContent(
         if (!state.selecting) {
             editingPurchase = false
             confirmingDelete = false
+            checklistCounts = null
         }
     }
 
@@ -316,7 +339,7 @@ fun LibraryContent(
                 onBookClick = onBookClick,
                 onSettingsClick = onSettingsClick,
                 scrollBehavior = scrollBehavior,
-                searchHint = if (state.separateKinds && state.kind == LibraryKind.COMICS) {
+                searchHint = if (state.kind == LibraryKind.COMICS) {
                     R.string.search_comics_hint
                 } else {
                     R.string.search_books_hint
@@ -327,7 +350,15 @@ fun LibraryContent(
             // The empty state has its own button; two of them side by side would be noise.
             // While books are picked, the selection toolbar takes this corner.
             if (!state.selecting && (!state.isLibraryEmpty || state.importing)) {
-                AddBooksMenu(state.importing, offersTop, scrollToTop, onImportClick, onAddBook, onAddManually)
+                AddBooksMenu(
+                    importing = state.importing,
+                    offersTop = offersTop,
+                    onScrollToTop = scrollToTop,
+                    onImportClick = onImportClick,
+                    onAddBook = onAddBook,
+                    onAddManually = onAddManually,
+                    onNewShelf = if (state.inShelves) ({ shelfPrompt = ShelfPrompt.Create }) else null,
+                )
             }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -340,6 +371,9 @@ fun LibraryContent(
                     actions = selectionActions,
                     onEditPurchase = { editingPurchase = true },
                     onDelete = { confirmingDelete = true },
+                    onOpenShelves = {
+                        shelfScope.launch { checklistCounts = selectionActions.onShelvesOf() }
+                    },
                     modifier = Modifier.padding(bottom = FloatingToolbarDefaults.ScreenOffset),
                 )
             }
@@ -373,8 +407,22 @@ fun LibraryContent(
             }
 
             else -> Column(Modifier.padding(top = innerPadding.calculateTopPadding())) {
-                FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected, onKindToggle)
-                if (state.isFilterEmpty) {
+                FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected, onKindSelected)
+                if (state.isShelvesEmpty) {
+                    Box(Modifier.verticalScroll(rememberScrollState())) {
+                        EmptyState(
+                            expression = Expression.NEUTRAL,
+                            icon = painterResource(R.drawable.shelves_fill_48px),
+                            title = stringResource(R.string.shelves_empty_title),
+                            message = stringResource(R.string.shelves_empty_message),
+                            action = {
+                                Button(onClick = { shelfPrompt = ShelfPrompt.Create }) {
+                                    AddButtonContent(painterResource(R.drawable.add_48px), R.string.shelf_new)
+                                }
+                            },
+                        )
+                    }
+                } else if (state.isFilterEmpty) {
                     EmptyState(
                         expression = Expression.NEUTRAL,
                         icon = painterResource(R.drawable.filter_alt_off_fill_48px),
@@ -396,7 +444,8 @@ fun LibraryContent(
                             updateSheetHidden = false
                             onRefresh()
                         },
-                        enabled = !state.selecting,
+                        // Only comics have anything to check, so books are not pulled.
+                        enabled = !state.selecting && state.kind != LibraryKind.BOOKS,
                         state = pullState,
                         indicator = {
                             Box(
@@ -437,50 +486,90 @@ fun LibraryContent(
                             verticalArrangement = Arrangement.spacedBy(if (list) 0.dp else 16.dp),
                             modifier = Modifier.fillMaxSize().nestedScroll(scrollTurn),
                         ) {
-                            state.sections.forEach { section ->
-                                section.heading?.let { heading ->
-                                    item(key = "header-${heading.name}", span = { GridItemSpan(maxLineSpan) }) {
-                                        SectionHeader(
-                                            text = stringResource(heading.label),
-                                            // In line with the text of the rows under it.
-                                            modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier,
-                                        )
+                            // A book on several shelves is in the grid once for each, so its key says which.
+                            fun LazyGridScope.sectionItems(prefix: String, sections: List<LibrarySection>) {
+                                sections.forEach { section ->
+                                    section.heading?.let { heading ->
+                                        item(key = "${prefix}header-${heading.name}", span = { GridItemSpan(maxLineSpan) }) {
+                                            SectionHeader(
+                                                text = stringResource(heading.label),
+                                                // In line with the text of the rows under it.
+                                                modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier,
+                                            )
+                                        }
                                     }
-                                }
-                                items(section.books, key = { it.id }, contentType = { state.display }) { book ->
-                                    if (list) {
-                                        LibraryBookRow(
-                                            book = book,
-                                            matching = book.id in state.matching,
-                                            selecting = state.selecting,
-                                            selected = book.id in selection.ids,
-                                            actions = selectionActions,
-                                            onOpen = onBookClick,
-                                            onOpenAuthor = onAuthorClick,
-                                            modifier = Modifier.animateItem(),
-                                        )
-                                    } else {
-                                        LibraryBookItem(
-                                            book = book,
-                                            matching = book.id in state.matching,
-                                            selecting = state.selecting,
-                                            selected = book.id in selection.ids,
-                                            actions = selectionActions,
-                                            onOpen = onBookClick,
-                                            onOpenAuthor = onAuthorClick,
-                                            modifier = Modifier.animateItem(),
-                                        )
+                                    items(section.books, key = { "$prefix${it.id}" }, contentType = { state.display }) { book ->
+                                        if (list) {
+                                            LibraryBookRow(
+                                                book = book,
+                                                matching = book.id in state.matching,
+                                                selecting = state.selecting,
+                                                selected = book.id in selection.ids,
+                                                actions = selectionActions,
+                                                onOpen = onBookClick,
+                                                onOpenAuthor = onAuthorClick,
+                                                modifier = Modifier.animateItem(),
+                                            )
+                                        } else {
+                                            LibraryBookItem(
+                                                book = book,
+                                                matching = book.id in state.matching,
+                                                selecting = state.selecting,
+                                                selected = book.id in selection.ids,
+                                                actions = selectionActions,
+                                                onOpen = onBookClick,
+                                                onOpenAuthor = onAuthorClick,
+                                                modifier = Modifier.animateItem(),
+                                            )
+                                        }
                                     }
                                 }
                             }
+                            if (state.inShelves) {
+                                state.shelfGroups.forEach { group ->
+                                    stickyHeader(key = "shelf-${group.shelf.id}") {
+                                        ShelfHeader(
+                                            shelf = group.shelf,
+                                            // Extends over the grid's own side padding, so the books slide under all of it.
+                                            modifier = Modifier.fillMaxWidth(),
+                                            // In line with the rows' text in a list, with the covers' edge in a grid.
+                                            indent = if (list) 8.dp else 0.dp,
+                                            onAddBooks = { shelfActions.onPickBooksFor(group.shelf.id) },
+                                            onRename = { shelfPrompt = ShelfPrompt.Rename(group.shelf) },
+                                            onDelete = { shelfPrompt = ShelfPrompt.Delete(group.shelf) },
+                                        )
+                                    }
+                                    if (group.sections.isEmpty()) {
+                                        item(key = "shelf-${group.shelf.id}-empty", span = { GridItemSpan(maxLineSpan) }) {
+                                            EmptyShelfLine(
+                                                indent = if (list) 8.dp else 0.dp,
+                                                onAddBooks = { shelfActions.onPickBooksFor(group.shelf.id) },
+                                            )
+                                        }
+                                    }
+                                    sectionItems("${group.shelf.id}/", group.sections)
+                                }
+                            } else {
+                                sectionItems("", state.sections)
+                            }
                             item(key = "end", span = { GridItemSpan(maxLineSpan) }) {
+                                // Centred, and the bubble kept to the width of an empty state's text on a wide window.
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Portrait(Expression.CONTENT, Modifier.width(96.dp))
-                                    SpeechBubble(stringResource(R.string.library_end_bubble), Modifier.weight(1f, fill = false))
+                                    SpeechBubble(
+                                        stringResource(
+                                            if (state.kind == LibraryKind.COMICS) {
+                                                R.string.library_end_bubble_comics
+                                            } else {
+                                                R.string.library_end_bubble
+                                            },
+                                        ),
+                                        Modifier.weight(1f, fill = false).widthIn(max = 360.dp),
+                                    )
                                 }
                             }
                         }
@@ -519,12 +608,37 @@ fun LibraryContent(
         }
         DeleteBooksDialog(selection.books, onConfirm = onConfirm, onDismiss = { confirmingDelete = false })
     }
-    // Hidden by hand, the sheet stays away until the next pull. It waits for the comics to be
-    // counted, so a library with none to ask does not flash one up.
-    val updateCheck = state.updateCheck
-    if (updateCheck != null && updateCheck.total > 0 && !updateSheetHidden) {
-        UpdateCheckSheet(updateCheck, onCancel = onCancelRefresh, onDismiss = { updateSheetHidden = true })
+    ShelfPrompts(
+        prompt = shelfPrompt,
+        onCreate = shelfActions.onCreate,
+        onRename = shelfActions.onRename,
+        onDelete = shelfActions.onDelete,
+        onDismiss = { shelfPrompt = null },
+    )
+    checklistCounts?.let { counts ->
+        ShelfChecklistSheet(
+            shelves = state.shelves,
+            memberCounts = counts,
+            picked = selection.size,
+            onApply = selectionActions.onChangeShelves,
+            onDismiss = { checklistCounts = null },
+        )
     }
+    state.addingTo?.let { shelf ->
+        ShelfAddBooksSheet(
+            candidates = state.shelfCandidates,
+            onAdd = { shelfActions.onAddBooks(shelf.id, it) },
+            onDismiss = { shelfActions.onPickBooksFor(null) },
+        )
+    }
+    // Hidden by hand, the sheet stays away until the next pull.
+    UpdateCheckSheet(
+        progress = state.updateCheck,
+        finished = state.updateCheckFinished,
+        hidden = updateSheetHidden,
+        onCancel = onCancelRefresh,
+        onDismiss = { updateSheetHidden = true },
+    )
 }
 
 /** Picking books in the grid, and what is then done to all of them at once. */
@@ -543,6 +657,19 @@ class SelectionActions(
     ) -> Unit = { _, _, _, _, _ -> },
     val onUnmarkPurchased: () -> Unit = {},
     val onDelete: () -> Unit = {},
+    /** For each shelf, how many of the picked books are on it. */
+    val onShelvesOf: suspend () -> Map<String, Int> = { emptyMap() },
+    val onChangeShelves: (ShelfChange) -> Unit = {},
+)
+
+/** Making and changing shelves, and putting books on one. */
+class ShelfActions(
+    val onCreate: (String) -> Unit = {},
+    val onRename: (String, String) -> Unit = { _, _ -> },
+    val onDelete: (String) -> Unit = {},
+    /** Starts picking books for the shelf with this ID, or stops with null. */
+    val onPickBooksFor: (String?) -> Unit = {},
+    val onAddBooks: (shelfId: String, bookIds: List<String>) -> Unit = { _, _ -> },
 )
 
 @Composable
@@ -591,6 +718,7 @@ private fun AddBooksMenu(
     onImportClick: () -> Unit,
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
+    onNewShelf: (() -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     BackHandler(expanded) { expanded = false }
@@ -635,6 +763,18 @@ private fun AddBooksMenu(
         // The menu brings its own margins, and the scaffold has already applied the same ones.
         modifier = Modifier.offset(x = 16.dp, y = 16.dp),
     ) {
+        if (onNewShelf != null) {
+            FloatingActionButtonMenuItem(
+                onClick = {
+                    expanded = false
+                    onNewShelf()
+                },
+                text = { Text(stringResource(R.string.shelf_new)) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                icon = { Icon(painterResource(R.drawable.shelves_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+            )
+        }
         FloatingActionButtonMenuItem(
             onClick = {
                 expanded = false
@@ -674,7 +814,7 @@ private fun FilterRow(
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
     onDisplaySelected: (LibraryDisplay) -> Unit,
-    onKindToggle: () -> Unit,
+    onKindSelected: (LibraryKind) -> Unit,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
     Column {
@@ -705,8 +845,8 @@ private fun FilterRow(
                 )
             }
             Row {
+                KindMenu(state.kind, onKindSelected)
                 DisplayToggle(state.display, onDisplaySelected)
-                if (state.separateKinds) KindToggle(state.kind, onKindToggle)
                 SortMenu(state.sort, state.sortReversed, onSortSelected)
             }
         }
@@ -759,20 +899,53 @@ private fun DisplayToggle(display: LibraryDisplay, onDisplaySelected: (LibraryDi
     }
 }
 
-/** Flips between the books and the comics. Like the display toggle, it shows what a tap leads to. */
+/**
+ * Shows what the library is showing, books, comics or shelves, in the primary colour. A tap opens a
+ * menu of all three, the one in use marked.
+ */
 @Composable
-private fun KindToggle(kind: LibraryKind, onToggle: () -> Unit) {
-    val other = kind.other
-    IconButton(onClick = onToggle) {
-        Icon(
-            painter = painterResource(
-                if (other == LibraryKind.COMICS) R.drawable.auto_stories_48px else R.drawable.library_books_fill_48px,
-            ),
-            contentDescription = stringResource(
-                if (other == LibraryKind.COMICS) R.string.show_comic else R.string.show_books,
-            ),
-            modifier = Modifier.size(24.dp),
-        )
+private fun KindMenu(kind: LibraryKind, onKindSelected: (LibraryKind) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { expanded = true },
+            colors = IconButtonDefaults.iconButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+        ) {
+            Icon(
+                painter = painterResource(kind.icon),
+                contentDescription = stringResource(R.string.library_kind_choose, stringResource(kind.label)),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            LibraryKind.entries.forEach { option ->
+                val selected = option == kind
+                DropdownMenuItem(
+                    text = { Text(stringResource(option.label)) },
+                    onClick = {
+                        expanded = false
+                        onKindSelected(option)
+                    },
+                    leadingIcon = {
+                        Icon(painterResource(option.icon), contentDescription = null, modifier = Modifier.size(24.dp))
+                    },
+                    trailingIcon = if (selected) {
+                        { Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.size(24.dp)) }
+                    } else {
+                        null
+                    },
+                    colors = if (selected) {
+                        MenuDefaults.itemColors(
+                            textColor = MaterialTheme.colorScheme.primary,
+                            leadingIconColor = MaterialTheme.colorScheme.primary,
+                            trailingIconColor = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        MenuDefaults.itemColors()
+                    },
+                )
+            }
+        }
     }
 }
 
@@ -811,6 +984,101 @@ private fun SortMenu(
                 )
             }
         }
+    }
+}
+
+/** A shelf's name over its books, with its menu. It is filled in, as the books scroll under it. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ShelfHeader(
+    shelf: Shelf,
+    onAddBooks: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    indent: Dp = 8.dp,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    Column(modifier.background(MaterialTheme.colorScheme.surface)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = indent),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = shelf.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.tertiary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = pluralStringResource(R.plurals.shelf_book_count, shelf.bookCount, shelf.bookCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box {
+                IconButton(onClick = { menuOpen = true }) {
+                    Icon(
+                        painterResource(R.drawable.more_vert_48px),
+                        contentDescription = stringResource(R.string.shelf_more_actions),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.shelf_add_books)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.add_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                        onClick = {
+                            menuOpen = false
+                            onAddBooks()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.shelf_rename)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.edit_note_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                        onClick = {
+                            menuOpen = false
+                            onRename()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.shelf_delete)) },
+                        leadingIcon = { Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                        onClick = {
+                            menuOpen = false
+                            onDelete()
+                        },
+                    )
+                }
+            }
+        }
+        // A faint grey rule, as wide as the books under it.
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = indent),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+        )
+    }
+}
+
+/** What a shelf with nothing on it shows in place of its books. */
+@Composable
+private fun EmptyShelfLine(indent: Dp, onAddBooks: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = stringResource(R.string.shelf_empty_title),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f).padding(start = indent),
+        )
+        TextButton(onClick = onAddBooks) { Text(stringResource(R.string.shelf_add_books)) }
     }
 }
 
@@ -1028,6 +1296,16 @@ private fun LibraryBookRow(
                     )
                 }
             }
+            book.series?.let { series ->
+                val number = book.seriesNumberText
+                Text(
+                    text = if (number != null) stringResource(R.string.series_with_number, series, number) else series,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = subtitleColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             val (badgeIcon, badgeLabel) = ownershipBadge(book)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 val tint = subtitleColor
@@ -1131,6 +1409,7 @@ private fun SelectionToolbar(
     actions: SelectionActions,
     onEditPurchase: () -> Unit,
     onDelete: () -> Unit,
+    onOpenShelves: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var stateMenuOpen by remember { mutableStateOf(false) }
@@ -1190,6 +1469,13 @@ private fun SelectionToolbar(
                     }
                 }
             }
+        }
+        IconButton(onClick = onOpenShelves) {
+            Icon(
+                painterResource(R.drawable.shelves_48px),
+                contentDescription = stringResource(R.string.shelf_add_to),
+                modifier = Modifier.size(24.dp),
+            )
         }
         Box {
             IconButton(onClick = { moreOpen = true }) {

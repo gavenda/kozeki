@@ -39,7 +39,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -161,7 +160,6 @@ fun SettingsScreen(
         onClearCache = viewModel::clearCache,
         backupActions = backupActions,
         onRefreshExtensions = viewModel::refreshExtensions,
-        onSetSeparateKinds = viewModel::setSeparateKinds,
         onSetUpdateInterval = viewModel::setUpdateInterval,
         onAniListSignIn = viewModel::signInToAniList,
         onAniListSignOut = viewModel::signOutOfAniList,
@@ -183,7 +181,6 @@ fun SettingsContent(
     backupActions: BackupActions,
     modifier: Modifier = Modifier,
     onRefreshExtensions: () -> Unit = {},
-    onSetSeparateKinds: (Boolean) -> Unit = {},
     onSetUpdateInterval: (Int) -> Unit = {},
     onAniListSignIn: () -> Unit = {},
     onAniListSignOut: () -> Unit = {},
@@ -220,10 +217,6 @@ fun SettingsContent(
                 item(key = "source") {
                     Section(title = stringResource(R.string.settings_source_title)) {
                         HardcoverSetting(state, onSignIn, onSignOut, onDismissSignInError)
-                    }
-                }
-                item(key = "comic") {
-                    Section(title = stringResource(R.string.settings_comic_title)) {
                         ComicSourcesSetting(state.extensions, onRefreshExtensions)
                         UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
                     }
@@ -231,17 +224,6 @@ fun SettingsContent(
                 item(key = "tracking") {
                     Section(title = stringResource(R.string.settings_tracking_title)) {
                         AniListSetting(state, onAniListSignIn, onAniListSignOut, onDismissAniListError)
-                    }
-                }
-                item(key = "library") {
-                    Section(title = stringResource(R.string.settings_library_title)) {
-                        SettingRow(
-                            icon = painterResource(R.drawable.shelves_48px),
-                            title = stringResource(R.string.settings_library_separate_title),
-                            subtitle = stringResource(R.string.settings_library_separate_description),
-                        ) {
-                            Switch(checked = state.separateKinds, onCheckedChange = onSetSeparateKinds)
-                        }
                     }
                 }
                 item(key = "appearance") {
