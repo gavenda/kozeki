@@ -17,10 +17,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         NoteEntity::class,
         YearlyGoalEntity::class,
         MetadataCacheEntity::class,
-        MangaChapterEntity::class,
-        MangaTrackEntity::class,
+        ComicChapterEntity::class,
+        ComicTrackEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -33,8 +33,8 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun yearlyGoalDao(): YearlyGoalDao
     abstract fun metadataCacheDao(): MetadataCacheDao
-    abstract fun mangaChapterDao(): MangaChapterDao
-    abstract fun mangaTrackDao(): MangaTrackDao
+    abstract fun comicChapterDao(): ComicChapterDao
+    abstract fun comicTrackDao(): ComicTrackDao
     abstract fun backupDao(): BackupDao
 
     companion object {
@@ -46,11 +46,12 @@ abstract class KozekiDatabase : RoomDatabase() {
                     AddCustomCover,
                     AddPhysicalReadings,
                     AddPurchaseMemo,
-                    AddMangaChapters,
-                    AddMangaTracks,
+                    AddComicChapters,
+                    AddComicTracks,
                     AddTrackCovers,
                     AddNewChapters,
                     AddTrackPublication,
+                    RenameToComics,
                 )
                 .build()
 
@@ -120,8 +121,11 @@ abstract class KozekiDatabase : RoomDatabase() {
             }
         }
 
-        /** Manga are read chapter by chapter, and the user's place in each is kept. */
-        private val AddMangaChapters = object : Migration(6, 7) {
+        /**
+         * Comics are read chapter by chapter, and the user's place in each is kept. Up to version 12
+         * comics were called manga, and these steps make the tables under the names they had then.
+         */
+        private val AddComicChapters = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `manga_chapters` (`bookId` TEXT NOT NULL, `url` TEXT NOT NULL, " +
@@ -136,8 +140,8 @@ abstract class KozekiDatabase : RoomDatabase() {
             }
         }
 
-        /** A manga can be followed on AniList, and what it was last told is kept. */
-        private val AddMangaTracks = object : Migration(7, 8) {
+        /** A comic can be followed on AniList, and what it was last told is kept. */
+        private val AddComicTracks = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS `manga_tracks` (`bookId` TEXT NOT NULL, `mediaId` INTEGER NOT NULL, " +
@@ -157,14 +161,33 @@ abstract class KozekiDatabase : RoomDatabase() {
             }
         }
 
-        /** A track keeps whether its manga is still coming out. */
+        /**
+         * Manga are called comics. The tables are renamed, and so are the source the books found
+         * through Mihon carry and the links of their covers. Cached lookups under the old name go.
+         */
+        private val RenameToComics = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `manga_chapters` RENAME TO `comic_chapters`")
+                db.execSQL("DROP INDEX IF EXISTS `index_manga_chapters_bookId`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_comic_chapters_bookId` ON `comic_chapters` (`bookId`)")
+                db.execSQL("ALTER TABLE `manga_tracks` RENAME TO `comic_tracks`")
+                db.execSQL("UPDATE books SET source = 'COMICS' WHERE source = 'MANGA'")
+                db.execSQL(
+                    "UPDATE books SET coverUrl = 'kozeki-comic://' || substr(coverUrl, 16) " +
+                        "WHERE coverUrl LIKE 'kozeki-manga://%'",
+                )
+                db.execSQL("DELETE FROM metadata_cache WHERE source = 'MANGA'")
+            }
+        }
+
+        /** A track keeps whether its comic is still coming out. */
         private val AddTrackPublication = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE manga_tracks ADD COLUMN publication TEXT")
             }
         }
 
-        /** A manga counts the chapters that came out since it was last opened, and when it was last checked. */
+        /** A comic counts the chapters that came out since it was last opened, and when it was last checked. */
         private val AddNewChapters = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN newChapters INTEGER NOT NULL DEFAULT 0")

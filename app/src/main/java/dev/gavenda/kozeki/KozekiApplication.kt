@@ -3,8 +3,8 @@ package dev.gavenda.kozeki
 import android.app.Application
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
-import dev.gavenda.kozeki.data.manga.PageImages
-import dev.gavenda.kozeki.data.manga.MangaCoverFetcher
+import dev.gavenda.kozeki.data.comic.PageImages
+import dev.gavenda.kozeki.data.comic.ComicCoverFetcher
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
@@ -24,11 +24,11 @@ class KozekiApplication : Application() {
         val koin = startKoin { modules(appModule(this@KozekiApplication)) }.koin
         // Before anything can load an extension.
         koin.exposeToExtensions()
-        // Manga covers are fetched through their source, which a plain network fetch is refused by.
+        // Comic covers are fetched through their source, which a plain network fetch is refused by.
         SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
                 .components {
-                    add(MangaCoverFetcher.Factory { koin.get() })
+                    add(ComicCoverFetcher.Factory { koin.get() })
                     // AVIF and JPEG XL pages, which the platform cannot decode at a webtoon's height.
                     add(PageImages.CoilDecoder.Factory())
                 }
@@ -42,7 +42,7 @@ class KozekiApplication : Application() {
         }
         // Picks up books imported offline, or left pending because no source was configured yet.
         MatchWorker.enqueue(this)
-        // New chapters of the manga being followed, found while the app is not open.
+        // New chapters of the comics being followed, found while the app is not open.
         koin.get<CoroutineScope>().launch {
             koin.get<SettingsRepository>().updateIntervalHours.collect { UpdateWorker.schedule(this@KozekiApplication, it) }
         }

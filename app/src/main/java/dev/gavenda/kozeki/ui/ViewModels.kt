@@ -14,7 +14,7 @@ import dev.gavenda.kozeki.ui.book.BookDetailViewModel
 import dev.gavenda.kozeki.ui.book.FoundBookViewModel
 import dev.gavenda.kozeki.ui.calendar.CalendarViewModel
 import dev.gavenda.kozeki.ui.library.LibraryViewModel
-import dev.gavenda.kozeki.ui.manga.MangaReaderViewModel
+import dev.gavenda.kozeki.ui.comic.ComicReaderViewModel
 import dev.gavenda.kozeki.ui.reader.ReaderViewModel
 import dev.gavenda.kozeki.ui.search.SearchViewModel
 import dev.gavenda.kozeki.ui.settings.SettingsViewModel
@@ -63,7 +63,7 @@ fun readerViewModel(bookId: String) = ReaderViewModel(
     koin.get(),
 )
 
-fun mangaReaderViewModel(bookId: String, chapterUrl: String) = MangaReaderViewModel(
+fun comicReaderViewModel(bookId: String, chapterUrl: String) = ComicReaderViewModel(
     bookId,
     chapterUrl,
     koin.get(),
@@ -81,7 +81,7 @@ fun settingsViewModel() = SettingsViewModel(
     hardcoverSignIn = koin.get(),
     aniListAuth = koin.get(),
     driveBackup = koin.get(),
-    mangaSources = koin.get(),
+    comicSources = koin.get(),
     versionName = BuildConfig.VERSION_NAME,
     clock = koin.get(),
 )

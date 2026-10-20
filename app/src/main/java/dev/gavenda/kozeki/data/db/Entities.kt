@@ -76,7 +76,7 @@ data class BookEntity(
     val sourceUrl: String? = null,
     val matchStatus: MatchStatus = MatchStatus.NONE,
     /**
-     * What a Mihon source asked to have handed back with the manga, as JSON. Only manga have any, and
+     * What a Mihon source asked to have handed back with the comic, as JSON. Only comics have any, and
      * a source that keeps none leaves it null.
      */
     val sourceMemo: String? = null,
@@ -98,9 +98,9 @@ data class BookEntity(
     val chapterIndex: Int? = null,
     val chapterCount: Int? = null,
     val lastReadAt: Long? = null,
-    /** Chapters of a manga that came out since its page was last opened. Opening the page puts it back to 0. */
+    /** Chapters of a comic that came out since its page was last opened. Opening the page puts it back to 0. */
     @ColumnInfo(defaultValue = "0") val newChapters: Int = 0,
-    /** Epoch milliseconds a manga's source was last asked for its chapters in the background, or 0 for never. */
+    /** Epoch milliseconds a comic's source was last asked for its chapters in the background, or 0 for never. */
     @ColumnInfo(defaultValue = "0") val chaptersCheckedAt: Long = 0L,
 
     /** Page reached in a physical copy, entered by hand and kept apart from the EPUB position above. */
@@ -111,24 +111,24 @@ data class BookEntity(
     @Embedded val sync: SyncStamp,
 )
 
-/** Whether the book is a manga: read chapter by chapter through a Mihon source, with no file of its own. */
-val BookEntity.isManga: Boolean get() = source == MetadataSource.MANGA
+/** Whether the book is a comic: read chapter by chapter through a Mihon source, with no file of its own. */
+val BookEntity.isComic: Boolean get() = source == MetadataSource.COMICS
 
-/** Whether the book is on the user's shelves: an EPUB was imported for it, or it is a manga being read online. */
-val BookEntity.isInLibrary: Boolean get() = fileHash != null || isManga
+/** Whether the book is on the user's shelves: an EPUB was imported for it, or it is a comic being read online. */
+val BookEntity.isInLibrary: Boolean get() = fileHash != null || isComic
 
 /**
- * A chapter of a manga, as its source listed it, with where the user is in it. Rows are written to a
+ * A chapter of a comic, as its source listed it, with where the user is in it. Rows are written to a
  * backup as they are, so a new column needs a default. Chapters are looked up in the source again
  * whenever the book is opened, so what is kept for good is what the user did: [read] and [lastPageRead].
  */
 @Entity(
-    tableName = "manga_chapters",
+    tableName = "comic_chapters",
     primaryKeys = ["bookId", "url"],
     indices = [Index("bookId")],
 )
 @Serializable
-data class MangaChapterEntity(
+data class ComicChapterEntity(
     val bookId: String,
     /** The chapter's URL on its source, which is what the source knows it by. */
     val url: String,
@@ -254,12 +254,12 @@ data class MetadataCacheEntity(
     val expiresAt: Long,
 )
 
-/** A manga as it stands on the user's AniList. The progress and status here are what AniList was last told or told us. */
-@Entity(tableName = "manga_tracks")
+/** A comic as it stands on the user's AniList. The progress and status here are what AniList was last told or told us. */
+@Entity(tableName = "comic_tracks")
 @Serializable
-data class MangaTrackEntity(
+data class ComicTrackEntity(
     @PrimaryKey val bookId: String,
-    /** The manga's ID on AniList. */
+    /** The comic's ID on AniList. */
     val mediaId: Long,
     /** The user's list entry for it, once there is one. */
     val entryId: Long? = null,

@@ -20,7 +20,7 @@ import androidx.compose.foundation.text.input.delete
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExpandedDockedSearchBar
-import androidx.compose.material3.ExpandedFullScreenSearchBar
+import androidx.compose.material3.ExpandedFullScreenContainedSearchBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -89,6 +89,8 @@ fun BookSearchBar(
     onQueryChange: (String) -> Unit,
     onBookClick: (Book) -> Unit,
     modifier: Modifier = Modifier,
+    /** What the empty field asks for, which follows the kind of book the list shows. */
+    @StringRes hint: Int = R.string.search_books_hint,
 ) {
     val searchBarState = rememberSearchBarState()
     val textFieldState = rememberTextFieldState()
@@ -105,6 +107,18 @@ fun BookSearchBar(
         if (!expanded) textFieldState.clearText()
     }
 
+    // The open search keeps the colour of the page it opened from, with the field still the pill
+    // it was in the bar.
+    val pillColor = SearchBarDefaults.collapsedContainedSearchBarColor
+    val colors = SearchBarDefaults.colors(
+        containerColor = MaterialTheme.colorScheme.surface,
+        inputFieldColors = SearchBarDefaults.inputFieldColors(
+            focusedContainerColor = pillColor,
+            unfocusedContainerColor = pillColor,
+            disabledContainerColor = pillColor,
+        ),
+    )
+
     // Composed twice, in the bar and again in the open search, which is a window of its own.
     val inputField = @Composable { fieldModifier: Modifier ->
         val keyboard = LocalSoftwareKeyboardController.current
@@ -117,13 +131,13 @@ fun BookSearchBar(
             modifier = fieldModifier.fillMaxWidth(),
             placeholder = {
                 // The field already announces itself as a search field.
-                Text(stringResource(R.string.search_books_hint), Modifier.clearAndSetSemantics {})
+                Text(stringResource(hint), Modifier.clearAndSetSemantics {})
             },
             leadingIcon = {
                 if (expanded) {
                     IconButton(onClick = { scope.launch { searchBarState.animateToCollapsed() } }) {
                         Icon(
-                            painterResource(R.drawable.arrow_back_48px),
+                            painterResource(R.drawable.keyboard_arrow_left_48px),
                             contentDescription = stringResource(R.string.action_back),
                             modifier = Modifier.size(24.dp),
                         )
@@ -144,11 +158,13 @@ fun BookSearchBar(
             // Clearing the query takes a frame or two longer than closing, and the closed bar
             // must not flash it in the meantime.
             outputTransformation = if (expanded) null else HideText,
+            colors = colors.inputFieldColors,
         )
     }
     val results: @Composable ColumnScope.() -> Unit = {
         SearchResults(
             state = state,
+            hint = hint,
             onBookClick = { book ->
                 // Once the search is closing, a second tap must not pick a second book.
                 if (searchBarState.targetValue == SearchBarValue.Expanded) {
@@ -186,9 +202,10 @@ fun BookSearchBar(
         if (roomy) {
             ExpandedDockedSearchBar(state = searchBarState, inputField = { inputField(Modifier) }, content = results)
         } else {
-            ExpandedFullScreenSearchBar(
+            ExpandedFullScreenContainedSearchBar(
                 state = searchBarState,
                 inputField = { inputField(Modifier) },
+                colors = colors,
                 content = results,
             )
         }
@@ -196,12 +213,18 @@ fun BookSearchBar(
 }
 
 @Composable
-private fun SearchResults(state: SearchUiState, onBookClick: (Book) -> Unit, modifier: Modifier = Modifier) {
+private fun SearchResults(
+    state: SearchUiState,
+    onBookClick: (Book) -> Unit,
+    modifier: Modifier = Modifier,
+    @StringRes hint: Int = R.string.search_books_hint,
+) {
     when {
-        state.query.isEmpty() -> SearchMessage(
+        // An empty query lists every book, so this is only seen with none in Kozeki at all.
+        state.query.isEmpty() && state.isEmpty -> SearchMessage(
             expression = Expression.CURIOUS,
             icon = painterResource(R.drawable.search_48px),
-            title = stringResource(R.string.search_books_hint),
+            title = stringResource(hint),
             message = stringResource(R.string.search_books_prompt),
             modifier = modifier,
         )
@@ -311,7 +334,7 @@ private fun BookSearchBarPreview() {
 @Composable
 private fun SearchResultsPreview() {
     AppTheme {
-        Surface(color = SearchBarDefaults.colors().containerColor) {
+        Surface {
             SearchResults(state = SearchIndex(PreviewData.books).search("e"), onBookClick = {})
         }
     }
@@ -321,7 +344,7 @@ private fun SearchResultsPreview() {
 @Composable
 private fun SearchNoResultsPreview() {
     AppTheme {
-        Surface(color = SearchBarDefaults.colors().containerColor) {
+        Surface {
             SearchResults(state = SearchUiState(query = "silmarillion"), onBookClick = {})
         }
     }

@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.ui.search
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +51,7 @@ fun SearchTopBar(
     onSettingsClick: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior,
     modifier: Modifier = Modifier,
+    @StringRes searchHint: Int = R.string.search_books_hint,
 ) {
     val barState = scrollBehavior.state
     val containerColor = MaterialTheme.colorScheme.surface
@@ -95,6 +97,7 @@ fun SearchTopBar(
                 state = search,
                 onQueryChange = onSearchQueryChange,
                 onBookClick = onBookClick,
+                hint = searchHint,
                 modifier = Modifier
                     // The bar gives up its end to the settings button before it slides up beside it.
                     .layout { measurable, constraints ->

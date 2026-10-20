@@ -52,6 +52,7 @@ data class SettingsSnapshot(
     val readerPreferences: ReaderPreferences? = null,
     val lastCurrency: String? = null,
     val librarySort: String? = null,
+    val librarySortReversed: Boolean? = null,
     val libraryDisplay: String? = null,
     val searchSource: MetadataSource? = null,
 )
@@ -83,6 +84,11 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     /** Name of the order the library was last put in, or null while the user has not picked one. */
     val librarySort: Flow<String?> = store.data.map { it[Keys.LibrarySort] }.distinctUntilChanged()
 
+    /** Whether the library's order is turned the other way round from its usual direction. */
+    val librarySortReversed: Flow<Boolean> = store.data
+        .map { it[Keys.LibrarySortReversed] ?: false }
+        .distinctUntilChanged()
+
     /** Name of the way the library's books were last laid out, or null while the user has not picked one. */
     val libraryDisplay: Flow<String?> = store.data.map { it[Keys.LibraryDisplay] }.distinctUntilChanged()
 
@@ -90,13 +96,13 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     val libraryKind: Flow<String?> = store.data.map { it[Keys.LibraryKind] }.distinctUntilChanged()
 
     /**
-     * Whether the library keeps manga apart from the books with an EPUB or a paper copy, showing
+     * Whether the library keeps comics apart from the books with an EPUB or a paper copy, showing
      * one kind at a time. On unless the user turned it off.
      */
     val separateLibraryKinds: Flow<Boolean> =
         store.data.map { it[Keys.SeparateLibraryKinds] ?: true }.distinctUntilChanged()
 
-    /** Hours between the checks of followed manga for new chapters, or 0 for none. */
+    /** Hours between the checks of followed comics for new chapters, or 0 for none. */
     val updateIntervalHours: Flow<Int> =
         store.data.map { it[Keys.UpdateIntervalHours] ?: DEFAULT_UPDATE_INTERVAL_HOURS }.distinctUntilChanged()
 
@@ -111,17 +117,28 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     var searchSource: MetadataSource
         get() {
             val name = searchPreferences.getString(SEARCH_SOURCE, null)
-            return MetadataSource.entries.find { it.name == name } ?: MetadataSource.HARDCOVER
+            return MetadataSource.named(name) ?: MetadataSource.HARDCOVER
         }
         set(value) = searchPreferences.edit { putString(SEARCH_SOURCE, value.name) }
 
     /**
-     * The ID of the manga source the online search of manga goes to, or 0 while the user has not
+     * The book catalogue the online search was last pointed at, so that going back from comics to
+     * books returns to it. Until one is saved, the last search source when that is a book one.
+     */
+    var bookSearchSource: MetadataSource
+        get() {
+            val saved = MetadataSource.named(searchPreferences.getString(BOOK_SOURCE, null))
+            return saved ?: searchSource.takeIf { it in MetadataSource.matchable } ?: MetadataSource.HARDCOVER
+        }
+        set(value) = searchPreferences.edit { putString(BOOK_SOURCE, value.name) }
+
+    /**
+     * The ID of the comic source the online search of comics goes to, or 0 while the user has not
      * picked one. Kept beside [searchSource] for the same reason.
      */
-    var mangaSourceId: Long
-        get() = searchPreferences.getLong(MANGA_SOURCE, 0L)
-        set(value) = searchPreferences.edit { putLong(MANGA_SOURCE, value) }
+    var comicSourceId: Long
+        get() = searchPreferences.getLong(COMIC_SOURCE, searchPreferences.getLong(LEGACY_COMIC_SOURCE, 0L))
+        set(value) = searchPreferences.edit { putLong(COMIC_SOURCE, value) }
 
     /**
      * The Google account backups go to, or null while nobody is signed in. It says where the
@@ -146,8 +163,9 @@ class SettingsRepository(context: Context) : DriveLinkStore {
                 ?.let { runCatching { json.decodeFromString<ReaderPreferences>(it) }.getOrNull() },
             lastCurrency = prefs[Keys.LastCurrency],
             librarySort = prefs[Keys.LibrarySort],
+            librarySortReversed = prefs[Keys.LibrarySortReversed],
             libraryDisplay = prefs[Keys.LibraryDisplay],
-            searchSource = MetadataSource.entries.find { it.name == searchPreferences.getString(SEARCH_SOURCE, null) },
+            searchSource = MetadataSource.named(searchPreferences.getString(SEARCH_SOURCE, null)),
         )
     }
 
@@ -159,6 +177,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
             snapshot.readerPreferences?.let { prefs[Keys.ReaderPreferences] = json.encodeToString(it) }
             snapshot.lastCurrency?.let { prefs[Keys.LastCurrency] = it }
             snapshot.librarySort?.let { prefs[Keys.LibrarySort] = it }
+            snapshot.librarySortReversed?.let { prefs[Keys.LibrarySortReversed] = it }
             snapshot.libraryDisplay?.let { prefs[Keys.LibraryDisplay] = it }
         }
         snapshot.searchSource?.let { searchSource = it }
@@ -180,8 +199,11 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.LastCurrency] = code }
     }
 
-    suspend fun setLibrarySort(name: String) {
-        store.edit { it[Keys.LibrarySort] = name }
+    suspend fun setLibrarySort(name: String, reversed: Boolean) {
+        store.edit {
+            it[Keys.LibrarySort] = name
+            it[Keys.LibrarySortReversed] = reversed
+        }
     }
 
     suspend fun setLibraryKind(name: String) {
@@ -206,6 +228,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val ReaderPreferences = stringPreferencesKey("reader_preferences")
         val LastCurrency = stringPreferencesKey("last_currency")
         val LibrarySort = stringPreferencesKey("library_sort")
+        val LibrarySortReversed = booleanPreferencesKey("library_sort_reversed")
         val LibraryDisplay = stringPreferencesKey("library_display")
         val LibraryKind = stringPreferencesKey("library_kind")
         val SeparateLibraryKinds = booleanPreferencesKey("separate_library_kinds")
@@ -217,6 +240,10 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
         const val DEFAULT_UPDATE_INTERVAL_HOURS = 12
         private const val SEARCH_SOURCE = "source"
-        private const val MANGA_SOURCE = "manga_source"
+        private const val COMIC_SOURCE = "comic_source"
+        private const val BOOK_SOURCE = "book_source"
+
+        /** Where [comicSourceId] was kept before comics were called comics. */
+        private const val LEGACY_COMIC_SOURCE = "manga_source"
     }
 }

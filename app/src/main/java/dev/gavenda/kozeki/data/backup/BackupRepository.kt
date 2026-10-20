@@ -67,8 +67,8 @@ class BackupRepository(
                 physicalReadings = dao.physicalReadings(),
                 notes = dao.notes(),
                 yearlyGoals = dao.yearlyGoals(),
-                mangaChapters = dao.mangaChapters(),
-                mangaTracks = dao.mangaTracks(),
+                comicChapters = dao.comicChapters(),
+                comicTracks = dao.comicTracks(),
                 settings = savedSettings,
             )
         }
@@ -86,8 +86,8 @@ class BackupRepository(
             dao.clearPhysicalReadings()
             dao.clearNotes()
             dao.clearYearlyGoals()
-            dao.clearMangaChapters()
-            dao.clearMangaTracks()
+            dao.clearComicChapters()
+            dao.clearComicTracks()
             dao.putBooks(layout.books)
             // A row of a book the backup does not have would count in the statistics under no title.
             dao.putReadThroughs(backup.readThroughs.filter { it.bookId in bookIds })
@@ -95,8 +95,8 @@ class BackupRepository(
             dao.putPhysicalReadings(backup.physicalReadings.filter { it.bookId in bookIds })
             dao.putNotes(backup.notes.filter { it.bookId in bookIds })
             dao.putYearlyGoals(backup.yearlyGoals)
-            dao.putMangaChapters(backup.mangaChapters.filter { it.bookId in bookIds })
-            dao.putMangaTracks(backup.mangaTracks.filter { it.bookId in bookIds })
+            dao.putComicChapters(backup.comicChapters.filter { it.bookId in bookIds })
+            dao.putComicTracks(backup.comicTracks.filter { it.bookId in bookIds })
         }
         storage.keepOnly(layout.epubs, layout.books.mapNotNullTo(HashSet()) { it.coverFile })
         settings.restore(backup.settings)

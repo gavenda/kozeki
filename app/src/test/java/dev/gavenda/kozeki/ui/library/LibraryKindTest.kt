@@ -9,23 +9,23 @@ import org.junit.Test
 class LibraryKindTest {
 
     private val book = Book(id = "b", title = "A book")
-    private val manga = Book(id = "m", title = "A manga", isManga = true)
+    private val comic = Book(id = "m", title = "A comic", isComic = true)
 
     @Test
-    fun `books are what is not manga`() {
+    fun `books are what is not comic`() {
         assertTrue(LibraryKind.BOOKS.matches(book))
-        assertFalse(LibraryKind.BOOKS.matches(manga))
+        assertFalse(LibraryKind.BOOKS.matches(comic))
     }
 
     @Test
-    fun `manga are what is manga`() {
-        assertTrue(LibraryKind.MANGA.matches(manga))
-        assertFalse(LibraryKind.MANGA.matches(book))
+    fun `comics are what is comic`() {
+        assertTrue(LibraryKind.COMICS.matches(comic))
+        assertFalse(LibraryKind.COMICS.matches(book))
     }
 
     @Test
     fun `the other kind is the one a toggle leads to`() {
-        assertEquals(LibraryKind.MANGA, LibraryKind.BOOKS.other)
-        assertEquals(LibraryKind.BOOKS, LibraryKind.MANGA.other)
+        assertEquals(LibraryKind.COMICS, LibraryKind.BOOKS.other)
+        assertEquals(LibraryKind.BOOKS, LibraryKind.COMICS.other)
     }
 }

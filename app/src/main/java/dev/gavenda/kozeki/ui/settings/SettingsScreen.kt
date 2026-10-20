@@ -71,7 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import dev.gavenda.kozeki.R
-import dev.gavenda.kozeki.data.manga.BrokenExtension
+import dev.gavenda.kozeki.data.comic.BrokenExtension
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
@@ -222,9 +222,9 @@ fun SettingsContent(
                         HardcoverSetting(state, onSignIn, onSignOut, onDismissSignInError)
                     }
                 }
-                item(key = "manga") {
-                    Section(title = stringResource(R.string.settings_manga_title)) {
-                        MangaSourcesSetting(state.extensions, onRefreshExtensions)
+                item(key = "comic") {
+                    Section(title = stringResource(R.string.settings_comic_title)) {
+                        ComicSourcesSetting(state.extensions, onRefreshExtensions)
                         UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
                     }
                 }
@@ -405,7 +405,7 @@ private fun About(versionName: String, birthday: Boolean) {
     }
 }
 
-/** The AniList account manga are tracked on. Tapping it signs in, or offers to sign out once signed in. */
+/** The AniList account comics are tracked on. Tapping it signs in, or offers to sign out once signed in. */
 @Composable
 private fun AniListSetting(
     state: SettingsUiState,
@@ -602,7 +602,7 @@ internal fun AccountAvatar(url: String?) {
 
 private val UPDATE_INTERVALS = listOf(0, 6, 12, 24)
 
-/** How often the manga being followed are asked for new chapters, which the library then shows. */
+/** How often the comics being followed are asked for new chapters, which the library then shows. */
 @Composable
 private fun UpdateIntervalSetting(hours: Int, onSet: (Int) -> Unit) {
     SettingRow(

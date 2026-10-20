@@ -80,10 +80,15 @@ class SearchIndexTest {
     }
 
     @Test
-    fun `a query without a word in it finds nothing`() {
-        assertTrue(index.search("").isEmpty)
-        assertTrue(index.search("   ").isEmpty)
-        assertTrue(index.search("?!").isEmpty)
+    fun `an empty query finds every book`() {
+        val all = listOf("ender", "darkness", "miserables", "dispossessed", "lathe")
+        assertEquals(all, found(""))
+        assertEquals(all, found("   "))
         assertEquals("", index.search("   ").query)
+    }
+
+    @Test
+    fun `a query of only punctuation finds nothing`() {
+        assertTrue(index.search("?!").isEmpty)
     }
 }

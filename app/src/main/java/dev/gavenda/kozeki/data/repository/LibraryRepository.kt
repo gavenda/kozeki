@@ -5,7 +5,7 @@ import androidx.room.withTransaction
 import dev.gavenda.kozeki.data.db.BookEntity
 import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.db.isInLibrary
-import dev.gavenda.kozeki.data.db.isManga
+import dev.gavenda.kozeki.data.db.isComic
 import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
@@ -73,7 +73,7 @@ class LibraryRepository(
     private val sessions = db.readingSessionDao()
     private val physicalReadings = db.physicalReadingDao()
     private val notes = db.noteDao()
-    private val mangaChapters = db.mangaChapterDao()
+    private val comicChapters = db.comicChapterDao()
     private val importLock = Mutex()
 
     private val _stateChanges = MutableSharedFlow<Pair<String, ReadingState>>(extraBufferCapacity = 16)
@@ -289,8 +289,8 @@ class LibraryRepository(
     /** Adds a book found in a metadata source to the wishlist or the purchased list. */
     suspend fun addFromMetadata(metadata: BookMetadata, wanted: Acquisition): String {
         books.findBySource(metadata.source, metadata.sourceId).firstOrNull()?.let { return it.id }
-        // A manga can be read from the moment it is added, so it is never merely wanted.
-        val acquisition = if (metadata.source == MetadataSource.MANGA) Acquisition.DOWNLOADED else wanted
+        // A comic can be read from the moment it is added, so it is never merely wanted.
+        val acquisition = if (metadata.source == MetadataSource.COMICS) Acquisition.DOWNLOADED else wanted
 
         val bookId = UUID.randomUUID().toString()
         books.upsert(
@@ -790,7 +790,7 @@ class LibraryRepository(
             sessions.softDeleteForBook(bookId, now)
             physicalReadings.softDeleteForBook(bookId, now)
             notes.softDeleteForBook(bookId, now)
-            mangaChapters.softDeleteForBook(bookId, now)
+            comicChapters.softDeleteForBook(bookId, now)
             books.upsert(book.copy(sync = book.sync.deleted(now)))
             cover = book.coverFile
         }
@@ -923,7 +923,7 @@ class LibraryRepository(
         matchStatus = matchStatus,
         sourceMemo = sourceMemo,
         inLibrary = isInLibrary,
-        isManga = isManga,
+        isComic = isComic,
         hasFile = fileHash != null && storage.hasEpub(id),
         locator = locator,
         progression = progression,

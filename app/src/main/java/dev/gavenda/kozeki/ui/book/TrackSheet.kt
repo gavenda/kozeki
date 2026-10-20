@@ -48,7 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
-import dev.gavenda.kozeki.data.db.MangaTrackEntity
+import dev.gavenda.kozeki.data.db.ComicTrackEntity
 import dev.gavenda.kozeki.data.model.TrackStatus
 import dev.gavenda.kozeki.data.tracking.anilist.AniListMedia
 import dev.gavenda.kozeki.data.tracking.anilist.ScoreFormat
@@ -60,12 +60,12 @@ class TrackSheetActions(
     val onQueryChange: (String) -> Unit = {},
     val onSearch: () -> Unit = {},
     val onBind: (AniListMedia) -> Unit = {},
-    val onEdit: ((MangaTrackEntity) -> MangaTrackEntity) -> Unit = {},
+    val onEdit: ((ComicTrackEntity) -> ComicTrackEntity) -> Unit = {},
     val onUntrack: (fromList: Boolean) -> Unit = {},
     val onDismiss: () -> Unit = {},
 )
 
-/** Finds the manga on AniList, or, once it is followed, shows and changes its entry there. */
+/** Finds the comic on AniList, or, once it is followed, shows and changes its entry there. */
 @Composable
 fun TrackSheet(state: TrackingUiState, actions: TrackSheetActions) {
     ModalBottomSheet(onDismissRequest = actions.onDismiss, sheetState = rememberExpandedSheetState()) {
@@ -166,7 +166,7 @@ private fun TrackSearch(state: TrackingUiState, actions: TrackSheetActions) {
 }
 
 @Composable
-private fun TrackEntry(track: MangaTrackEntity, state: TrackingUiState, actions: TrackSheetActions) {
+private fun TrackEntry(track: ComicTrackEntity, state: TrackingUiState, actions: TrackSheetActions) {
     val sheet = state.sheet
     Column(
         modifier = Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),

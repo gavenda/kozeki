@@ -26,7 +26,7 @@ class TrackWorker(context: Context, parameters: WorkerParameters) :
     }
 
     companion object {
-        private const val UNIQUE_NAME = "push-tracked-manga"
+        private const val UNIQUE_NAME = "push-tracked-comics"
         private const val MAX_ATTEMPTS = 6
 
         fun enqueue(context: Context) {

@@ -3,8 +3,8 @@ package dev.gavenda.kozeki.ui.book
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.gavenda.kozeki.data.db.MangaTrackEntity
-import dev.gavenda.kozeki.data.manga.MangaChapterRepository
+import dev.gavenda.kozeki.data.db.ComicTrackEntity
+import dev.gavenda.kozeki.data.comic.ComicChapterRepository
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.BookReviews
@@ -14,7 +14,7 @@ import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
-import dev.gavenda.kozeki.data.model.MangaChapter
+import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.Note
@@ -72,10 +72,10 @@ data class ReviewsUiState(
     val error: LookupError? = null,
 )
 
-/** The chapters of a manga, for the page of a book that is one. */
-data class MangaChaptersUiState(
+/** The chapters of a comic, for the page of a book that is one. */
+data class ComicChaptersUiState(
     /** In reading order, the first chapter first. */
-    val chapters: List<MangaChapter> = emptyList(),
+    val chapters: List<ComicChapter> = emptyList(),
     /** Whether the source is being asked what chapters it has right now. */
     val loading: Boolean = false,
     val error: LookupError? = null,
@@ -83,7 +83,7 @@ data class MangaChaptersUiState(
     val captchaUrl: String? = null,
 ) {
     /** Where reading goes on from, which is the last chapter once every one is read. */
-    val resume: MangaChapter? get() = chapters.resumeChapter() ?: chapters.lastOrNull()
+    val resume: ComicChapter? get() = chapters.resumeChapter() ?: chapters.lastOrNull()
 
     /** Every chapter is read. */
     val finished: Boolean get() = chapters.isNotEmpty() && chapters.all { it.read }
@@ -92,7 +92,7 @@ data class MangaChaptersUiState(
     val started: Boolean get() = chapters.any { it.read || it.lastPageRead > 0 }
 }
 
-/** The sheet where a manga is bound to its page on AniList and its entry there is looked after. */
+/** The sheet where a comic is bound to its page on AniList and its entry there is looked after. */
 data class TrackSheetUiState(
     val open: Boolean = false,
     val query: String = "",
@@ -103,20 +103,20 @@ data class TrackSheetUiState(
     val error: LookupError? = null,
 )
 
-/** A manga's place on AniList, for the page of a manga. */
+/** A comic's place on AniList, for the page of a comic. */
 data class TrackingUiState(
     /** Somebody is signed in to AniList, which tracking needs. */
     val signedIn: Boolean = false,
     val scoreFormat: ScoreFormat = ScoreFormat.POINT_10_DECIMAL,
-    /** Null while the manga is not followed there. */
-    val track: MangaTrackEntity? = null,
+    /** Null while the comic is not followed there. */
+    val track: ComicTrackEntity? = null,
     val sheet: TrackSheetUiState = TrackSheetUiState(),
 )
 
 data class BookDetailUiState(
-    /** Null for a book that is not a manga. */
-    val chapters: MangaChaptersUiState? = null,
-    /** Null for a book that is not a manga. */
+    /** Null for a book that is not a comic. */
+    val chapters: ComicChaptersUiState? = null,
+    /** Null for a book that is not a comic. */
     val tracking: TrackingUiState? = null,
     val loading: Boolean = true,
     /** Whether a pull to refresh is waiting on the source. */
@@ -153,7 +153,7 @@ class BookDetailViewModel(
     private val metadata: MetadataRepository,
     private val matchService: MatchService,
     private val settings: SettingsRepository,
-    private val mangaChapters: MangaChapterRepository,
+    private val comicChapters: ComicChapterRepository,
     private val scheduleMatching: () -> Unit,
     private val tracker: TrackRepository,
     private val aniListAuth: AniListAuth,
@@ -162,8 +162,8 @@ class BookDetailViewModel(
     private data class Activity(
         val importing: Boolean,
         val matching: Boolean,
-        val chapters: List<MangaChapter>,
-        val chaptersStatus: MangaChaptersUiState,
+        val chapters: List<ComicChapter>,
+        val chaptersStatus: ComicChaptersUiState,
         val refreshing: Boolean,
     )
 
@@ -182,7 +182,7 @@ class BookDetailViewModel(
     private var trackSearchJob: Job? = null
 
     /** Whether the source is being asked for chapters, and how that went. Its list is not in it. */
-    private val chaptersStatus = MutableStateFlow(MangaChaptersUiState())
+    private val chaptersStatus = MutableStateFlow(ComicChaptersUiState())
     private var chaptersJob: Job? = null
     private val refreshing = MutableStateFlow(false)
     private var searchJob: Job? = null
@@ -226,7 +226,7 @@ class BookDetailViewModel(
             combine(
                 importing,
                 matchService.matching.map { bookId in it },
-                mangaChapters.observe(bookId),
+                comicChapters.observe(bookId),
                 chaptersStatus,
                 refreshing,
                 ::Activity,
@@ -237,12 +237,12 @@ class BookDetailViewModel(
             val (busy, matching) = activity.importing to activity.matching
             BookDetailUiState(
                 loading = false,
-                chapters = if (data.book?.isManga == true) {
+                chapters = if (data.book?.isComic == true) {
                     activity.chaptersStatus.copy(chapters = activity.chapters.inReadingOrder())
                 } else {
                     null
                 },
-                tracking = trackingState.takeIf { data.book?.isManga == true },
+                tracking = trackingState.takeIf { data.book?.isComic == true },
                 book = data.book,
                 notes = data.notes,
                 readThroughs = data.readThroughs,
@@ -259,12 +259,12 @@ class BookDetailViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookDetailUiState())
 
     init {
-        // A manga's chapters are asked for again whenever its page is opened: new ones appear there.
+        // A comic's chapters are asked for again whenever its page is opened: new ones appear there.
         viewModelScope.launch {
             val book = library.observeBook(bookId).filterNotNull().first()
-            if (book.isManga) {
+            if (book.isComic) {
                 // Opening the page is seeing what came out.
-                mangaChapters.clearNew(bookId)
+                comicChapters.clearNew(bookId)
                 refreshChapters()
                 // What was read on AniList meanwhile; not worth saying anything of when it cannot be asked.
                 try {
@@ -287,19 +287,19 @@ class BookDetailViewModel(
 
     fun readAgain() = launch {
         library.readAgain(bookId)
-        // A manga is read again from its first chapter, so none counts as read.
-        uiState.value.chapters?.chapters?.let { mangaChapters.markRead(bookId, it.map(MangaChapter::url), read = false) }
+        // A comic is read again from its first chapter, so none counts as read.
+        uiState.value.chapters?.chapters?.let { comicChapters.markRead(bookId, it.map(ComicChapter::url), read = false) }
     }
 
-    /** Marks chapters of a manga read, or puts them back to unread. */
-    fun setChaptersRead(urls: List<String>, read: Boolean) = launch { mangaChapters.markRead(bookId, urls, read) }
+    /** Marks chapters of a comic read, or puts them back to unread. */
+    fun setChaptersRead(urls: List<String>, read: Boolean) = launch { comicChapters.markRead(bookId, urls, read) }
 
     /** Asks the source for its chapters again, after it failed or to see whether new ones came out. */
     fun retryChapters() = refreshChapters()
 
     /**
-     * Asks the source for the manga's details and chapters together, for a pull to refresh. What it
-     * says of the manga replaces what is kept; a failure shows as the chapters' error.
+     * Asks the source for the comic's details and chapters together, for a pull to refresh. What it
+     * says of the comic replaces what is kept; a failure shows as the chapters' error.
      */
     fun refresh() {
         if (refreshing.value) return
@@ -309,16 +309,16 @@ class BookDetailViewModel(
             val sourceId = book.sourceId ?: return@launch
             refreshing.value = true
             try {
-                val update = mangaChapters.fetch(sourceId, book.title, book.sourceMemo, details = true)
+                val update = comicChapters.fetch(sourceId, book.title, book.sourceMemo, details = true)
                 update.details?.let { library.applyMetadata(bookId, it) }
-                mangaChapters.sync(bookId, update.chapters.orEmpty())
-                chaptersStatus.value = MangaChaptersUiState()
+                comicChapters.sync(bookId, update.chapters.orEmpty())
+                chaptersStatus.value = ComicChaptersUiState()
                 try {
                     tracker.refresh(bookId)
                 } catch (_: MetadataException) {
                 }
             } catch (e: MetadataException) {
-                chaptersStatus.value = MangaChaptersUiState(
+                chaptersStatus.value = ComicChaptersUiState(
                     error = LookupError.from(e),
                     captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: book.sourceUrl },
                 )
@@ -333,14 +333,14 @@ class BookDetailViewModel(
         chaptersJob = viewModelScope.launch {
             val book = library.observeBook(bookId).first() ?: return@launch
             val sourceId = book.sourceId ?: return@launch
-            chaptersStatus.value = MangaChaptersUiState(loading = true)
+            chaptersStatus.value = ComicChaptersUiState(loading = true)
             chaptersStatus.value = try {
-                mangaChapters.sync(bookId, mangaChapters.fetch(sourceId, book.title, book.sourceMemo).chapters.orEmpty())
-                MangaChaptersUiState()
+                comicChapters.sync(bookId, comicChapters.fetch(sourceId, book.title, book.sourceMemo).chapters.orEmpty())
+                ComicChaptersUiState()
             } catch (e: MetadataException) {
-                MangaChaptersUiState(
+                ComicChaptersUiState(
                     error = LookupError.from(e),
-                    // A source whose own address is not known is opened at the page the manga was found at.
+                    // A source whose own address is not known is opened at the page the comic was found at.
                     captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: book.sourceUrl },
                 )
             }
@@ -380,13 +380,13 @@ class BookDetailViewModel(
         }
     }
 
-    /** Follows the manga as [media]. */
+    /** Follows the comic as [media]. */
     fun bindTrack(media: AniListMedia) = changeTrack { tracker.bind(bookId, media) }
 
     /** Changes the entry: its status, chapters read or score. */
-    fun editTrack(change: (MangaTrackEntity) -> MangaTrackEntity) = changeTrack { tracker.edit(bookId, change) }
+    fun editTrack(change: (ComicTrackEntity) -> ComicTrackEntity) = changeTrack { tracker.edit(bookId, change) }
 
-    /** Stops following the manga, and takes it off the list on AniList too when [fromList]. */
+    /** Stops following the comic, and takes it off the list on AniList too when [fromList]. */
     fun untrack(fromList: Boolean) = changeTrack {
         tracker.unbind(bookId, fromList)
         trackSheet.value = TrackSheetUiState()
@@ -499,7 +499,7 @@ class BookDetailViewModel(
             open = true,
             loading = true,
             query = query,
-            // Manga are never what a file is matched to.
+            // Comics are never what a file is matched to.
             source = settings.searchSource.takeIf { it in MetadataSource.matchable } ?: MetadataSource.HARDCOVER,
         )
         loadCandidates(book)

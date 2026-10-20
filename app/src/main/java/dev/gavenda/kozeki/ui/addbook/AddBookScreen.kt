@@ -47,7 +47,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
-import dev.gavenda.kozeki.data.manga.MangaProvider
+import dev.gavenda.kozeki.data.comic.ComicProvider
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
@@ -62,8 +62,9 @@ import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
+import dev.gavenda.kozeki.ui.components.nameRes
 import dev.gavenda.kozeki.ui.components.OwnedBadge
-import dev.gavenda.kozeki.ui.components.SourcePicker
+import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.sourceAttributionItem
 import dev.gavenda.kozeki.ui.koinViewModel
@@ -84,7 +85,8 @@ fun AddBookScreen(
         onBack = onBack,
         onQueryChange = viewModel::onQueryChange,
         onSourceChange = viewModel::setSource,
-        onMangaSourceChange = viewModel::setMangaSource,
+        onComicsChange = viewModel::setComics,
+        onComicSourceChange = viewModel::setComicSource,
         onSearch = viewModel::search,
         onLoadMore = viewModel::loadMore,
         onOpenResult = onOpenResult,
@@ -107,7 +109,8 @@ fun AddBookContent(
     onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    onMangaSourceChange: (Long) -> Unit = {},
+    onComicsChange: (Boolean) -> Unit = {},
+    onComicSourceChange: (Long) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -149,7 +152,13 @@ fun AddBookContent(
                         query = it
                         onQueryChange(it)
                     },
-                    placeholder = { Text(stringResource(R.string.search_hint)) },
+                    placeholder = {
+                        Text(
+                            stringResource(
+                                if (state.source == MetadataSource.COMICS) R.string.add_book_search_comics else R.string.add_book_search_books,
+                            ),
+                        )
+                    },
                     singleLine = true,
                     shape = SearchBarDefaults.inputFieldShape,
                     colors = TextFieldDefaults.colors(
@@ -193,19 +202,39 @@ fun AddBookContent(
                         .focusRequester(focusRequester),
                 )
 
-                SourcePicker(
-                    source = state.source,
-                    onSourceChange = onSourceChange,
+                val comics = state.source == MetadataSource.COMICS
+                ConnectedButtonGroup(
+                    options = listOf(
+                        stringResource(R.string.add_book_kind_books),
+                        stringResource(R.string.add_book_kind_comics),
+                    ),
+                    selectedIndex = if (comics) 1 else 0,
+                    onSelect = { onComicsChange(it == 1) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
                 )
 
-                if (state.source == MetadataSource.MANGA && state.mangaSources.isNotEmpty()) {
-                    MangaSourceChips(
-                        options = state.mangaSources,
-                        selectedId = state.mangaSourceId,
-                        onSelect = onMangaSourceChange,
+                // Books have their catalogues as comics have their sources: one picked, as a chip.
+                if (comics) {
+                    if (state.comicSources.isNotEmpty()) {
+                        SourceChips(
+                            options = state.comicSources,
+                            key = { it.id },
+                            label = { it.label },
+                            selected = { it.id == state.comicSourceId },
+                            onSelect = { onComicSourceChange(it.id) },
+                        )
+                    }
+                } else {
+                    val bookSources = MetadataSource.matchable
+                    val labels = bookSources.map { stringResource(it.nameRes) }
+                    SourceChips(
+                        options = bookSources,
+                        key = { it.name },
+                        label = { labels[bookSources.indexOf(it)] },
+                        selected = { it == state.source },
+                        onSelect = onSourceChange,
                     )
                 }
 
@@ -222,11 +251,11 @@ fun AddBookContent(
                     state.error == LookupError.NO_EXTENSIONS -> EmptyState(
                         expression = Expression.DOWNCAST,
                         icon = painterResource(R.drawable.auto_stories_off_48px),
-                        title = stringResource(R.string.add_book_manga_none_title),
-                        message = stringResource(R.string.add_book_manga_none_message),
+                        title = stringResource(R.string.add_book_comic_none_title),
+                        message = stringResource(R.string.add_book_comic_none_message),
                         // Where the extensions that were found, and why the others were not, are listed.
                         action = {
-                            Button(onClick = onOpenSettings) { Text(stringResource(R.string.settings_manga_title)) }
+                            Button(onClick = onOpenSettings) { Text(stringResource(R.string.settings_comic_title)) }
                         },
                     )
 
@@ -251,21 +280,15 @@ fun AddBookContent(
                     results == null -> EmptyState(
                         expression = Expression.STUDIOUS,
                         icon = painterResource(R.drawable.travel_explore_48px),
-                        title = stringResource(R.string.add_book_prompt_title),
-                        message = stringResource(R.string.add_book_prompt_message),
+                        title = stringResource(if (comics) R.string.add_book_comic_prompt_title else R.string.add_book_prompt_title),
+                        message = stringResource(if (comics) R.string.add_book_comic_prompt_message else R.string.add_book_prompt_message),
                     )
 
                     results.isEmpty() -> EmptyState(
                         expression = Expression.WORRIED,
                         icon = painterResource(R.drawable.search_off_48px),
-                        title = stringResource(R.string.add_book_no_results_title),
-                        message = stringResource(
-                            if (state.source == MetadataSource.MANGA) {
-                                R.string.add_book_manga_no_results_message
-                            } else {
-                                R.string.add_book_no_results_message
-                            },
-                        ),
+                        title = stringResource(if (comics) R.string.add_book_comic_no_results_title else R.string.add_book_no_results_title),
+                        message = stringResource(if (comics) R.string.add_book_comic_no_results_message else R.string.add_book_no_results_message),
                     )
 
                     else -> {
@@ -281,7 +304,7 @@ fun AddBookContent(
                                     onClick = { if (owned != null) onOpenBook(owned.id) else onOpenResult(result) },
                                     trailingContent = owned?.let { book -> { OwnedBadge(book) } },
                                     onOpenAuthor = onOpenAuthor,
-                                    sourceLabel = state.mangaLabel(result),
+                                    sourceLabel = state.comicLabel(result),
                                 )
                             }
                             loadingMoreItem(state.loadingMore)
@@ -294,19 +317,21 @@ fun AddBookContent(
 
 }
 
-/** The chip of the manga source [result] came from, when it is one of the sources listed. */
-private fun AddBookUiState.mangaLabel(result: BookMetadata): String? {
-    if (result.source != MetadataSource.MANGA) return null
-    val id = MangaProvider.parseSourceId(result.sourceId)?.first ?: return null
-    return mangaSources.firstOrNull { it.id == id }?.label
+/** The chip of the comic source [result] came from, when it is one of the sources listed. */
+private fun AddBookUiState.comicLabel(result: BookMetadata): String? {
+    if (result.source != MetadataSource.COMICS) return null
+    val id = ComicProvider.parseSourceId(result.sourceId)?.first ?: return null
+    return comicSources.firstOrNull { it.id == id }?.label
 }
 
-/** The manga sources to search, one of them picked. Scrolls when the extensions have many. */
+/** The sources to search, one of them picked: comic sources or book catalogues. Scrolls when there are many. */
 @Composable
-private fun MangaSourceChips(
-    options: List<MangaSourceOption>,
-    selectedId: Long,
-    onSelect: (Long) -> Unit,
+private fun <T> SourceChips(
+    options: List<T>,
+    key: (T) -> Any,
+    label: (T) -> String,
+    selected: (T) -> Boolean,
+    onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyRow(
@@ -314,11 +339,11 @@ private fun MangaSourceChips(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(options, key = { it.id }) { option ->
+        items(options, key = key) { option ->
             FilterChip(
-                selected = option.id == selectedId,
-                onClick = { onSelect(option.id) },
-                label = { Text(option.label) },
+                selected = selected(option),
+                onClick = { onSelect(option) },
+                label = { Text(label(option)) },
             )
         }
     }
@@ -428,26 +453,26 @@ private fun AddBookGoogleBooksPreview() {
 
 @ScreenPreviews
 @Composable
-private fun AddBookMangaPreview() {
+private fun AddBookComicPreview() {
     AppTheme {
         AddBookContent(
             state = AddBookUiState(
-                source = MetadataSource.MANGA,
-                mangaSources = listOf(
-                    MangaSourceOption(1L, "MangaDex"),
-                    MangaSourceOption(2L, "Asura Scans"),
-                    MangaSourceOption(3L, "Comick"),
+                source = MetadataSource.COMICS,
+                comicSources = listOf(
+                    ComicSourceOption(1L, "MangaDex"),
+                    ComicSourceOption(2L, "Asura Scans"),
+                    ComicSourceOption(3L, "Comick"),
                 ),
-                mangaSourceId = 1L,
+                comicSourceId = 1L,
                 results = listOf(
                     BookMetadata(
-                        source = MetadataSource.MANGA,
+                        source = MetadataSource.COMICS,
                         sourceId = "1:/title/a",
                         title = "Frieren: Beyond Journey's End",
                         authors = listOf("Kanehito Yamada", "Tsukasa Abe"),
                     ),
                     BookMetadata(
-                        source = MetadataSource.MANGA,
+                        source = MetadataSource.COMICS,
                         sourceId = "1:/title/b",
                         title = "Dungeon Meshi",
                         authors = listOf("Ryoko Kui"),
@@ -469,10 +494,10 @@ private fun AddBookMangaPreview() {
 
 @ScreenPreviews
 @Composable
-private fun AddBookNoMangaSourcesPreview() {
+private fun AddBookNoComicSourcesPreview() {
     AppTheme {
         AddBookContent(
-            state = AddBookUiState(source = MetadataSource.MANGA, error = LookupError.NO_EXTENSIONS),
+            state = AddBookUiState(source = MetadataSource.COMICS, error = LookupError.NO_EXTENSIONS),
             onBack = {},
             onQueryChange = {},
             onSourceChange = {},

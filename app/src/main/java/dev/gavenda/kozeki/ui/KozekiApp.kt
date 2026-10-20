@@ -43,7 +43,7 @@ import dev.gavenda.kozeki.ui.book.BookDetailScreen
 import dev.gavenda.kozeki.ui.book.FoundBookScreen
 import dev.gavenda.kozeki.ui.calendar.CalendarScreen
 import dev.gavenda.kozeki.ui.library.LibraryScreen
-import dev.gavenda.kozeki.ui.manga.MangaReaderScreen
+import dev.gavenda.kozeki.ui.comic.ComicReaderScreen
 import dev.gavenda.kozeki.ui.navigation.AddBookRoute
 import dev.gavenda.kozeki.ui.navigation.AuthorRoute
 import dev.gavenda.kozeki.ui.navigation.BookRoute
@@ -52,7 +52,7 @@ import dev.gavenda.kozeki.ui.navigation.DayRoute
 import dev.gavenda.kozeki.ui.navigation.FoundBookRoute
 import dev.gavenda.kozeki.ui.navigation.LibraryRoute
 import dev.gavenda.kozeki.ui.navigation.BookFormRoute
-import dev.gavenda.kozeki.ui.navigation.MangaReaderRoute
+import dev.gavenda.kozeki.ui.navigation.ComicReaderRoute
 import dev.gavenda.kozeki.ui.navigation.ReaderRoute
 import dev.gavenda.kozeki.ui.navigation.SettingsRoute
 import dev.gavenda.kozeki.ui.navigation.StatisticsRoute
@@ -162,7 +162,7 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
                     result = result,
                     onBack = { entry.back() },
                     onRead = { entry.open(ReaderRoute(it)) },
-                    onReadChapter = { bookId, url -> entry.open(MangaReaderRoute(bookId, url)) },
+                    onReadChapter = { bookId, url -> entry.open(ComicReaderRoute(bookId, url)) },
                     onEdit = { entry.open(BookFormRoute(it)) },
                     onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
@@ -191,14 +191,14 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
                     bookId = entry.toRoute<BookRoute>().bookId,
                     onBack = { entry.back() },
                     onRead = { entry.open(ReaderRoute(it)) },
-                    onReadChapter = { bookId, url -> entry.open(MangaReaderRoute(bookId, url)) },
+                    onReadChapter = { bookId, url -> entry.open(ComicReaderRoute(bookId, url)) },
                     onEdit = { entry.open(BookFormRoute(it)) },
                     onOpenAuthor = { entry.open(AuthorRoute(it.id, it.name)) },
                 )
             }
-            composable<MangaReaderRoute> { entry ->
-                val route = entry.toRoute<MangaReaderRoute>()
-                MangaReaderScreen(bookId = route.bookId, chapterUrl = route.chapterUrl, onBack = { entry.back() })
+            composable<ComicReaderRoute> { entry ->
+                val route = entry.toRoute<ComicReaderRoute>()
+                ComicReaderScreen(bookId = route.bookId, chapterUrl = route.chapterUrl, onBack = { entry.back() })
             }
             composable<ReaderRoute> { entry ->
                 ReaderScreen(bookId = entry.toRoute<ReaderRoute>().bookId, onBack = { entry.back() })

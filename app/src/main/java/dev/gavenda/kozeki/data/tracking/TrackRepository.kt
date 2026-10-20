@@ -1,11 +1,11 @@
 package dev.gavenda.kozeki.data.tracking
 
 import dev.gavenda.kozeki.data.db.KozekiDatabase
-import dev.gavenda.kozeki.data.db.MangaTrackEntity
+import dev.gavenda.kozeki.data.db.ComicTrackEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
-import dev.gavenda.kozeki.data.manga.MangaChapterRepository
+import dev.gavenda.kozeki.data.comic.ComicChapterRepository
 import dev.gavenda.kozeki.data.metadata.MetadataException
-import dev.gavenda.kozeki.data.model.MangaChapter
+import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.TrackStatus
 import dev.gavenda.kozeki.data.repository.LibraryRepository
@@ -26,7 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Keeps manga in step with the user's AniList, the way Mihon does: chapters read there are read
+ * Keeps comics in step with the user's AniList, the way Mihon does: chapters read there are read
  * here, chapters finished here are told to AniList, and the status goes with them.
  *
  * What cannot be told right away, because AniList could not be reached, stays marked on the track
@@ -36,13 +36,13 @@ class TrackRepository(
     db: KozekiDatabase,
     private val api: AniListApi,
     private val auth: AniListAuth,
-    private val chapters: MangaChapterRepository,
+    private val chapters: ComicChapterRepository,
     private val library: LibraryRepository,
     private val clock: Clock,
     scope: CoroutineScope,
     private val scheduleRetry: () -> Unit,
 ) {
-    private val tracks = db.mangaTrackDao()
+    private val tracks = db.comicTrackDao()
     private val lock = Mutex()
 
     init {
@@ -54,13 +54,13 @@ class TrackRepository(
         }
     }
 
-    fun observe(bookId: String): Flow<MangaTrackEntity?> = tracks.observe(bookId)
+    fun observe(bookId: String): Flow<ComicTrackEntity?> = tracks.observe(bookId)
 
-    /** Manga on AniList that match [text]. */
+    /** Comics on AniList that match [text]. */
     suspend fun search(text: String): List<AniListMedia> = withToken { api.search(it, text) }
 
     /**
-     * Follows the book as [media], the manga the user picked. An entry the user already has for it
+     * Follows the book as [media], the comic the user picked. An entry the user already has for it
      * is taken as it is, and what is read here and there is then brought together.
      */
     suspend fun bind(bookId: String, media: AniListMedia) {
@@ -68,7 +68,7 @@ class TrackRepository(
         val entry = media.entry
         val now = clock.millis()
         lock.withLock {
-            val track = MangaTrackEntity(
+            val track = ComicTrackEntity(
                 bookId = bookId,
                 mediaId = media.id,
                 entryId = entry?.id,
@@ -82,7 +82,7 @@ class TrackRepository(
                 score = entry?.score ?: 0,
                 startedOn = entry?.startedOn?.toEpochDay(),
                 completedOn = entry?.completedOn?.toEpochDay(),
-                // No entry yet: following it is what puts the manga on the list.
+                // No entry yet: following it is what puts the comic on the list.
                 pendingPush = entry == null,
                 sync = SyncStamp.created(now),
             )
@@ -100,7 +100,7 @@ class TrackRepository(
         }
     }
 
-    /** Asks AniList how the manga stands and brings both sides together. */
+    /** Asks AniList how the comic stands and brings both sides together. */
     suspend fun refresh(bookId: String) {
         lock.withLock {
             val track = tracks.get(bookId) ?: return
@@ -130,7 +130,7 @@ class TrackRepository(
     }
 
     /** Changes what is on the track, here and on AniList. A higher progress marks the chapters read. */
-    suspend fun edit(bookId: String, change: (MangaTrackEntity) -> MangaTrackEntity) {
+    suspend fun edit(bookId: String, change: (ComicTrackEntity) -> ComicTrackEntity) {
         lock.withLock {
             val track = tracks.get(bookId) ?: return
             val next = change(track)
@@ -175,7 +175,7 @@ class TrackRepository(
     // ---- Both sides together ---------------------------------------------------------------
 
     /** Sends what waits, then lets whichever side is ahead in chapters bring the other along. */
-    private suspend fun reconcileLocked(track: MangaTrackEntity) {
+    private suspend fun reconcileLocked(track: ComicTrackEntity) {
         var current = track
         if (current.pendingPush && !pushLocked(current, throwErrors = false)) return
         current = tracks.get(current.bookId) ?: return
@@ -188,7 +188,7 @@ class TrackRepository(
     }
 
     /** What AniList says replaces what was kept, except score and dates it has none of. */
-    private fun applyRemote(track: MangaTrackEntity, entry: AniListEntry): MangaTrackEntity = track.copy(
+    private fun applyRemote(track: ComicTrackEntity, entry: AniListEntry): ComicTrackEntity = track.copy(
         entryId = entry.id,
         status = entry.status,
         progress = entry.progress,
@@ -201,7 +201,7 @@ class TrackRepository(
      * Chapters up to the track's progress are read here, and the book takes the status the track
      * has. [before] is how the track stood, and null for a first look, where both count as new.
      */
-    private suspend fun pullIntoBook(before: MangaTrackEntity?, after: MangaTrackEntity) {
+    private suspend fun pullIntoBook(before: ComicTrackEntity?, after: ComicTrackEntity) {
         if (before == null || after.progress > before.progress) {
             val unread = chaptersToMarkRead(chapters.get(after.bookId), after.progress)
             if (unread.isNotEmpty()) chapters.markRead(after.bookId, unread, read = true)
@@ -220,7 +220,7 @@ class TrackRepository(
      * Tells AniList what the track holds. On success the track becomes what AniList answered.
      * Returns true when nothing waits afterwards.
      */
-    private suspend fun pushLocked(track: MangaTrackEntity, throwErrors: Boolean): Boolean {
+    private suspend fun pushLocked(track: ComicTrackEntity, throwErrors: Boolean): Boolean {
         val update = AniListEntryUpdate(
             status = track.status,
             progress = track.progress,
@@ -261,11 +261,11 @@ class TrackRepository(
 }
 
 /** The number of the furthest chapter read, as AniList counts: whole chapters, and none without a number. */
-internal fun highestChapterRead(chapters: List<MangaChapter>): Int =
+internal fun highestChapterRead(chapters: List<ComicChapter>): Int =
     chapters.filter { it.read }.mapNotNull { it.number }.maxOrNull()?.toInt()?.coerceAtLeast(0) ?: 0
 
 /** The chapters that AniList's [progress] says were read and that are not yet marked so here. */
-internal fun chaptersToMarkRead(chapters: List<MangaChapter>, progress: Int): List<String> =
+internal fun chaptersToMarkRead(chapters: List<ComicChapter>, progress: Int): List<String> =
     if (progress <= 0) emptyList() else chapters.filter { !it.read && it.number != null && it.number <= progress }.map { it.url }
 
 /**
@@ -273,7 +273,7 @@ internal fun chaptersToMarkRead(chapters: List<MangaChapter>, progress: Int): Li
  * chapter completes it, and the first chapter read, or reading again after a pause, makes it current.
  * [today] is an epoch day.
  */
-internal fun advance(track: MangaTrackEntity, progress: Int, today: Long): MangaTrackEntity {
+internal fun advance(track: ComicTrackEntity, progress: Int, today: Long): ComicTrackEntity {
     if (progress <= track.progress) return track
     val moved = track.copy(progress = progress)
     val total = track.totalChapters
@@ -292,7 +292,7 @@ internal fun advance(track: MangaTrackEntity, progress: Int, today: Long): Manga
 }
 
 /** The track after the user sets the status of the book to [status]. [today] is an epoch day. */
-internal fun withStatus(track: MangaTrackEntity, status: TrackStatus, today: Long): MangaTrackEntity {
+internal fun withStatus(track: ComicTrackEntity, status: TrackStatus, today: Long): ComicTrackEntity {
     if (track.status == status) return track
     // Reading again is what REPEATING is, so the book going back to Reading leaves it be.
     if (track.status == TrackStatus.REPEATING && status == TrackStatus.CURRENT) return track

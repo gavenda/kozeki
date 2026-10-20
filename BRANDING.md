@@ -49,6 +49,7 @@ The halo is used where it means something: starting up, waiting, a goal reached,
 |---|---|
 | Launch screen | Draws itself in over half a second. The rings run round from the top, then the second hand swings from twelve to three. |
 | Anything loading, at 32dp and up | `HaloLoadingIndicator`, 48dp unless given another size. The rings drift one way while the hands go round the other. |
+| Checking followed comics for new chapters | A 96dp loading halo in the middle of the sheet a pull to refresh opens in the library. Its hands go round once over the whole check (`progress`), and it is the plain wait until the comics are counted. |
 | A cover whose details are being looked up | The loading halo over the dimmed cover, with `glow = true`. Nothing else glows, since the glow only shows against something dark. |
 | A goal that is met | The day's and the year's goal ring (`GoalRing`) become the halo. The full ring takes the halo's colour and gains the inner ring and the ties, and the percentage stays where the dial would be. |
 | The calendar | The cell for 23 April, her birthday and World Book Day, is ringed with the halo every year. It is the rings only (`dial = false`), as wide as the cell's cover box and centred on it, over whatever the cell shows. |
@@ -133,7 +134,7 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 | `CURIOUS` | A small "o" | 8 | Library search, before typing |
 | `STUDIOUS` | Monocle | 23 | Add book, before searching |
 | `ASLEEP` | Eyes closed | 7 | A day with nothing read |
-| `DOWNCAST` | Half-lidded eyes | 15 | Library search with nothing found; an author with no books listed; Add book on Manga with no source installed |
+| `DOWNCAST` | Half-lidded eyes | 15 | Library search with nothing found; an author with no books listed; Add book on Comics with no source installed |
 | `WORRIED` | Mouth open, a bead of sweat | 13 | Add book, nothing found |
 | `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page |
 | `DUMBFOUNDED` | Black dots for eyes | 21 | An author whose page is gone |

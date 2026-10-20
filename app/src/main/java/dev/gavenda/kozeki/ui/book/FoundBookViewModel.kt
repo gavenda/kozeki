@@ -2,7 +2,7 @@ package dev.gavenda.kozeki.ui.book
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.gavenda.kozeki.data.manga.MangaChapterRepository
+import dev.gavenda.kozeki.data.comic.ComicChapterRepository
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -40,19 +40,19 @@ class FoundBookViewModel(
     private val result: BookMetadata,
     private val library: LibraryRepository,
     private val metadata: MetadataRepository,
-    private val mangaChapters: MangaChapterRepository,
+    private val comicChapters: ComicChapterRepository,
 ) : ViewModel() {
 
-    private val isManga = result.source == MetadataSource.MANGA
+    private val isComic = result.source == MetadataSource.COMICS
 
-    /** What the source says about the book. A manga's search result says little, so it is filled in. */
+    /** What the source says about the book. A comic's search result says little, so it is filled in. */
     private val details = MutableStateFlow(result)
 
     /** Null when the source has no reviews, which leaves nothing to ask for. */
     private val reviews = MutableStateFlow<ReviewsUiState?>(null)
 
-    /** What the source lists of a manga, not yet stored. Null for a book that is not one. */
-    private val chapters = MutableStateFlow<MangaChaptersUiState?>(null)
+    /** What the source lists of a comic, not yet stored. Null for a book that is not one. */
+    private val chapters = MutableStateFlow<ComicChaptersUiState?>(null)
     private var remoteChapters: List<SChapter>? = null
     private var reviewsJob: Job? = null
     private var chaptersJob: Job? = null
@@ -71,7 +71,7 @@ class FoundBookViewModel(
 
     init {
         loadReviews()
-        if (isManga) {
+        if (isComic) {
             loadChapters()
         }
     }
@@ -80,7 +80,7 @@ class FoundBookViewModel(
     fun add(acquisition: Acquisition) = store(acquisition, readChapter = null)
 
     /**
-     * Makes the manga the user's own and goes on to read it: [chapterUrl], or the first chapter
+     * Makes the comic the user's own and goes on to read it: [chapterUrl], or the first chapter
      * when it is null.
      */
     fun startReading(chapterUrl: String?) {
@@ -93,7 +93,7 @@ class FoundBookViewModel(
         addJob = viewModelScope.launch {
             val id = library.addFromMetadata(details.value, acquisition)
             // What was listed while the page was open is the book's chapters from the start.
-            remoteChapters?.let { mangaChapters.sync(id, it) }
+            remoteChapters?.let { comicChapters.sync(id, it) }
             eventChannel.send(FoundBookAdded(id, readChapter))
         }
     }
@@ -115,7 +115,7 @@ class FoundBookViewModel(
         }
     }
 
-    /** What the search result left out of the page, from what the source says of the manga itself. */
+    /** What the search result left out of the page, from what the source says of the comic itself. */
     private fun fillIn(full: BookMetadata) {
         details.value = result.copy(
             title = full.title.ifBlank { result.title },
@@ -130,10 +130,10 @@ class FoundBookViewModel(
     private fun loadChapters() {
         chaptersJob?.cancel()
         chaptersJob = viewModelScope.launch {
-            chapters.value = MangaChaptersUiState(loading = true)
+            chapters.value = ComicChaptersUiState(loading = true)
             chapters.value = try {
-                // One question for both: a source does not take two about the same manga at once.
-                val update = mangaChapters.fetch(
+                // One question for both: a source does not take two about the same comic at once.
+                val update = comicChapters.fetch(
                     result.sourceId,
                     result.title,
                     result.sourceMemo,
@@ -143,11 +143,11 @@ class FoundBookViewModel(
                 update.details?.let { fillIn(it) }
                 val remote = update.chapters.orEmpty()
                 remoteChapters = remote
-                MangaChaptersUiState(chapters = mangaChapters.preview(remote).inReadingOrder())
+                ComicChaptersUiState(chapters = comicChapters.preview(remote).inReadingOrder())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: MetadataException) {
-                MangaChaptersUiState(
+                ComicChaptersUiState(
                     error = LookupError.from(e),
                     captchaUrl = (e as? MetadataException.Captcha)?.let { it.url ?: result.infoUrl },
                 )
@@ -176,5 +176,5 @@ internal fun BookMetadata.toBook(): Book = Book(
     sourceId = sourceId,
     sourceUrl = infoUrl,
     matchStatus = MatchStatus.MATCHED,
-    isManga = source == MetadataSource.MANGA,
+    isComic = source == MetadataSource.COMICS,
 )

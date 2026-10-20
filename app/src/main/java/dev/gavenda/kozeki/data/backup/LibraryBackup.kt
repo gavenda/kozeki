@@ -1,8 +1,10 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package dev.gavenda.kozeki.data.backup
 
 import dev.gavenda.kozeki.data.db.BookEntity
-import dev.gavenda.kozeki.data.db.MangaChapterEntity
-import dev.gavenda.kozeki.data.db.MangaTrackEntity
+import dev.gavenda.kozeki.data.db.ComicChapterEntity
+import dev.gavenda.kozeki.data.db.ComicTrackEntity
 import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
@@ -12,8 +14,10 @@ import dev.gavenda.kozeki.data.settings.SettingsSnapshot
 import java.io.ByteArrayOutputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -43,10 +47,12 @@ data class LibraryBackup(
     val physicalReadings: List<PhysicalReadingEntity> = emptyList(),
     val notes: List<NoteEntity> = emptyList(),
     val yearlyGoals: List<YearlyGoalEntity> = emptyList(),
-    /** Absent from backups made before manga could be read. */
-    val mangaChapters: List<MangaChapterEntity> = emptyList(),
-    /** Absent from backups made before manga could be tracked on AniList. */
-    val mangaTracks: List<MangaTrackEntity> = emptyList(),
+    /** Absent from backups made before comics could be read. */
+    @JsonNames("mangaChapters")
+    val comicChapters: List<ComicChapterEntity> = emptyList(),
+    /** Absent from backups made before comics could be tracked on AniList. */
+    @JsonNames("mangaTracks")
+    val comicTracks: List<ComicTrackEntity> = emptyList(),
     val settings: SettingsSnapshot = SettingsSnapshot(),
 ) {
     companion object {

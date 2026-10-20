@@ -195,6 +195,7 @@ fun LibraryScreen(
         },
         onSettingsClick = onOpenSettings,
         onRefresh = viewModel::checkForUpdates,
+        onCancelRefresh = viewModel::cancelUpdateCheck,
     )
 }
 
@@ -238,12 +239,14 @@ fun LibraryContent(
     modifier: Modifier = Modifier,
     onKindToggle: () -> Unit = {},
     onRefresh: () -> Unit = {},
+    onCancelRefresh: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyGridState()
     val selection = state.selection
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+    var updateSheetHidden by rememberSaveable { mutableStateOf(false) }
 
     // A filter that was just picked starts from its top. Left alone, the grid holds on to the book
     // it was showing, which on the way back to every book is somewhere in the middle. Remembered
@@ -313,6 +316,11 @@ fun LibraryContent(
                 onBookClick = onBookClick,
                 onSettingsClick = onSettingsClick,
                 scrollBehavior = scrollBehavior,
+                searchHint = if (state.separateKinds && state.kind == LibraryKind.COMICS) {
+                    R.string.search_comics_hint
+                } else {
+                    R.string.search_books_hint
+                },
             )
         },
         floatingActionButton = {
@@ -381,8 +389,13 @@ fun LibraryContent(
                     val edge = if (list) 8.dp else 16.dp
                     val pullState = rememberPullToRefreshState()
                     PullToRefreshBox(
-                        isRefreshing = state.refreshing,
-                        onRefresh = onRefresh,
+                        // The sheet shows the check, so the indicator goes back up once let go.
+                        // Pulled again while the sheet is hidden, it brings the sheet back.
+                        isRefreshing = false,
+                        onRefresh = {
+                            updateSheetHidden = false
+                            onRefresh()
+                        },
                         enabled = !state.selecting,
                         state = pullState,
                         indicator = {
@@ -390,7 +403,7 @@ fun LibraryContent(
                                 Modifier
                                     .align(Alignment.TopCenter)
                                     .graphicsLayer {
-                                        val shown = if (state.refreshing) 1f else pullState.distanceFraction.coerceIn(0f, 1f)
+                                        val shown = pullState.distanceFraction.coerceIn(0f, 1f)
                                         alpha = shown
                                         translationY = (shown - 1f) * size.height
                                     },
@@ -505,6 +518,12 @@ fun LibraryContent(
             selectionActions.onDelete()
         }
         DeleteBooksDialog(selection.books, onConfirm = onConfirm, onDismiss = { confirmingDelete = false })
+    }
+    // Hidden by hand, the sheet stays away until the next pull. It waits for the comics to be
+    // counted, so a library with none to ask does not flash one up.
+    val updateCheck = state.updateCheck
+    if (updateCheck != null && updateCheck.total > 0 && !updateSheetHidden) {
+        UpdateCheckSheet(updateCheck, onCancel = onCancelRefresh, onDismiss = { updateSheetHidden = true })
     }
 }
 
@@ -688,7 +707,7 @@ private fun FilterRow(
             Row {
                 DisplayToggle(state.display, onDisplaySelected)
                 if (state.separateKinds) KindToggle(state.kind, onKindToggle)
-                SortMenu(state.sort, onSortSelected)
+                SortMenu(state.sort, state.sortReversed, onSortSelected)
             }
         }
         // The chips slide out from under the row and push the books down, rather than cover them.
@@ -740,17 +759,17 @@ private fun DisplayToggle(display: LibraryDisplay, onDisplaySelected: (LibraryDi
     }
 }
 
-/** Flips between the books and the manga. Like the display toggle, it shows what a tap leads to. */
+/** Flips between the books and the comics. Like the display toggle, it shows what a tap leads to. */
 @Composable
 private fun KindToggle(kind: LibraryKind, onToggle: () -> Unit) {
     val other = kind.other
     IconButton(onClick = onToggle) {
         Icon(
             painter = painterResource(
-                if (other == LibraryKind.MANGA) R.drawable.auto_stories_48px else R.drawable.library_books_fill_48px,
+                if (other == LibraryKind.COMICS) R.drawable.auto_stories_48px else R.drawable.library_books_fill_48px,
             ),
             contentDescription = stringResource(
-                if (other == LibraryKind.MANGA) R.string.show_manga else R.string.show_books,
+                if (other == LibraryKind.COMICS) R.string.show_comic else R.string.show_books,
             ),
             modifier = Modifier.size(24.dp),
         )
@@ -758,7 +777,12 @@ private fun KindToggle(kind: LibraryKind, onToggle: () -> Unit) {
 }
 
 @Composable
-private fun SortMenu(sort: LibrarySort, onSortSelected: (LibrarySort) -> Unit, modifier: Modifier = Modifier) {
+private fun SortMenu(
+    sort: LibrarySort,
+    reversed: Boolean,
+    onSortSelected: (LibrarySort) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
         IconButton(onClick = { expanded = true }) {
@@ -773,8 +797,16 @@ private fun SortMenu(sort: LibrarySort, onSortSelected: (LibrarySort) -> Unit, m
                         onSortSelected(option)
                     },
                     leadingIcon = {
+                        // The order in use shows which way it runs; picking it again turns it round.
                         // An empty slot keeps the labels of the other orders in line.
-                        if (option == sort) Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.size(24.dp))
+                        if (option == sort) {
+                            val descending = sort.isDescending(reversed)
+                            Icon(
+                                painterResource(if (descending) R.drawable.arrow_downward_48px else R.drawable.arrow_upward_48px),
+                                contentDescription = stringResource(if (descending) R.string.sort_descending else R.string.sort_ascending),
+                                modifier = Modifier.size(24.dp),
+                            )
+                        }
                     },
                 )
             }
@@ -838,7 +870,7 @@ private fun LibraryBookItem(
                     Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
                 }
             }
-            // Chapters that came out since the manga was opened take the corner a pick would, which wins.
+            // Chapters that came out since the comic was opened take the corner a pick would, which wins.
             if (book.newChapters > 0 && !selected) NewChaptersBadge(book.newChapters, Modifier.align(Alignment.TopStart).padding(6.dp))
             val (badgeIcon, badgeLabel) = ownershipBadge(book)
             // How the book is had goes in the lower left, with the heart above it.
@@ -1056,7 +1088,7 @@ private fun MatchingOverlay(shape: Shape, modifier: Modifier = Modifier, indicat
     }
 }
 
-/** How many chapters of a manga are new, on a backing in the colours that call for a look. */
+/** How many chapters of a comic are new, on a backing in the colours that call for a look. */
 @Composable
 private fun NewChaptersBadge(count: Int, modifier: Modifier = Modifier) {
     val description = pluralStringResource(R.plurals.new_chapters, count, count)

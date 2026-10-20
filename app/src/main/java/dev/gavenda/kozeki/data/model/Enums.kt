@@ -1,4 +1,12 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package dev.gavenda.kozeki.data.model
+
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonNames
+
+/** What [MetadataSource.COMICS] and the library's comics were saved as before they were called comics. */
+const val LEGACY_COMICS = "MANGA"
 
 /** Where a book is in its reading lifecycle. */
 enum class ReadingState {
@@ -14,7 +22,7 @@ enum class Acquisition {
     WISHLIST,
     PURCHASED,
     /**
-     * An EPUB was imported, or it is a manga read online, and no purchase is on record. Having the
+     * An EPUB was imported, or it is a comic read online, and no purchase is on record. Having the
      * means to read it says nothing about buying it.
      */
     DOWNLOADED,
@@ -33,16 +41,21 @@ enum class MetadataSource(
     GOOGLE_BOOKS(hasReviews = false, hasAuthorPages = false),
 
     /**
-     * The manga sources of the Mihon extensions installed on the device, standing in as one
+     * The comic sources of the Mihon extensions installed on the device, standing in as one
      * catalogue. Its books are read through the extension that found them, so they are not
-     * something an EPUB can be matched to.
+     * something an EPUB can be matched to. Saved as MANGA before it was called comics, and still read under that name.
      */
-    MANGA(hasReviews = false, hasAuthorPages = false),
+    @JsonNames(LEGACY_COMICS)
+    COMICS(hasReviews = false, hasAuthorPages = false),
     ;
 
     companion object {
         /** The sources an imported EPUB can be matched against: the ones that describe books. */
-        val matchable: List<MetadataSource> = entries.filter { it != MANGA }
+        val matchable: List<MetadataSource> = entries.filter { it != COMICS }
+
+        /** The source saved as [name], or null for none. Reads the name comics were saved under before. */
+        fun named(name: String?): MetadataSource? =
+            entries.find { it.name == name } ?: COMICS.takeIf { name == LEGACY_COMICS }
     }
 }
 
@@ -69,7 +82,7 @@ enum class ReadOutcome {
     DROPPED,
 }
 
-/** Whether a manga is still coming out, as AniList has it. */
+/** Whether a comic is still coming out, as AniList has it. */
 enum class PublicationStatus {
     RELEASING,
     FINISHED,
@@ -78,7 +91,7 @@ enum class PublicationStatus {
     NOT_YET_RELEASED,
 }
 
-/** Where a manga stands on the user's AniList, which names its states differently from the app. */
+/** Where a comic stands on the user's AniList, which names its states differently from the app. */
 enum class TrackStatus {
     CURRENT,
     PLANNING,

@@ -12,12 +12,12 @@ import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.epub.Readium
 import dev.gavenda.kozeki.data.files.BookStorage
 import dev.gavenda.kozeki.data.files.IncomingEpubs
-import dev.gavenda.kozeki.data.manga.MangaChapterRepository
-import dev.gavenda.kozeki.data.manga.MangaImages
-import dev.gavenda.kozeki.data.manga.MangaPages
-import dev.gavenda.kozeki.data.manga.MangaReaderPreferences
-import dev.gavenda.kozeki.data.manga.MangaProvider
-import dev.gavenda.kozeki.data.manga.MangaSources
+import dev.gavenda.kozeki.data.comic.ComicChapterRepository
+import dev.gavenda.kozeki.data.comic.ComicImages
+import dev.gavenda.kozeki.data.comic.ComicPages
+import dev.gavenda.kozeki.data.comic.ComicReaderPreferences
+import dev.gavenda.kozeki.data.comic.ComicProvider
+import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.CoverDownloader
 import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -118,7 +118,7 @@ fun appModule(app: Application) = module {
                 androidPackage = app.packageName,
                 androidCertSha1 = signingCertificateSha1(app),
             ),
-            MangaProvider(get(), get()),
+            ComicProvider(get(), get()),
         )
         MetadataRepository(providers, get<KozekiDatabase>().metadataCacheDao(), get())
     }
@@ -167,13 +167,13 @@ fun appModule(app: Application) = module {
 
     single { JavaScriptEngine(app) }
 
-    single { MangaSources(app, get()) }
+    single { ComicSources(app, get()) }
 
-    single { MangaImages(get(), get()) }
+    single { ComicImages(get(), get()) }
 
-    single { MangaChapterRepository(get(), get(), get()) }
+    single { ComicChapterRepository(get(), get(), get()) }
 
-    single { MangaPages(app, get()) }
+    single { ComicPages(app, get()) }
 
     single { AniListApi(get()) }
 
@@ -201,7 +201,7 @@ fun appModule(app: Application) = module {
         )
     }
 
-    single { MangaReaderPreferences(app) }
+    single { ComicReaderPreferences(app) }
 }
 
 /**

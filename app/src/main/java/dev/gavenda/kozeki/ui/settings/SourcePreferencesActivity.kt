@@ -55,7 +55,7 @@ import androidx.preference.PreferenceManager
 import androidx.preference.PreferenceScreen
 import androidx.preference.TwoStatePreference
 import dev.gavenda.kozeki.R
-import dev.gavenda.kozeki.data.manga.MangaSources
+import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.Source
@@ -76,7 +76,7 @@ class SourcePreferencesActivity : ComponentActivity() {
         setContent {
             AppTheme {
                 val source by produceState<ConfigurableSource?>(null, sourceId) {
-                    value = GlobalContext.get().get<MangaSources>().get(sourceId) as? ConfigurableSource
+                    value = GlobalContext.get().get<ComicSources>().get(sourceId) as? ConfigurableSource
                 }
                 // Gone when the extension was removed while this was open.
                 val loaded = source ?: return@AppTheme

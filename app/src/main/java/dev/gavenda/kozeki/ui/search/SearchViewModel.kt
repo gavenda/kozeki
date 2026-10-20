@@ -43,15 +43,16 @@ internal class SearchIndex(books: List<Book>) {
     /**
      * The books in which every word of [query] appears, in the title, the subtitle or an author's
      * name. Case, accents and punctuation make no difference, and a word may be part of a longer
-     * one. Books keep the order they were given in.
+     * one. Books keep the order they were given in. An empty query finds every book, so the search
+     * has something to show the moment it opens.
      */
     fun search(query: String): SearchUiState {
         val words = searchable(query).split(' ').filter { it.isNotEmpty() }
-        // No words would match every book.
-        val found = if (words.isEmpty()) {
-            emptyList()
-        } else {
-            entries.filter { (_, text) -> words.all(text::contains) }.map { (book, _) -> book }
+        val found = when {
+            query.isBlank() -> entries.map { (book, _) -> book }
+            // Only punctuation: something was typed, and nothing is written that way.
+            words.isEmpty() -> emptyList()
+            else -> entries.filter { (_, text) -> words.all(text::contains) }.map { (book, _) -> book }
         }
         val (library, withoutFile) = found.partition { it.inLibrary }
         val (wishlist, purchased) = withoutFile.partition { it.acquisition == Acquisition.WISHLIST }

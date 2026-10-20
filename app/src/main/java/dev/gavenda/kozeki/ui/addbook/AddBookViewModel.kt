@@ -2,7 +2,7 @@ package dev.gavenda.kozeki.ui.addbook
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.gavenda.kozeki.data.manga.MangaSources
+import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
@@ -28,8 +28,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** A manga source the search can be pointed at, as a chip. */
-data class MangaSourceOption(val id: Long, val label: String)
+/** A comic source the search can be pointed at, as a chip. */
+data class ComicSourceOption(val id: Long, val label: String)
 
 data class AddBookUiState(
     val query: String = "",
@@ -46,44 +46,44 @@ data class AddBookUiState(
     val captchaUrl: String? = null,
     /** The results already among the user's own books, by source ID, so their rows can show it. */
     val owned: Map<String, Book> = emptyMap(),
-    /** The manga sources the installed extensions provide. Only searched when [source] is manga. */
-    val mangaSources: List<MangaSourceOption> = emptyList(),
-    /** The one of [mangaSources] searched, or 0 when there is none. */
-    val mangaSourceId: Long = 0L,
+    /** The comic sources the installed extensions provide. Only searched when [source] is comics. */
+    val comicSources: List<ComicSourceOption> = emptyList(),
+    /** The one of [comicSources] searched, or 0 when there is none. */
+    val comicSourceId: Long = 0L,
 ) {
     /**
-     * How much of a query is searched. Manga are browsed too, so with nothing typed the source
+     * How much of a query is searched. Comics are browsed too, so with nothing typed the source
      * lists what is popular on it, and titles there can be short.
      */
-    val minQueryLength: Int get() = if (source == MetadataSource.MANGA) 0 else 3
+    val minQueryLength: Int get() = if (source == MetadataSource.COMICS) 0 else 3
 }
 
 class AddBookViewModel(
     private val metadata: MetadataRepository,
     library: LibraryRepository,
     private val settings: SettingsRepository,
-    mangaSources: MangaSources,
+    comicSources: ComicSources,
 ) : ViewModel() {
 
     // Opens on the source searched last time.
     private val _uiState = MutableStateFlow(AddBookUiState(source = settings.searchSource))
 
-    private val pickedManga = MutableStateFlow(settings.mangaSourceId)
+    private val pickedComic = MutableStateFlow(settings.comicSourceId)
 
     val uiState: StateFlow<AddBookUiState> =
         combine(
             _uiState,
             library.observeAll().map(::OwnedBooks),
-            mangaSources.sources,
-            pickedManga,
+            comicSources.sources,
+            pickedComic,
         ) { state, owned, sources, picked ->
-            val labels = mangaSourceLabels(sources.map { it.name to it.lang })
-            val options = sources.mapIndexed { i, source -> MangaSourceOption(source.id, labels[i]) }
+            val labels = comicSourceLabels(sources.map { it.name to it.lang })
+            val options = sources.mapIndexed { i, source -> ComicSourceOption(source.id, labels[i]) }
             state.copy(
                 owned = owned.among(state.results.orEmpty()),
-                mangaSources = options,
+                comicSources = options,
                 // The same fallback the search itself makes while the picked source is not installed.
-                mangaSourceId = (options.firstOrNull { it.id == picked } ?: options.firstOrNull())?.id ?: 0L,
+                comicSourceId = (options.firstOrNull { it.id == picked } ?: options.firstOrNull())?.id ?: 0L,
             )
         }
             .flowOn(Dispatchers.Default)
@@ -100,8 +100,8 @@ class AddBookViewModel(
     private var searched: String? = null
 
     init {
-        // Manga are browsed, so they open on what is popular instead of waiting for a query.
-        if (_uiState.value.source == MetadataSource.MANGA) search() else checkAvailability()
+        // Comics are browsed, so they open on what is popular instead of waiting for a query.
+        if (_uiState.value.source == MetadataSource.COMICS) search() else checkAvailability()
     }
 
     /** Points the search at [source], repeats it there, and remembers the choice for next time. */
@@ -113,18 +113,24 @@ class AddBookViewModel(
             it.copy(source = source, loading = false, results = null, canLoadMore = false, error = null)
         }
         settings.searchSource = source
-        if (source == MetadataSource.MANGA || _uiState.value.query.trim().length >= MIN_QUERY_LENGTH) {
+        if (source != MetadataSource.COMICS) settings.bookSearchSource = source
+        if (source == MetadataSource.COMICS || _uiState.value.query.trim().length >= MIN_QUERY_LENGTH) {
             search()
         } else {
             checkAvailability()
         }
     }
 
-    /** Points manga searches at the source with [id], and repeats the search there. */
-    fun setMangaSource(id: Long) {
-        if (id == _uiState.value.mangaSourceId) return
-        settings.mangaSourceId = id
-        pickedManga.value = id
+    /** Switches between books and comics, books going back to the catalogue they were last searched in. */
+    fun setComics(comics: Boolean) {
+        setSource(if (comics) MetadataSource.COMICS else settings.bookSearchSource)
+    }
+
+    /** Points comic searches at the source with [id], and repeats the search there. */
+    fun setComicSource(id: Long) {
+        if (id == _uiState.value.comicSourceId) return
+        settings.comicSourceId = id
+        pickedComic.value = id
         cancelSearch()
         _uiState.update { it.copy(loading = false, results = null, canLoadMore = false, error = null) }
         search()
@@ -153,7 +159,7 @@ class AddBookViewModel(
      */
     private fun search(debounceMs: Long) {
         val query = _uiState.value.query.trim()
-        val browsing = _uiState.value.source == MetadataSource.MANGA
+        val browsing = _uiState.value.source == MetadataSource.COMICS
         if (!browsing && query.length < MIN_QUERY_LENGTH) {
             // Too short to search, and the results on screen were for something longer.
             if (debounceMs > 0) {
@@ -172,7 +178,7 @@ class AddBookViewModel(
             _uiState.update { it.copy(loading = true, error = null, captchaUrl = null) }
             try {
                 // A bare ISBN gets an exact lookup instead of a text search.
-                val isbn = if (source == MetadataSource.MANGA) null else Isbn.toIsbn13(query)
+                val isbn = if (source == MetadataSource.COMICS) null else Isbn.toIsbn13(query)
                 val search = if (isbn == null) BookSearch(metadata, source, query) else null
                 val results = search?.next() ?: metadata.findByIsbn(source, isbn!!)
                 pager = search
@@ -218,10 +224,10 @@ class AddBookViewModel(
 
     internal companion object {
         /**
-         * How each of the manga sources, given as (name, language), is shown: by name, and with its
+         * How each of the comic sources, given as (name, language), is shown: by name, and with its
          * language only where another has the same name, as sources of one site often differ only by it.
          */
-        fun mangaSourceLabels(sources: List<Pair<String, String>>): List<String> {
+        fun comicSourceLabels(sources: List<Pair<String, String>>): List<String> {
             val clashing = sources.groupingBy { it.first }.eachCount().filterValues { it > 1 }.keys
             return sources.map { (name, lang) ->
                 if (name in clashing && lang != "all" && lang != "other" && lang.isNotBlank()) {

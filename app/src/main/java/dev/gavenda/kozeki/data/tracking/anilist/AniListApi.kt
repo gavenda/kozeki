@@ -29,7 +29,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 /** The account a token belongs to. */
 data class AniListViewer(val name: String, val avatarUrl: String?, val scoreFormat: ScoreFormat)
 
-/** A manga on AniList, with the signed-in user's entry for it when they have one. */
+/** A comic on AniList, with the signed-in user's entry for it when they have one. */
 data class AniListMedia(
     val id: Long,
     val title: String,
@@ -42,7 +42,7 @@ data class AniListMedia(
     val entry: AniListEntry?,
 )
 
-/** A manga on the user's list. [score] is 0 to 100 whatever the account shows. */
+/** A comic on the user's list. [score] is 0 to 100 whatever the account shows. */
 data class AniListEntry(
     val id: Long,
     val status: TrackStatus,

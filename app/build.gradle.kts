@@ -151,7 +151,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.adaptive)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    implementation(libs.materialKolor.material3)
+    implementation(libs.materialKolor.core)
 
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
@@ -164,7 +164,7 @@ dependencies {
 
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
-    // Pinch and double-tap zoom for a manga page, which can be far larger than the screen.
+    // Pinch and double-tap zoom for a comic page, which can be far larger than the screen.
     implementation(libs.telephoto.zoomable.image.coil)
     implementation(libs.okhttp)
     // Pages some sources serve as AVIF or JPEG XL, which the platform cannot decode at a webtoon's height.
@@ -172,6 +172,7 @@ dependencies {
     implementation(libs.jxl.coder)
 
     // Asks Google for access to the user's Drive, which is where backups go.
+    //noinspection LoginCredentials
     implementation(libs.play.services.auth)
 
     implementation(libs.readium.shared)

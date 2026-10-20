@@ -6,8 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.backup.drive.DriveBackup
 import dev.gavenda.kozeki.data.backup.drive.DriveBackupState
-import dev.gavenda.kozeki.data.manga.MangaExtension
-import dev.gavenda.kozeki.data.manga.MangaSources
+import dev.gavenda.kozeki.data.comic.ComicExtension
+import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
@@ -43,10 +43,10 @@ data class SettingsUiState(
     val yearlyGoalBooks: Int? = null,
     val cachedLookups: Int = 0,
     /** The Mihon extensions installed on the device, or null until they have been looked for. */
-    val extensions: List<MangaExtension>? = null,
-    /** Whether the library keeps manga apart from books and shows one kind at a time. */
+    val extensions: List<ComicExtension>? = null,
+    /** Whether the library keeps comics apart from books and shows one kind at a time. */
     val separateKinds: Boolean = true,
-    /** Hours between the checks of followed manga for new chapters, 0 being never. */
+    /** Hours between the checks of followed comics for new chapters, 0 being never. */
     val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
     val versionName: String = "",
     /** Today is Ui's birthday. */
@@ -58,9 +58,9 @@ sealed interface SettingsEvent {
     data class OpenBrowser(val uri: Uri) : SettingsEvent
 }
 
-/** What the screen reads from the sources of manga and the tracker, held together to be combined. */
+/** What the screen reads from the sources of comics and the tracker, held together to be combined. */
 private data class LibrarySettings(
-    val extensions: List<MangaExtension>?,
+    val extensions: List<ComicExtension>?,
     val separateKinds: Boolean,
     val updateIntervalHours: Int,
     val aniList: AniListAccount,
@@ -75,7 +75,7 @@ class SettingsViewModel(
     private val hardcoverSignIn: HardcoverSignIn,
     private val aniListAuth: AniListAuth,
     private val driveBackup: DriveBackup,
-    private val mangaSources: MangaSources,
+    private val comicSources: ComicSources,
     versionName: String,
     clock: Clock,
 ) : ViewModel() {
@@ -91,7 +91,7 @@ class SettingsViewModel(
         combine(
             accounts,
             combine(
-                mangaSources.extensions,
+                comicSources.extensions,
                 settings.separateLibraryKinds,
                 settings.updateIntervalHours,
                 aniListAuth.account,
@@ -104,9 +104,9 @@ class SettingsViewModel(
         settings.dailyGoalMinutes,
         stats.observeYearlyGoal(today.year),
         metadata.observeCacheSize(),
-    ) { (accountsState, mangaState), themeMode, dailyGoal, yearlyGoal, cached ->
+    ) { (accountsState, comicState), themeMode, dailyGoal, yearlyGoal, cached ->
         val (hardcover, signIn, backup) = accountsState
-        val (extensions, separateKinds, updateIntervalHours, aniList, aniListSignIn) = mangaState
+        val (extensions, separateKinds, updateIntervalHours, aniList, aniListSignIn) = comicState
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
@@ -139,12 +139,12 @@ class SettingsViewModel(
 
     init {
         // The list is what the section shows, so it is not left for the first time something searches.
-        viewModelScope.launch { mangaSources.ensureLoaded() }
+        viewModelScope.launch { comicSources.ensureLoaded() }
     }
 
     /** Looks for the installed extensions again, for after one was installed or removed. */
     fun refreshExtensions() {
-        viewModelScope.launch { mangaSources.refresh() }
+        viewModelScope.launch { comicSources.refresh() }
     }
 
     fun signIn() {

@@ -4,7 +4,7 @@ import dev.gavenda.kozeki.data.backup.BackupCodec
 import dev.gavenda.kozeki.data.backup.BackupException
 import dev.gavenda.kozeki.data.backup.LibraryBackup
 import dev.gavenda.kozeki.data.db.BookEntity
-import dev.gavenda.kozeki.data.db.MangaChapterEntity
+import dev.gavenda.kozeki.data.db.ComicChapterEntity
 import dev.gavenda.kozeki.data.db.NoteEntity
 import dev.gavenda.kozeki.data.db.PhysicalReadingEntity
 import dev.gavenda.kozeki.data.db.ReadThroughEntity
@@ -21,7 +21,9 @@ import dev.gavenda.kozeki.data.settings.ReaderPreferences
 import dev.gavenda.kozeki.data.settings.ReaderTheme
 import dev.gavenda.kozeki.data.settings.SettingsSnapshot
 import dev.gavenda.kozeki.data.settings.ThemeMode
+import java.io.ByteArrayOutputStream
 import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -151,6 +153,7 @@ class BackupCodecTest {
             readerPreferences = ReaderPreferences(fontScale = 1.2, theme = ReaderTheme.SEPIA, justify = true),
             lastCurrency = "EUR",
             librarySort = "TITLE",
+            librarySortReversed = true,
             libraryDisplay = "LIST",
             searchSource = MetadataSource.GOOGLE_BOOKS,
         ),
@@ -187,15 +190,17 @@ class BackupCodecTest {
     fun `a backup written when the format was new is still read`() {
         val file = javaClass.getResource("/backup-format-1.json")!!.readBytes()
 
-        assertEquals(sample, BackupCodec.decode(file, schemaVersion = 6))
+        // The library's order could not be turned round yet, so the file says nothing about it.
+        val then = sample.copy(settings = sample.settings.copy(librarySortReversed = null))
+        assertEquals(then, BackupCodec.decode(file, schemaVersion = 6))
     }
 
     @Test
-    fun `manga chapters are written and read back`() {
+    fun `comic chapters are written and read back`() {
         val withChapters = sample.copy(
             schemaVersion = 7,
-            mangaChapters = listOf(
-                MangaChapterEntity(
+            comicChapters = listOf(
+                ComicChapterEntity(
                     bookId = "book-2",
                     url = "/chapter/1",
                     name = "Chapter 1",
@@ -212,6 +217,38 @@ class BackupCodecTest {
         )
 
         assertEquals(withChapters, BackupCodec.decode(BackupCodec.encode(withChapters), schemaVersion = 7))
+    }
+
+    /** Comics were called manga, and the backups made then say so. They are still read in full. */
+    @Test
+    fun `a backup made while comics were called manga is still read`() {
+        val comic = sample.books.first().copy(id = "comic-1", source = MetadataSource.COMICS)
+        val withComic = sample.copy(
+            schemaVersion = 11,
+            books = sample.books + comic,
+            comicChapters = listOf(
+                ComicChapterEntity(
+                    bookId = "comic-1",
+                    url = "/chapter/1",
+                    name = "Chapter 1",
+                    chapterNumber = 1f,
+                    scanlator = null,
+                    uploadedAt = 0,
+                    sourceOrder = 0,
+                    read = false,
+                    lastPageRead = 0,
+                    pageCount = null,
+                    sync = stamp,
+                ),
+            ),
+        )
+        val text = GZIPInputStream(BackupCodec.encode(withComic).inputStream()).use { it.readBytes() }.decodeToString()
+        val old = text.replace("\"COMICS\"", "\"MANGA\"").replace("\"comicChapters\"", "\"mangaChapters\"")
+            .replace("\"comicTracks\"", "\"mangaTracks\"")
+        assertTrue("MANGA" in old && "mangaChapters" in old)
+        val bytes = ByteArrayOutputStream().also { out -> GZIPOutputStream(out).use { it.write(old.encodeToByteArray()) } }
+
+        assertEquals(withComic, BackupCodec.decode(bytes.toByteArray(), schemaVersion = 12))
     }
 
     @Test
@@ -261,14 +298,14 @@ class BackupCodecTest {
         assertEquals(
             setOf(
                 "format", "schemaVersion", "createdAt", "appVersion", "device", "books", "readThroughs",
-                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "mangaChapters", "mangaTracks", "settings",
+                "readingSessions", "physicalReadings", "notes", "yearlyGoals", "comicChapters", "comicTracks", "settings",
             ),
             written.keys,
         )
         assertEquals(
             setOf(
                 "dailyGoalMinutes", "themeMode", "readerPreferences", "lastCurrency", "librarySort",
-                "libraryDisplay", "searchSource",
+                "librarySortReversed", "libraryDisplay", "searchSource",
             ),
             (written.getValue("settings") as JsonObject).keys,
         )

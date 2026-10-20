@@ -92,7 +92,7 @@ class MetadataRepository(
      * depends on which source of it is picked, and there is no quota to protect, so it is neither
      * cached nor spaced out.
      */
-    private val MetadataSource.isLive: Boolean get() = this == MetadataSource.MANGA
+    private val MetadataSource.isLive: Boolean get() = this == MetadataSource.COMICS
 
     private fun provider(source: MetadataSource): MetadataProvider = providers.getValue(source)
 

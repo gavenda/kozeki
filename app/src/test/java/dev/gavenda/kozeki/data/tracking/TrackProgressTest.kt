@@ -1,8 +1,8 @@
 package dev.gavenda.kozeki.data.tracking
 
-import dev.gavenda.kozeki.data.db.MangaTrackEntity
+import dev.gavenda.kozeki.data.db.ComicTrackEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
-import dev.gavenda.kozeki.data.model.MangaChapter
+import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.TrackStatus
 import dev.gavenda.kozeki.data.tracking.anilist.ScoreFormat
 import org.junit.Assert.assertEquals
@@ -12,7 +12,7 @@ import org.junit.Test
 
 class TrackProgressTest {
 
-    private fun chapter(url: String, number: Float?, read: Boolean = false) = MangaChapter(
+    private fun chapter(url: String, number: Float?, read: Boolean = false) = ComicChapter(
         url = url,
         name = url,
         number = number,
@@ -30,10 +30,10 @@ class TrackProgressTest {
         total: Int? = 10,
         startedOn: Long? = null,
         completedOn: Long? = null,
-    ) = MangaTrackEntity(
+    ) = ComicTrackEntity(
         bookId = "b",
         mediaId = 1,
-        title = "Manga",
+        title = "Comic",
         status = status,
         progress = progress,
         totalChapters = total,
@@ -74,7 +74,7 @@ class TrackProgressTest {
     }
 
     @Test
-    fun `reading the first chapter starts a planned manga`() {
+    fun `reading the first chapter starts a planned comic`() {
         val next = advance(track(), progress = 1, today = 100)
 
         assertEquals(TrackStatus.CURRENT, next.status)
@@ -101,7 +101,7 @@ class TrackProgressTest {
     }
 
     @Test
-    fun `a manga with no known end is not completed by reading`() {
+    fun `a comic with no known end is not completed by reading`() {
         val next = advance(track(TrackStatus.CURRENT, progress = 50, total = null), progress = 200, today = 100)
 
         assertEquals(TrackStatus.CURRENT, next.status)
@@ -124,7 +124,7 @@ class TrackProgressTest {
     }
 
     @Test
-    fun `a manga being repeated stays so when the book goes back to reading`() {
+    fun `a comic being repeated stays so when the book goes back to reading`() {
         val before = track(TrackStatus.REPEATING)
 
         assertSame(before, withStatus(before, TrackStatus.CURRENT, today = 100))

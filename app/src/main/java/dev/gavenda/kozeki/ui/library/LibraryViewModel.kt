@@ -10,12 +10,15 @@ import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
+import dev.gavenda.kozeki.data.model.LEGACY_COMICS
 import dev.gavenda.kozeki.data.model.ReadingState
-import dev.gavenda.kozeki.data.manga.MangaChapterRepository
+import dev.gavenda.kozeki.data.comic.ComicChapterRepository
+import dev.gavenda.kozeki.data.comic.UpdateCheckProgress
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,58 +66,80 @@ enum class LibraryKind {
     /** Books with an EPUB, books on paper, and the ones only wanted. */
     BOOKS,
 
-    /** Manga, read online through a Mihon source. */
-    MANGA,
+    /** Comics, read online through a Mihon source. */
+    COMICS,
     ;
 
-    fun matches(book: Book): Boolean = book.isManga == (this == MANGA)
+    fun matches(book: Book): Boolean = book.isComic == (this == COMICS)
 
-    val other: LibraryKind get() = if (this == BOOKS) MANGA else BOOKS
+    val other: LibraryKind get() = if (this == BOOKS) COMICS else BOOKS
 }
 
-/** The order the books of a filter are shown in. Books that tie keep the order of [RECENT]. */
-enum class LibrarySort(@param:StringRes val label: Int) {
+/**
+ * The order the books of a filter are shown in. Books that tie keep the order of [RECENT]. Each order
+ * has a usual direction, [descending] or not, and can be turned the other way round; the books it has
+ * nothing to go by for stay at the end either way.
+ */
+enum class LibrarySort(@param:StringRes val label: Int, val descending: Boolean) {
     /** Books with an EPUB first, most recently read at the top, then the ones still without a file. */
-    RECENT(R.string.sort_recent),
-    TITLE(R.string.sort_title),
+    RECENT(R.string.sort_recent, descending = true),
+    TITLE(R.string.sort_title, descending = false),
 
     /** By the first author as their name is written, with the books that name nobody at the end. */
-    AUTHOR(R.string.sort_author),
+    AUTHOR(R.string.sort_author, descending = false),
 
     /** Newest first. */
-    DATE_ADDED(R.string.sort_date_added),
+    DATE_ADDED(R.string.sort_date_added, descending = true),
 
     /** The user's own rating, highest first, with the books not rated yet at the end. */
-    RATING(R.string.sort_rating),
+    RATING(R.string.sort_rating, descending = true),
 
     /**
      * What the book cost, highest first, with the books without a price at the end. Prices in different
      * currencies cannot be weighed against each other, so each currency is kept together, the one most
-     * books were bought in first.
+     * books were bought in first, whichever way the prices run.
      */
-    PRICE(R.string.sort_price),
+    PRICE(R.string.sort_price, descending = true),
     ;
 
-    /** [books], given in the order of [RECENT], in this order. */
-    fun sorted(books: List<Book>): List<Book> = when (this) {
-        RECENT -> books
-        TITLE -> books.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
-        AUTHOR -> books.sortedWith(
-            compareBy<Book> { it.authors.isEmpty() }
-                .thenBy(String.CASE_INSENSITIVE_ORDER) { it.authors.firstOrNull().orEmpty() },
-        )
-        DATE_ADDED -> books.sortedByDescending { it.addedAt }
-        RATING -> books.sortedByDescending { it.rating ?: -1f }
-        PRICE -> {
-            val (withPrice, withoutPrice) = books.partition { it.purchasePriceMinor != null }
-            val currencyCounts = withPrice.groupingBy { it.purchaseCurrency.orEmpty() }.eachCount()
-            withPrice.sortedWith(
-                compareByDescending<Book> { currencyCounts.getValue(it.purchaseCurrency.orEmpty()) }
-                    .thenBy { it.purchaseCurrency.orEmpty() }
-                    .thenByDescending { it.purchasePriceMinor },
-            ) + withoutPrice
+    /** Whether the books run from highest to lowest, once [reversed] is taken into account. */
+    fun isDescending(reversed: Boolean): Boolean = descending != reversed
+
+    /** [books], given in the order of [RECENT], in this order, or the other way round when [reversed]. */
+    fun sorted(books: List<Book>, reversed: Boolean = false): List<Book> {
+        if (this == RECENT && !reversed) return books
+        val (placed, unplaced) = books.partition(::hasValue)
+        val ordered = when (this) {
+            RECENT -> placed.asReversed()
+            TITLE -> placed.sortedWith(compareBy<Book, String>(String.CASE_INSENSITIVE_ORDER) { it.title }.flip(reversed))
+            AUTHOR -> placed.sortedWith(
+                compareBy<Book, String>(String.CASE_INSENSITIVE_ORDER) { it.authors.first() }.flip(reversed),
+            )
+            DATE_ADDED -> placed.sortedWith(compareByDescending<Book> { it.addedAt }.flip(reversed))
+            RATING -> placed.sortedWith(compareByDescending<Book> { it.rating }.flip(reversed))
+            PRICE -> {
+                val currencyCounts = placed.groupingBy { it.purchaseCurrency.orEmpty() }.eachCount()
+                placed.sortedWith(
+                    compareByDescending<Book> { currencyCounts.getValue(it.purchaseCurrency.orEmpty()) }
+                        .thenBy { it.purchaseCurrency.orEmpty() }
+                        .then(compareByDescending<Book> { it.purchasePriceMinor }.flip(reversed)),
+                )
+            }
         }
+        return ordered + unplaced
     }
+
+    /** Whether this order has anything to go by for [book]; the ones it has not go at the end. */
+    private fun hasValue(book: Book): Boolean = when (this) {
+        // Read at some point, or there to be read: the wishlist and books still to come stay at the end.
+        RECENT -> book.isComic || book.hasFile || book.lastReadAt != null
+        TITLE, DATE_ADDED -> true
+        AUTHOR -> book.authors.isNotEmpty()
+        RATING -> book.rating != null
+        PRICE -> book.purchasePriceMinor != null
+    }
+
+    private fun <T> Comparator<T>.flip(reversed: Boolean): Comparator<T> = if (reversed) reversed() else this
 }
 
 /** How the books of the library are laid out. */
@@ -176,10 +201,12 @@ data class LibraryUiState(
     val loading: Boolean = true,
     val filter: LibraryFilter = LibraryFilter.ALL,
     val sort: LibrarySort = LibrarySort.RECENT,
+    /** Whether [sort] runs the other way round from its usual direction. */
+    val sortReversed: Boolean = false,
     val display: LibraryDisplay = LibraryDisplay.COVERS,
     /** The kind shown, when [separateKinds]. */
     val kind: LibraryKind = LibraryKind.BOOKS,
-    /** Whether books and manga are kept apart. When not, everything is shown and [kind] means nothing. */
+    /** Whether books and comics are kept apart. When not, everything is shown and [kind] means nothing. */
     val separateKinds: Boolean = true,
     val sections: List<LibrarySection> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
@@ -190,13 +217,15 @@ data class LibraryUiState(
     val importing: Boolean = false,
     /** The books whose details are being looked up right now. */
     val matching: Set<String> = emptySet(),
-    /** The sources of followed manga are being asked for new chapters. */
-    val refreshing: Boolean = false,
+    /** How far the sources of followed comics have been asked for new chapters, while they are. */
+    val updateCheck: UpdateCheckProgress? = null,
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
     val selection: LibrarySelection = LibrarySelection(),
 ) {
     val selecting: Boolean get() = !selection.isEmpty
+    /** The sources of followed comics are being asked for new chapters. */
+    val refreshing: Boolean get() = updateCheck != null
     /** Every book on screen, in the order shown. */
     val books: List<Book> get() = sections.flatMap { it.books }
 
@@ -227,7 +256,7 @@ class LibraryViewModel(
     private val settings: SettingsRepository,
     matchService: MatchService,
     private val incoming: IncomingEpubs,
-    private val chapters: MangaChapterRepository,
+    private val chapters: ComicChapterRepository,
     private val scheduleMatching: () -> Unit,
 ) : ViewModel() {
 
@@ -236,7 +265,8 @@ class LibraryViewModel(
     // A count, as an EPUB from another app can arrive while the files of an earlier import are still coming in.
     private val importsRunning = MutableStateFlow(0)
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
-    private val refreshing = MutableStateFlow(false)
+    private val updateCheck = MutableStateFlow<UpdateCheckProgress?>(null)
+    private var updateJob: Job? = null
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
     val events: Flow<LibraryEvent> = eventChannel.receiveAsFlow()
@@ -248,19 +278,21 @@ class LibraryViewModel(
 
     private val sort = settings.librarySort.map { name ->
         LibrarySort.entries.firstOrNull { it.name == name } ?: LibrarySort.RECENT
-    }
+    }.combine(settings.librarySortReversed, ::Pair)
 
     private val display = settings.libraryDisplay.map { name ->
         LibraryDisplay.entries.firstOrNull { it.name == name } ?: LibraryDisplay.COVERS
     }
 
     private val kind = settings.libraryKind.map { name ->
-        LibraryKind.entries.firstOrNull { it.name == name } ?: LibraryKind.BOOKS
+        LibraryKind.entries.firstOrNull { it.name == name }
+            ?: LibraryKind.COMICS.takeIf { name == LEGACY_COMICS }
+            ?: LibraryKind.BOOKS
     }
 
     private data class ViewOptions(
         val filter: LibraryFilter,
-        val sort: LibrarySort,
+        val sort: Pair<LibrarySort, Boolean>,
         val display: LibraryDisplay,
         val kind: LibraryKind,
         val separateKinds: Boolean,
@@ -268,25 +300,27 @@ class LibraryViewModel(
 
     private val view = combine(chosenFilter, sort, display, kind, settings.separateLibraryKinds, ::ViewOptions)
 
-    private val busy = combine(importsRunning, matchService.matching, refreshing) { imports, matching, refreshing ->
-        Triple(imports > 0, matching, refreshing)
+    private val busy = combine(importsRunning, matchService.matching, updateCheck) { imports, matching, check ->
+        Triple(imports > 0, matching, check)
     }
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
 
     val uiState: StateFlow<LibraryUiState> =
         combine(books, view, busy, selectedIds, purchaseDefaults) { allBooks, view, busy, selected, defaults ->
-            val (filter, sort, display) = Triple(view.filter, view.sort, view.display)
+            val (filter, display) = view.filter to view.display
+            val (sort, sortReversed) = view.sort
             // One kind at a time, unless the user has asked for everything together.
             val books = if (view.separateKinds) allBooks.filter(view.kind::matches) else allBooks
             val (importing, matching, checking) = busy
             val (currency, locations) = defaults
             val counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) }
-            val shown = sort.sorted(books.filter(filter::matches))
+            val shown = sort.sorted(books.filter(filter::matches), sortReversed)
             LibraryUiState(
                 loading = false,
                 filter = filter,
                 sort = sort,
+                sortReversed = sortReversed,
                 display = display,
                 kind = view.kind,
                 separateKinds = view.separateKinds,
@@ -296,7 +330,7 @@ class LibraryViewModel(
                 libraryBooks = allBooks.size,
                 importing = importing,
                 matching = matching,
-                refreshing = checking,
+                updateCheck = checking,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
@@ -304,17 +338,22 @@ class LibraryViewModel(
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
-    /** Asks the sources of the manga being followed for new chapters, for a pull to refresh. */
+    /** Asks the sources of the comics being followed for new chapters, for a pull to refresh. */
     fun checkForUpdates() {
-        if (refreshing.value) return
-        viewModelScope.launch {
-            refreshing.value = true
+        if (updateJob?.isActive == true) return
+        updateCheck.value = UpdateCheckProgress(checked = 0, total = 0, current = null)
+        updateJob = viewModelScope.launch {
             try {
-                chapters.checkForUpdates(pauseMs = 500)
+                chapters.checkForUpdates(pauseMs = 500) { updateCheck.value = it }
             } finally {
-                refreshing.value = false
+                updateCheck.value = null
             }
         }
+    }
+
+    /** Stops a check for new chapters part way. What was found up to then is kept. */
+    fun cancelUpdateCheck() {
+        updateJob?.cancel()
     }
 
     fun selectFilter(filter: LibraryFilter) {
@@ -322,11 +361,14 @@ class LibraryViewModel(
         clearSelection()
     }
 
+    /** Puts the library in [sort], or turns it the other way round when it is already in it. */
     fun selectSort(sort: LibrarySort) {
-        viewModelScope.launch { settings.setLibrarySort(sort.name) }
+        val current = uiState.value
+        val reversed = if (sort == current.sort) !current.sortReversed else false
+        viewModelScope.launch { settings.setLibrarySort(sort.name, reversed) }
     }
 
-    /** Switches between the books and the manga. */
+    /** Switches between the books and the comics. */
     fun toggleKind() {
         val next = uiState.value.kind.other
         viewModelScope.launch { settings.setLibraryKind(next.name) }

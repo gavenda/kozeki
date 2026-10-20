@@ -16,16 +16,16 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE deletedAt IS NULL ORDER BY title COLLATE NOCASE")
     fun observeAll(): Flow<List<BookEntity>>
 
-    /** Books with an EPUB attached, and manga, which are read online, most recently read first. */
+    /** Books with an EPUB attached, and comics, which are read online, most recently read first. */
     @Query(
-        "SELECT * FROM books WHERE deletedAt IS NULL AND (fileHash IS NOT NULL OR source = 'MANGA') " +
+        "SELECT * FROM books WHERE deletedAt IS NULL AND (fileHash IS NOT NULL OR source = 'COMICS') " +
             "ORDER BY COALESCE(lastReadAt, createdAt) DESC",
     )
     fun observeLibrary(): Flow<List<BookEntity>>
 
     /** Wishlist and purchased entries that have no EPUB yet. */
     @Query(
-        "SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL AND (source IS NULL OR source != 'MANGA') " +
+        "SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL AND (source IS NULL OR source != 'COMICS') " +
             "ORDER BY createdAt DESC",
     )
     fun observeWithoutFile(): Flow<List<BookEntity>>
@@ -42,8 +42,8 @@ interface BookDao {
     @Query("SELECT * FROM books WHERE source = :source AND sourceId = :sourceId AND deletedAt IS NULL")
     suspend fun findBySource(source: MetadataSource, sourceId: String): List<BookEntity>
 
-    /** The entries an imported EPUB could complete. A manga has no EPUB to wait for. */
-    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL AND (source IS NULL OR source != 'MANGA')")
+    /** The entries an imported EPUB could complete. A comic has no EPUB to wait for. */
+    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND fileHash IS NULL AND (source IS NULL OR source != 'COMICS')")
     suspend fun withoutFile(): List<BookEntity>
 
     @Query("SELECT * FROM books WHERE deletedAt IS NULL AND matchStatus = 'PENDING'")
@@ -71,9 +71,9 @@ interface BookDao {
     )
     fun observePublishers(): Flow<List<String>>
 
-    /** Manga worth asking their source about, the one asked longest ago first. */
+    /** Comics worth asking their source about, the one asked longest ago first. */
     @Query(
-        "SELECT * FROM books WHERE source = 'MANGA' AND deletedAt IS NULL AND sourceId IS NOT NULL " +
+        "SELECT * FROM books WHERE source = 'COMICS' AND deletedAt IS NULL AND sourceId IS NOT NULL " +
             "AND acquisition != 'WISHLIST' AND state NOT IN ('COMPLETED', 'DROPPED') ORDER BY chaptersCheckedAt",
     )
     suspend fun getForUpdateCheck(): List<BookEntity>
@@ -92,7 +92,7 @@ interface BookDao {
     suspend fun addNewChapters(id: String, count: Int)
 
     /**
-     * A manga's place, from how many of its chapters are read. Unlike [updateProgress] it leaves
+     * A comic's place, from how many of its chapters are read. Unlike [updateProgress] it leaves
      * [BookEntity.lastReadAt] alone, since marking chapters read is not reading.
      */
     @Query(
@@ -151,59 +151,59 @@ interface BookDao {
 }
 
 @Dao
-interface MangaChapterDao {
+interface ComicChapterDao {
 
-    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
-    fun observeForBook(bookId: String): Flow<List<MangaChapterEntity>>
+    @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
+    fun observeForBook(bookId: String): Flow<List<ComicChapterEntity>>
 
-    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
-    suspend fun getForBook(bookId: String): List<MangaChapterEntity>
+    @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
+    suspend fun getForBook(bookId: String): List<ComicChapterEntity>
 
     /** Every row of the book, the ones whose chapter left the source included. */
-    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId")
-    suspend fun getAllForBook(bookId: String): List<MangaChapterEntity>
+    @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId")
+    suspend fun getAllForBook(bookId: String): List<ComicChapterEntity>
 
-    @Query("SELECT * FROM manga_chapters WHERE bookId = :bookId AND url = :url AND deletedAt IS NULL")
-    suspend fun get(bookId: String, url: String): MangaChapterEntity?
+    @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId AND url = :url AND deletedAt IS NULL")
+    suspend fun get(bookId: String, url: String): ComicChapterEntity?
 
     @Upsert
-    suspend fun upsertAll(chapters: List<MangaChapterEntity>)
+    suspend fun upsertAll(chapters: List<ComicChapterEntity>)
 
     /**
      * [pageCount] only replaces what is there when it is known. A chapter that is read stays read:
      * opening it again to look at a page is not reading it unread, which [markRead] is for.
      */
     @Query(
-        "UPDATE manga_chapters SET read = CASE WHEN :read THEN 1 ELSE read END, lastPageRead = :lastPageRead, " +
+        "UPDATE comic_chapters SET read = CASE WHEN :read THEN 1 ELSE read END, lastPageRead = :lastPageRead, " +
             "pageCount = COALESCE(:pageCount, pageCount), updatedAt = :now WHERE bookId = :bookId AND url = :url",
     )
     suspend fun updateProgress(bookId: String, url: String, read: Boolean, lastPageRead: Int, pageCount: Int?, now: Long)
 
     /** Marking a chapter unread puts it back to its first page. */
     @Query(
-        "UPDATE manga_chapters SET read = :read, lastPageRead = CASE WHEN :read THEN lastPageRead ELSE 0 END, " +
+        "UPDATE comic_chapters SET read = :read, lastPageRead = CASE WHEN :read THEN lastPageRead ELSE 0 END, " +
             "updatedAt = :now WHERE bookId = :bookId AND url IN (:urls)",
     )
     suspend fun markRead(bookId: String, urls: List<String>, read: Boolean, now: Long)
 
-    @Query("UPDATE manga_chapters SET deletedAt = :now, updatedAt = :now WHERE bookId = :bookId AND deletedAt IS NULL")
+    @Query("UPDATE comic_chapters SET deletedAt = :now, updatedAt = :now WHERE bookId = :bookId AND deletedAt IS NULL")
     suspend fun softDeleteForBook(bookId: String, now: Long)
 }
 
 @Dao
-interface MangaTrackDao {
+interface ComicTrackDao {
 
-    @Query("SELECT * FROM manga_tracks WHERE bookId = :bookId AND deletedAt IS NULL")
-    fun observe(bookId: String): Flow<MangaTrackEntity?>
+    @Query("SELECT * FROM comic_tracks WHERE bookId = :bookId AND deletedAt IS NULL")
+    fun observe(bookId: String): Flow<ComicTrackEntity?>
 
-    @Query("SELECT * FROM manga_tracks WHERE bookId = :bookId AND deletedAt IS NULL")
-    suspend fun get(bookId: String): MangaTrackEntity?
+    @Query("SELECT * FROM comic_tracks WHERE bookId = :bookId AND deletedAt IS NULL")
+    suspend fun get(bookId: String): ComicTrackEntity?
 
-    @Query("SELECT * FROM manga_tracks WHERE pendingPush = 1 AND deletedAt IS NULL")
-    suspend fun pending(): List<MangaTrackEntity>
+    @Query("SELECT * FROM comic_tracks WHERE pendingPush = 1 AND deletedAt IS NULL")
+    suspend fun pending(): List<ComicTrackEntity>
 
     @Upsert
-    suspend fun upsert(track: MangaTrackEntity)
+    suspend fun upsert(track: ComicTrackEntity)
 }
 
 @Dao
@@ -408,17 +408,17 @@ interface BackupDao {
     @Query("SELECT * FROM yearly_goals WHERE deletedAt IS NULL")
     suspend fun yearlyGoals(): List<YearlyGoalEntity>
 
-    @Query("SELECT * FROM manga_chapters WHERE deletedAt IS NULL")
-    suspend fun mangaChapters(): List<MangaChapterEntity>
+    @Query("SELECT * FROM comic_chapters WHERE deletedAt IS NULL")
+    suspend fun comicChapters(): List<ComicChapterEntity>
 
-    @Query("SELECT * FROM manga_tracks WHERE deletedAt IS NULL")
-    suspend fun mangaTracks(): List<MangaTrackEntity>
+    @Query("SELECT * FROM comic_tracks WHERE deletedAt IS NULL")
+    suspend fun comicTracks(): List<ComicTrackEntity>
 
-    @Query("DELETE FROM manga_tracks")
-    suspend fun clearMangaTracks()
+    @Query("DELETE FROM comic_tracks")
+    suspend fun clearComicTracks()
 
     @Upsert
-    suspend fun putMangaTracks(rows: List<MangaTrackEntity>)
+    suspend fun putComicTracks(rows: List<ComicTrackEntity>)
 
     @Query("DELETE FROM books")
     suspend fun clearBooks()
@@ -438,8 +438,8 @@ interface BackupDao {
     @Query("DELETE FROM yearly_goals")
     suspend fun clearYearlyGoals()
 
-    @Query("DELETE FROM manga_chapters")
-    suspend fun clearMangaChapters()
+    @Query("DELETE FROM comic_chapters")
+    suspend fun clearComicChapters()
 
     // Upserts, so a backup that names a row twice still goes in.
     @Upsert
@@ -461,5 +461,5 @@ interface BackupDao {
     suspend fun putYearlyGoals(rows: List<YearlyGoalEntity>)
 
     @Upsert
-    suspend fun putMangaChapters(rows: List<MangaChapterEntity>)
+    suspend fun putComicChapters(rows: List<ComicChapterEntity>)
 }

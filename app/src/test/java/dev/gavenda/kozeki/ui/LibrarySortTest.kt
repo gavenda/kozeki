@@ -50,5 +50,24 @@ class LibrarySortTest {
             listOf("dear", "mid", "cheap", "yen", "free"),
             LibrarySort.PRICE.sorted(shelf).map { it.id },
         )
+        assertEquals(
+            listOf("cheap", "mid", "dear", "yen", "free"),
+            LibrarySort.PRICE.sorted(shelf, reversed = true).map { it.id },
+        )
+    }
+
+    @Test
+    fun `reversed turns the order round and keeps the books without a value at the end`() {
+        assertEquals(listOf("ubik", "solaris", "emma", "dune"), LibrarySort.TITLE.sorted(books, reversed = true).map { it.id })
+        assertEquals(listOf("emma", "dune", "solaris", "ubik"), LibrarySort.DATE_ADDED.sorted(books, reversed = true).map { it.id })
+        assertEquals(listOf("dune", "solaris", "emma", "ubik"), LibrarySort.RATING.sorted(books, reversed = true).map { it.id })
+    }
+
+    @Test
+    fun `the arrow follows the usual direction and the reversal`() {
+        assertEquals(true, LibrarySort.DATE_ADDED.isDescending(reversed = false))
+        assertEquals(false, LibrarySort.DATE_ADDED.isDescending(reversed = true))
+        assertEquals(false, LibrarySort.TITLE.isDescending(reversed = false))
+        assertEquals(true, LibrarySort.TITLE.isDescending(reversed = true))
     }
 }
