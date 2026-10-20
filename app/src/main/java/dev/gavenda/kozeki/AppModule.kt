@@ -230,6 +230,12 @@ internal fun scheduleMatching(): () -> Unit {
     return { MatchWorker.enqueue(context) }
 }
 
+/** Stops the metadata lookups under way. The books not reached are looked up on the next run. */
+internal fun cancelMatching(): () -> Unit {
+    val context = GlobalContext.get().get<Application>()
+    return { MatchWorker.cancel(context) }
+}
+
 /** SHA-1 of the certificate this build is signed with, as Google wants it: upper-case hex, no colons. */
 private fun signingCertificateSha1(context: Context): String? = runCatching {
     val info = context.packageManager.getPackageInfo(

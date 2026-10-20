@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -39,10 +40,10 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -212,6 +213,7 @@ fun LibraryScreen(
         },
         onSettingsClick = onOpenSettings,
         onRefresh = viewModel::checkForUpdates,
+        onRefreshMetadata = viewModel::refreshMetadata,
         onCancelRefresh = viewModel::cancelUpdateCheck,
     )
 }
@@ -257,6 +259,7 @@ fun LibraryContent(
     onKindSelected: (LibraryKind) -> Unit = {},
     shelfActions: ShelfActions = ShelfActions(),
     onRefresh: () -> Unit = {},
+    onRefreshMetadata: () -> Unit = {},
     onCancelRefresh: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -265,6 +268,7 @@ fun LibraryContent(
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     var updateSheetHidden by rememberSaveable { mutableStateOf(false) }
+    var confirmingMetadataRefresh by rememberSaveable { mutableStateOf(false) }
     var shelfPrompt by remember { mutableStateOf<ShelfPrompt?>(null) }
     // The shelves of the picked books, once asked for; the sheet waits on them.
     var checklistCounts by remember { mutableStateOf<Map<String, Int>?>(null) }
@@ -440,12 +444,17 @@ fun LibraryContent(
                         // The sheet shows the check, so the indicator goes back up once let go.
                         // Pulled again while the sheet is hidden, it brings the sheet back.
                         isRefreshing = false,
+                        // Among the books it refreshes their details, which replaces them, so it asks
+                        // first; one already running is only brought back. Elsewhere it checks the comics.
                         onRefresh = {
                             updateSheetHidden = false
-                            onRefresh()
+                            when {
+                                state.refreshing -> Unit
+                                state.kind == LibraryKind.BOOKS -> confirmingMetadataRefresh = true
+                                else -> onRefresh()
+                            }
                         },
-                        // Only comics have anything to check, so books are not pulled.
-                        enabled = !state.selecting && state.kind != LibraryKind.BOOKS,
+                        enabled = !state.selecting,
                         state = pullState,
                         indicator = {
                             Box(
@@ -502,7 +511,6 @@ fun LibraryContent(
                                         if (list) {
                                             LibraryBookRow(
                                                 book = book,
-                                                matching = book.id in state.matching,
                                                 selecting = state.selecting,
                                                 selected = book.id in selection.ids,
                                                 actions = selectionActions,
@@ -513,7 +521,6 @@ fun LibraryContent(
                                         } else {
                                             LibraryBookItem(
                                                 book = book,
-                                                matching = book.id in state.matching,
                                                 selecting = state.selecting,
                                                 selected = book.id in selection.ids,
                                                 actions = selectionActions,
@@ -548,6 +555,19 @@ fun LibraryContent(
                                         }
                                     }
                                     sectionItems("${group.shelf.id}/", group.sections)
+                                }
+                            } else if (state.bySeries) {
+                                state.seriesGroups.forEach { group ->
+                                    val key = group.name?.lowercase() ?: ""
+                                    stickyHeader(key = "series-$key") {
+                                        GroupHeader(
+                                            title = group.name ?: stringResource(R.string.library_no_series),
+                                            count = group.books.size,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            indent = if (list) 8.dp else 0.dp,
+                                        )
+                                    }
+                                    sectionItems("series-$key/", group.sections)
                                 }
                             } else {
                                 sectionItems("", state.sections)
@@ -601,6 +621,15 @@ fun LibraryContent(
             onDismiss = { editingPurchase = false },
         )
     }
+    if (confirmingMetadataRefresh) {
+        RefreshMetadataDialog(
+            onConfirm = {
+                confirmingMetadataRefresh = false
+                onRefreshMetadata()
+            },
+            onDismiss = { confirmingMetadataRefresh = false },
+        )
+    }
     if (confirmingDelete && state.selecting) {
         val onConfirm = {
             confirmingDelete = false
@@ -634,10 +663,24 @@ fun LibraryContent(
     // Hidden by hand, the sheet stays away until the next pull.
     UpdateCheckSheet(
         progress = state.updateCheck,
+        kind = state.updateCheckKind,
         finished = state.updateCheckFinished,
         hidden = updateSheetHidden,
         onCancel = onCancelRefresh,
         onDismiss = { updateSheetHidden = true },
+    )
+}
+
+/** Asks before every linked book's details are fetched again, as they replace what was changed by hand. */
+@Composable
+private fun RefreshMetadataDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(painterResource(R.drawable.refresh_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+        title = { Text(stringResource(R.string.metadata_refresh_confirm_title)) },
+        text = { Text(stringResource(R.string.metadata_refresh_confirm_message)) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.metadata_refresh_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
@@ -988,7 +1031,6 @@ private fun SortMenu(
 }
 
 /** A shelf's name over its books, with its menu. It is filled in, as the books scroll under it. */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ShelfHeader(
     shelf: Shelf,
@@ -999,14 +1041,66 @@ private fun ShelfHeader(
     indent: Dp = 8.dp,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    GroupHeader(title = shelf.name, count = shelf.bookCount, modifier = modifier, indent = indent) {
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(
+                    painterResource(R.drawable.more_vert_48px),
+                    contentDescription = stringResource(R.string.shelf_more_actions),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.shelf_add_books)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.add_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    onClick = {
+                        menuOpen = false
+                        onAddBooks()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.shelf_rename)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.edit_note_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    onClick = {
+                        menuOpen = false
+                        onRename()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.shelf_delete)) },
+                    leadingIcon = { Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    onClick = {
+                        menuOpen = false
+                        onDelete()
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The name of a run of books, a shelf or a series, pinned over them with how many there are, and
+ * whatever [trailing] puts at its end. It is filled in, as the books scroll under it.
+ */
+@Composable
+private fun GroupHeader(
+    title: String,
+    count: Int,
+    modifier: Modifier = Modifier,
+    indent: Dp = 8.dp,
+    trailing: @Composable () -> Unit = {},
+) {
     Column(modifier.background(MaterialTheme.colorScheme.surface)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = indent),
+            // As tall as a header with a menu button, whether this one has one or not.
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = indent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = shelf.name,
+                    text = title,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 1,
@@ -1015,46 +1109,12 @@ private fun ShelfHeader(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = pluralStringResource(R.plurals.shelf_book_count, shelf.bookCount, shelf.bookCount),
+                    text = pluralStringResource(R.plurals.shelf_book_count, count, count),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(
-                        painterResource(R.drawable.more_vert_48px),
-                        contentDescription = stringResource(R.string.shelf_more_actions),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.shelf_add_books)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.add_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                        onClick = {
-                            menuOpen = false
-                            onAddBooks()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.shelf_rename)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.edit_note_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                        onClick = {
-                            menuOpen = false
-                            onRename()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.shelf_delete)) },
-                        leadingIcon = { Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                        onClick = {
-                            menuOpen = false
-                            onDelete()
-                        },
-                    )
-                }
-            }
+            trailing()
         }
         // A faint grey rule, as wide as the books under it.
         HorizontalDivider(
@@ -1095,7 +1155,6 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LibraryBookItem(
     book: Book,
-    matching: Boolean,
     selecting: Boolean,
     selected: Boolean,
     actions: SelectionActions,
@@ -1127,7 +1186,6 @@ private fun LibraryBookItem(
     ) {
         Box(Modifier.padding(inset)) {
             BookCover(book, Modifier.fillMaxWidth())
-            if (matching) MatchingOverlay(MaterialTheme.shapes.medium, Modifier.matchParentSize())
             if (selected) {
                 Surface(
                     modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
@@ -1218,7 +1276,6 @@ private fun LibraryBookItem(
 @Composable
 private fun LibraryBookRow(
     book: Book,
-    matching: Boolean,
     selecting: Boolean,
     selected: Boolean,
     actions: SelectionActions,
@@ -1251,9 +1308,6 @@ private fun LibraryBookRow(
     ) {
         Box {
             BookCover(book, Modifier.width(56.dp), MaterialTheme.shapes.small, showTitleOnPlaceholder = false)
-            if (matching) {
-                MatchingOverlay(MaterialTheme.shapes.small, Modifier.matchParentSize(), indicatorSize = 32.dp)
-            }
             if (book.newChapters > 0 && !selected) {
                 NewChaptersBadge(book.newChapters, Modifier.align(Alignment.TopStart).padding(2.dp))
             }
@@ -1349,21 +1403,6 @@ private fun LibraryBookRow(
 private fun statusLine(book: Book): String = when (book.state) {
     ReadingState.READING -> formatPercent(book.overallProgression)
     else -> stringResource(book.state.labelRes)
-}
-
-/** Dims a cover and turns over it while the book's details are being looked up. */
-@Composable
-private fun MatchingOverlay(shape: Shape, modifier: Modifier = Modifier, indicatorSize: Dp = 48.dp) {
-    val description = stringResource(R.string.match_in_progress_title)
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f))
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) {
-        HaloLoadingIndicator(Modifier.size(indicatorSize), glow = true)
-    }
 }
 
 /** How many chapters of a comic are new, on a backing in the colours that call for a look. */

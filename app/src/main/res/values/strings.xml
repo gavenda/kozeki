@@ -57,6 +57,8 @@
     <string name="sort_rating">My rating</string>
     <string name="sort_price">Price</string>
     <string name="sort_series">Series</string>
+    <!-- Over the books in no series, when the library is sorted by series. -->
+    <string name="library_no_series">Not in a series</string>
     <string name="sort_ascending">Ascending</string>
     <string name="sort_descending">Descending</string>
     <string name="library_favorites">Favorites</string>
@@ -85,6 +87,21 @@
         <item quantity="one">%1$d more not due yet, left for later</item>
         <item quantity="other">%1$d more not due yet, left for later</item>
     </plurals>
+    <string name="metadata_refresh_title">Refreshing book details</string>
+    <plurals name="metadata_refresh_count">
+        <item quantity="one">%1$d of %2$d book</item>
+        <item quantity="other">%1$d of %2$d books</item>
+    </plurals>
+    <plurals name="metadata_refresh_skipped">
+        <item quantity="one">%1$d more not linked to a source, left as it is</item>
+        <item quantity="other">%1$d more not linked to a source, left as they are</item>
+    </plurals>
+    <!-- Over the lookup of books just imported. -->
+    <string name="lookup_title">Looking up new books</string>
+    <!-- Asked before a pull to refresh among the books, which replaces their details. -->
+    <string name="metadata_refresh_confirm_title">Refresh every book’s details?</string>
+    <string name="metadata_refresh_confirm_message">Books linked to sources will be updated. Edits will be replaced.</string>
+    <string name="metadata_refresh_confirm">Refresh</string>
     <plurals name="new_chapters">
         <item quantity="one">%1$d new chapter</item>
         <item quantity="other">%1$d new chapters</item>

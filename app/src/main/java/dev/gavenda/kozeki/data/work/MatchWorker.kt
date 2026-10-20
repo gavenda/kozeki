@@ -41,5 +41,10 @@ class MatchWorker(context: Context, parameters: WorkerParameters) :
             WorkManager.getInstance(context)
                 .enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
+
+        /** Stops the lookups under way and queued. The books not reached keep waiting for the next run. */
+        fun cancel(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_NAME)
+        }
     }
 }

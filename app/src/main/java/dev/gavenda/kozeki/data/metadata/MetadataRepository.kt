@@ -62,9 +62,12 @@ class MetadataRepository(
         return books(source, key, LOOKUP_TTL) { provider(source).searchByTitleAndAuthor(title, author) }
     }
 
-    /** The book with [sourceId] as [source] describes it now, or null when it has no such book. */
-    suspend fun book(source: MetadataSource, sourceId: String): BookMetadata? =
-        books(source, "book|$SEARCH_VERSION|$sourceId", LOOKUP_TTL) { listOfNotNull(provider(source).book(sourceId)) }
+    /**
+     * The book with [sourceId] as [source] describes it now, or null when it has no such book.
+     * [fresh] asks the source again whatever is cached, and fails rather than fall back on an old answer.
+     */
+    suspend fun book(source: MetadataSource, sourceId: String, fresh: Boolean = false): BookMetadata? =
+        books(source, "book|$SEARCH_VERSION|$sourceId", LOOKUP_TTL, fresh) { listOfNotNull(provider(source).book(sourceId)) }
             .firstOrNull()
 
     /** The author [source] knows as [authorId] and one page of their books, the first being 1. */
@@ -109,10 +112,11 @@ class MetadataRepository(
         source: MetadataSource,
         key: String,
         ttl: Duration,
+        fresh: Boolean = false,
         fetch: suspend () -> List<BookMetadata>,
     ): List<BookMetadata> =
         // An empty answer is cached too, but briefly: the book may be added to the source later.
-        cached(source, key, bookList, { if (it.isEmpty()) EMPTY_TTL else ttl }, fetch)
+        cached(source, key, bookList, { if (it.isEmpty()) EMPTY_TTL else ttl }, fresh, fetch)
             // Entries cached before names were tidied on the way in.
             .map { it.copy(authors = it.authors.singleLines()) }
 
@@ -121,17 +125,18 @@ class MetadataRepository(
         key: String,
         serializer: KSerializer<T>,
         lifetime: (T) -> Duration,
+        fresh: Boolean = false,
         fetch: suspend () -> T,
     ): T {
         if (source.isLive) return fetch()
 
         val fullKey = "${source.name}|$key"
-        read(fullKey, serializer)?.let { return it }
+        if (!fresh) read(fullKey, serializer)?.let { return it }
 
         val gate = gates.getValue(source)
         return gate.mutex.withLock {
             // Another caller may have filled the entry while this one waited for the gate.
-            read(fullKey, serializer)?.let { return@withLock it }
+            if (!fresh) read(fullKey, serializer)?.let { return@withLock it }
 
             val wait = gate.lastRequestAt + MIN_REQUEST_GAP_MS - clock.millis()
             if (wait > 0) delay(wait.milliseconds)
@@ -139,8 +144,8 @@ class MetadataRepository(
             val result = try {
                 fetch()
             } catch (e: MetadataException) {
-                // Offline or throttled: an expired answer is better than none.
-                read(fullKey, serializer, allowExpired = true)?.let { return@withLock it }
+                // Offline or throttled: an expired answer is better than none, unless a new one was asked for.
+                if (!fresh) read(fullKey, serializer, allowExpired = true)?.let { return@withLock it }
                 throw e
             } finally {
                 gate.lastRequestAt = clock.millis()

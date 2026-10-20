@@ -1,5 +1,7 @@
 package dev.gavenda.kozeki.ui.library
 
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -54,7 +56,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * How far a pull to refresh has got through the followed comics, with a way to stop it. [progress]
+ * What the sheet follows: a pull to refresh through the followed comics for new chapters or the books
+ * for their details, or the lookup of books just imported.
+ */
+enum class UpdateCheckKind(
+    @param:StringRes val title: Int,
+    @param:PluralsRes val count: Int,
+    @param:PluralsRes val skipped: Int,
+) {
+    CHAPTERS(R.string.update_check_title, R.plurals.update_check_count, R.plurals.update_check_skipped),
+    METADATA(R.string.metadata_refresh_title, R.plurals.metadata_refresh_count, R.plurals.metadata_refresh_skipped),
+
+    /** The books just imported, being looked up for the first time. Nothing is skipped. */
+    LOOKUP(R.string.lookup_title, R.plurals.metadata_refresh_count, R.plurals.metadata_refresh_skipped),
+}
+
+/**
+ * How far a pull to refresh has got through the followed comics, or the books for [kind] METADATA, with a way to stop it. [progress]
  * is null once the check is over. A check that got through every comic, [finished], is marked done
  * with a tick for a moment before the sheet slides away; a cancelled one slides away at once.
  *
@@ -64,6 +82,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun UpdateCheckSheet(
     progress: UpdateCheckProgress?,
+    kind: UpdateCheckKind,
     finished: Boolean,
     hidden: Boolean,
     onCancel: () -> Unit,
@@ -115,7 +134,7 @@ fun UpdateCheckSheet(
         },
         sheetState = sheetState,
     ) {
-        UpdateCheckContent(shown, done, onCancel = onCancel, onClose = close)
+        UpdateCheckContent(shown, kind, done, onCancel = onCancel, onClose = close)
     }
 }
 
@@ -123,6 +142,7 @@ fun UpdateCheckSheet(
 @Composable
 private fun UpdateCheckContent(
     progress: UpdateCheckProgress,
+    kind: UpdateCheckKind,
     finished: Boolean,
     onCancel: () -> Unit,
     onClose: () -> Unit,
@@ -134,7 +154,7 @@ private fun UpdateCheckContent(
     ) {
         AnimatedContent(targetState = finished, transitionSpec = { crossfade() }, label = "title") { done ->
             Text(
-                text = stringResource(if (done) R.string.update_check_done else R.string.update_check_title),
+                text = stringResource(if (done) R.string.update_check_done else kind.title),
                 style = MaterialTheme.typography.titleLargeEmphasized,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
@@ -161,18 +181,18 @@ private fun UpdateCheckContent(
             }
         }
         Text(
-            text = pluralStringResource(R.plurals.update_check_count, progress.total, progress.checked, progress.total),
+            text = pluralStringResource(kind.count, progress.total, progress.checked, progress.total),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (progress.skipped > 0) {
             Text(
-                text = pluralStringResource(R.plurals.update_check_skipped, progress.skipped, progress.skipped),
+                text = pluralStringResource(kind.skipped, progress.skipped, progress.skipped),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // The comic being asked; the line keeps its place once done, so the sheet does not jump.
+        // The comic or book being asked; the line keeps its place once done, so the sheet does not jump.
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = progress.current ?: " ",
@@ -239,6 +259,23 @@ private fun UpdateCheckContentPreview() {
         Surface {
             UpdateCheckContent(
                 UpdateCheckProgress(checked = 3, total = 12, current = "Solo Leveling", skipped = 8),
+                UpdateCheckKind.CHAPTERS,
+                finished = false,
+                onCancel = {},
+                onClose = {},
+            )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun MetadataRefreshContentPreview() {
+    AppTheme {
+        Surface {
+            UpdateCheckContent(
+                UpdateCheckProgress(checked = 41, total = 120, current = "The Left Hand of Darkness", skipped = 3),
+                UpdateCheckKind.METADATA,
                 finished = false,
                 onCancel = {},
                 onClose = {},
@@ -254,6 +291,7 @@ private fun UpdateCheckDonePreview() {
         Surface {
             UpdateCheckContent(
                 UpdateCheckProgress(checked = 12, total = 12, current = null, skipped = 8),
+                UpdateCheckKind.CHAPTERS,
                 finished = true,
                 onCancel = {},
                 onClose = {},

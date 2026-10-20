@@ -206,6 +206,20 @@ fun librarySections(filter: LibraryFilter, books: List<Book>): List<LibrarySecti
     }
 }
 
+/** The books of one series under its name, or the books in no series when [name] is null. */
+data class SeriesGroup(val name: String?, val sections: List<LibrarySection>) {
+    val books: List<Book> get() = sections.flatMap { it.books }
+}
+
+/**
+ * [books], already filtered and in [LibrarySort.SERIES], one series after another as the shelves are
+ * set out, each laid out in the library's own groups. The books in no series come last, together.
+ */
+fun seriesGroups(filter: LibraryFilter, books: List<Book>): List<SeriesGroup> =
+    books.groupBy { it.series?.lowercase() }.values.map { run ->
+        SeriesGroup(run.first().series, librarySections(filter, run))
+    }
+
 /** Between them these take in every book exactly once. The wishlist follows what is planned to be read. */
 private val GROUP_FILTERS = listOf(
     LibraryFilter.READING,
@@ -231,17 +245,19 @@ data class LibraryUiState(
     /** How many there are in the library altogether, which [totalBooks] is less of when one kind is shown. */
     val libraryBooks: Int? = null,
     val importing: Boolean = false,
-    /** The books whose details are being looked up right now. */
-    val matching: Set<String> = emptySet(),
-    /** How far the sources of followed comics have been asked for new chapters, while they are. */
+    /** How far the check in the sheet has got, while it runs: see [updateCheckKind]. */
     val updateCheck: UpdateCheckProgress? = null,
-    /** The last check got through every followed comic, rather than being cancelled. */
+    /** The last check got through everything it had to, rather than being cancelled. */
     val updateCheckFinished: Boolean = false,
+    /** What [updateCheck] is going through: the comics' chapters, the books' details, or new books. */
+    val updateCheckKind: UpdateCheckKind = UpdateCheckKind.CHAPTERS,
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
     val selection: LibrarySelection = LibrarySelection(),
     /** Every shelf, by name. */
     val shelves: List<Shelf> = emptyList(),
+    /** Each series with its books, when the books or comics are in [LibrarySort.SERIES]. */
+    val seriesGroups: List<SeriesGroup> = emptyList(),
     /** The shelves with their books, when [kind] is the shelves. */
     val shelfGroups: List<ShelfGroup> = emptyList(),
     /** The shelf books are being picked for, if any. */
@@ -250,12 +266,17 @@ data class LibraryUiState(
     val shelfCandidates: List<Book> = emptyList(),
 ) {
     val inShelves: Boolean get() = kind == LibraryKind.SHELVES
+    /** The books are set out a series at a time. The shelves keep to their own groups. */
+    val bySeries: Boolean get() = !inShelves && sort == LibrarySort.SERIES
     val selecting: Boolean get() = !selection.isEmpty
-    /** The sources of followed comics are being asked for new chapters. */
+    /** A check is running in the sheet. */
     val refreshing: Boolean get() = updateCheck != null
     /** Every book on screen, in the order shown. One on several shelves counts once. */
-    val books: List<Book> get() =
-        if (inShelves) shelfGroups.flatMap { it.books }.distinctBy { it.id } else sections.flatMap { it.books }
+    val books: List<Book> get() = when {
+        inShelves -> shelfGroups.flatMap { it.books }.distinctBy { it.id }
+        bySeries -> seriesGroups.flatMap { it.books }
+        else -> sections.flatMap { it.books }
+    }
 
     val allSelected: Boolean get() = selection.size == books.size
 
@@ -263,7 +284,7 @@ data class LibraryUiState(
     /** The shelves are shown and there are none yet, which has no filter to blame. */
     val isShelvesEmpty: Boolean get() = !loading && inShelves && shelves.isEmpty()
     val isFilterEmpty: Boolean get() =
-        !loading && !isShelvesEmpty && (if (inShelves) shelfGroups.isEmpty() else sections.isEmpty())
+        !loading && !isShelvesEmpty && if (inShelves) shelfGroups.isEmpty() else books.isEmpty()
 }
 
 /** The shelves, what is on each, and the one books are being picked for. */
@@ -289,10 +310,11 @@ class LibraryViewModel(
     private val library: LibraryRepository,
     private val shelves: ShelfRepository,
     private val settings: SettingsRepository,
-    matchService: MatchService,
+    private val matchService: MatchService,
     private val incoming: IncomingEpubs,
     private val chapters: ComicChapterRepository,
     private val scheduleMatching: () -> Unit,
+    private val cancelMatching: () -> Unit = {},
 ) : ViewModel() {
 
     private val chosenFilter = MutableStateFlow(LibraryFilter.ALL)
@@ -303,6 +325,7 @@ class LibraryViewModel(
     private val selectedIds = MutableStateFlow<Set<String>>(emptySet())
     private val updateCheck = MutableStateFlow<UpdateCheckProgress?>(null)
     private val updateCheckFinished = MutableStateFlow(false)
+    private val updateCheckKind = MutableStateFlow(UpdateCheckKind.CHAPTERS)
     private var updateJob: Job? = null
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
@@ -336,20 +359,33 @@ class LibraryViewModel(
 
     private val view = combine(chosenFilter, sort, display, kind, ::ViewOptions)
 
+    init {
+        // A lookup of imported books shows in the same sheet, unless a refresh started here has it.
+        viewModelScope.launch {
+            matchService.run.collect { run ->
+                if (updateJob?.isActive == true) return@collect
+                if (run.progress != null) updateCheckKind.value = UpdateCheckKind.LOOKUP
+                if (updateCheckKind.value != UpdateCheckKind.LOOKUP) return@collect
+                updateCheck.value = run.progress
+                updateCheckFinished.value = run.finished
+            }
+        }
+    }
+
     private val busy = combine(
         importsRunning,
-        matchService.matching,
         updateCheck,
         updateCheckFinished,
-    ) { imports, matching, check, finished ->
-        Busy(imports > 0, matching, check, finished)
+        updateCheckKind,
+    ) { imports, check, finished, checkKind ->
+        Busy(imports > 0, check, finished, checkKind)
     }
 
     private class Busy(
         val importing: Boolean,
-        val matching: Set<String>,
         val checking: UpdateCheckProgress?,
         val checkFinished: Boolean,
+        val checkKind: UpdateCheckKind,
     )
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
@@ -366,6 +402,7 @@ class LibraryViewModel(
             val (sort, sortReversed) = view.sort
             val (defaults, shelfData) = extras
             val inShelves = view.kind == LibraryKind.SHELVES
+            val bySeries = !inShelves && sort == LibrarySort.SERIES
             val ofKind = allBooks.filter(view.kind::matches)
             // The shelves show the books that are on one, however many.
             val shelved = if (inShelves) shelvedIds(shelfData.memberships) else null
@@ -380,14 +417,15 @@ class LibraryViewModel(
                 sortReversed = sortReversed,
                 display = display,
                 kind = view.kind,
-                sections = if (inShelves) emptyList() else librarySections(filter, shown),
+                sections = if (inShelves || bySeries) emptyList() else librarySections(filter, shown),
+                seriesGroups = if (bySeries) seriesGroups(filter, shown) else emptyList(),
                 counts = counts,
                 totalBooks = books.size,
                 libraryBooks = allBooks.size,
                 importing = busy.importing,
-                matching = busy.matching,
                 updateCheck = busy.checking,
                 updateCheckFinished = busy.checkFinished,
+                updateCheckKind = busy.checkKind,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
@@ -403,13 +441,27 @@ class LibraryViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
 
     /** Asks the sources of the comics being followed for new chapters, for a pull to refresh. */
-    fun checkForUpdates() {
+    fun checkForUpdates() = runCheck(UpdateCheckKind.CHAPTERS) { onProgress ->
+        chapters.checkForUpdates(pauseMs = 500, onProgress = onProgress)
+    }
+
+    /**
+     * Asks the metadata source of every linked book for its details again, putting them in place of
+     * what is kept. The library asks first, as it replaces whatever was changed by hand.
+     */
+    fun refreshMetadata() = runCheck(UpdateCheckKind.METADATA) { onProgress ->
+        matchService.refreshAll(onProgress = onProgress)
+    }
+
+    /** Runs one check at a time, its progress shown in the sheet. A second while one runs is ignored. */
+    private fun runCheck(kind: UpdateCheckKind, check: suspend (onProgress: (UpdateCheckProgress) -> Unit) -> Unit) {
         if (updateJob?.isActive == true) return
+        updateCheckKind.value = kind
         updateCheck.value = UpdateCheckProgress(checked = 0, total = 0, current = null)
         updateCheckFinished.value = false
         updateJob = viewModelScope.launch {
             try {
-                chapters.checkForUpdates(pauseMs = 500) { updateCheck.value = it }
+                check { updateCheck.value = it }
                 // Not reached when cancelled.
                 updateCheckFinished.value = true
             } finally {
@@ -418,9 +470,9 @@ class LibraryViewModel(
         }
     }
 
-    /** Stops a check for new chapters part way. What was found up to then is kept. */
+    /** Stops a check part way. What was found or refreshed up to then is kept. */
     fun cancelUpdateCheck() {
-        updateJob?.cancel()
+        if (uiState.value.updateCheckKind == UpdateCheckKind.LOOKUP) cancelMatching() else updateJob?.cancel()
     }
 
     fun selectFilter(filter: LibraryFilter) {

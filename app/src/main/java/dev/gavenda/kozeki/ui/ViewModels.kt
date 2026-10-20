@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.gavenda.kozeki.BuildConfig
 import dev.gavenda.kozeki.data.metadata.BookMetadata
+import dev.gavenda.kozeki.cancelMatching
 import dev.gavenda.kozeki.scheduleMatching
 import dev.gavenda.kozeki.ui.addbook.AddBookViewModel
 import dev.gavenda.kozeki.ui.addbook.BookFormViewModel
@@ -34,7 +35,7 @@ inline fun <reified VM : ViewModel> koinViewModel(key: String? = null, crossinli
 private val koin get() = GlobalContext.get()
 
 fun libraryViewModel() =
-    LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching())
+    LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), cancelMatching())
 
 fun addBookViewModel() = AddBookViewModel(koin.get(), koin.get(), koin.get(), koin.get())
 

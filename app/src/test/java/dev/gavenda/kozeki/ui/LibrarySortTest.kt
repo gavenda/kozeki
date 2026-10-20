@@ -1,7 +1,11 @@
 package dev.gavenda.kozeki.ui
 
+import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.ui.library.LibraryFilter
 import dev.gavenda.kozeki.ui.library.LibrarySort
+import dev.gavenda.kozeki.ui.library.seriesGroups
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -74,6 +78,23 @@ class LibrarySortTest {
             listOf("e3", "e2_5", "e1", "eNovella", "d1", "loose"),
             LibrarySort.SERIES.sorted(shelf, reversed = true).map { it.id },
         )
+    }
+
+    @Test
+    fun `series sets out each series under its name with its reading states, the unseried last`() {
+        val shelf = listOf(
+            Book(id = "loose", title = "Loose"),
+            Book(id = "e2", title = "Caliban's War", series = "The Expanse", seriesNumber = 2.0, acquisition = Acquisition.DOWNLOADED),
+            Book(id = "d1", title = "Dune", series = "Dune", seriesNumber = 1.0),
+            Book(id = "e1", title = "Leviathan Wakes", series = "the expanse", seriesNumber = 1.0, state = ReadingState.COMPLETED, acquisition = Acquisition.DOWNLOADED),
+            Book(id = "e3", title = "Abaddon's Gate", series = "The Expanse", seriesNumber = 3.0, acquisition = Acquisition.DOWNLOADED),
+        )
+        val groups = seriesGroups(LibraryFilter.ALL, LibrarySort.SERIES.sorted(shelf))
+        assertEquals(listOf("Dune", "the expanse", null), groups.map { it.name })
+        val expanse = groups[1].sections
+        assertEquals(listOf(LibraryFilter.PLANNED, LibraryFilter.COMPLETED), expanse.map { it.heading })
+        assertEquals(listOf(listOf("e2", "e3"), listOf("e1")), expanse.map { s -> s.books.map { it.id } })
+        assertEquals(listOf("loose"), groups[2].books.map { it.id })
     }
 
     @Test
