@@ -86,6 +86,13 @@ enum class LibrarySort(@param:StringRes val label: Int) {
 
     /** The user's own rating, highest first, with the books not rated yet at the end. */
     RATING(R.string.sort_rating),
+
+    /**
+     * What the book cost, highest first, with the books without a price at the end. Prices in different
+     * currencies cannot be weighed against each other, so each currency is kept together, the one most
+     * books were bought in first.
+     */
+    PRICE(R.string.sort_price),
     ;
 
     /** [books], given in the order of [RECENT], in this order. */
@@ -98,6 +105,15 @@ enum class LibrarySort(@param:StringRes val label: Int) {
         )
         DATE_ADDED -> books.sortedByDescending { it.addedAt }
         RATING -> books.sortedByDescending { it.rating ?: -1f }
+        PRICE -> {
+            val (withPrice, withoutPrice) = books.partition { it.purchasePriceMinor != null }
+            val currencyCounts = withPrice.groupingBy { it.purchaseCurrency.orEmpty() }.eachCount()
+            withPrice.sortedWith(
+                compareByDescending<Book> { currencyCounts.getValue(it.purchaseCurrency.orEmpty()) }
+                    .thenBy { it.purchaseCurrency.orEmpty() }
+                    .thenByDescending { it.purchasePriceMinor },
+            ) + withoutPrice
+        }
     }
 }
 

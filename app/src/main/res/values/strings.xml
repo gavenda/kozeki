@@ -53,6 +53,7 @@
     <string name="sort_author">Author</string>
     <string name="sort_date_added">Date added</string>
     <string name="sort_rating">My rating</string>
+    <string name="sort_price">Price</string>
     <string name="library_favorites">Favorites</string>
     <string name="library_empty_title">The shelves are empty</string>
     <string name="library_empty_message">W-Welcome. Hand me an EPUB to start reading, or ask for a book and I\'ll put it on your wishlist. I\'ll keep your place from there.</string>

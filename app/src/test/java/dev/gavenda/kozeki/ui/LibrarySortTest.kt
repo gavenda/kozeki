@@ -36,4 +36,19 @@ class LibrarySortTest {
     fun `rating puts the highest first, ties as they were and the unrated last`() {
         assertEquals(listOf("emma", "dune", "solaris", "ubik"), ids(LibrarySort.RATING))
     }
+
+    @Test
+    fun `price puts the dearest first, keeps each currency together and the unpriced last`() {
+        val shelf = listOf(
+            Book(id = "free", title = "Free"),
+            Book(id = "yen", title = "Yen", purchasePriceMinor = 1500, purchaseCurrency = "JPY"),
+            Book(id = "cheap", title = "Cheap", purchasePriceMinor = 499, purchaseCurrency = "USD"),
+            Book(id = "dear", title = "Dear", purchasePriceMinor = 2999, purchaseCurrency = "USD"),
+            Book(id = "mid", title = "Mid", purchasePriceMinor = 1299, purchaseCurrency = "USD"),
+        )
+        assertEquals(
+            listOf("dear", "mid", "cheap", "yen", "free"),
+            LibrarySort.PRICE.sorted(shelf).map { it.id },
+        )
+    }
 }
