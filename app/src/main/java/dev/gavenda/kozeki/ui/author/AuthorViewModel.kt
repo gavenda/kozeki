@@ -8,18 +8,23 @@ import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.OwnedBooks
+import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.ui.LookupError
+import dev.gavenda.kozeki.ui.components.BulkAdded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -44,7 +49,7 @@ class AuthorViewModel(
     private val authorId: String,
     name: String,
     private val metadata: MetadataRepository,
-    library: LibraryRepository,
+    private val library: LibraryRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthorUiState(name = name))
@@ -96,6 +101,20 @@ class AuthorViewModel(
             } catch (e: MetadataException) {
                 _uiState.update { it.copy(loading = false, error = LookupError.from(e)) }
             }
+        }
+    }
+
+    private val addedChannel = Channel<BulkAdded>(Channel.BUFFERED)
+
+    /** Picked results that were added, for the snackbar. */
+    val added: Flow<BulkAdded> = addedChannel.receiveAsFlow()
+
+    /** Adds the picked [results] to the library together, as [acquisition]. */
+    fun addAll(results: List<BookMetadata>, acquisition: Acquisition) {
+        if (results.isEmpty()) return
+        viewModelScope.launch {
+            val count = library.addAllFromMetadata(results, acquisition)
+            addedChannel.send(BulkAdded(count, acquisition))
         }
     }
 

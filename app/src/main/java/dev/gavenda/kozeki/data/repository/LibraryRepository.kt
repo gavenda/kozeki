@@ -335,6 +335,17 @@ class LibraryRepository(
     }
 
     /**
+     * Adds every one of [results] as [addFromMetadata] would, one after another. Returns how many
+     * were new, a result already among the user's books being left as it is.
+     */
+    suspend fun addAllFromMetadata(results: List<BookMetadata>, wanted: Acquisition): Int =
+        results.count { result ->
+            val known = books.findBySource(result.source, result.sourceId).isNotEmpty()
+            addFromMetadata(result, wanted)
+            !known
+        }
+
+    /**
      * Adds a book the user typed in themselves. It is linked to no source and no lookup is queued
      * for it, since going without one is the point. [cover] is a picture they picked for it.
      */

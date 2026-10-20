@@ -1,6 +1,5 @@
 package dev.gavenda.kozeki.ui.addbook
 
-import dev.gavenda.kozeki.ui.CaptchaActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +24,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -54,18 +55,25 @@ import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.ReadingState
+import dev.gavenda.kozeki.ui.CaptchaActivity
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.addBookViewModel
+import dev.gavenda.kozeki.ui.components.AddSelectedToolbar
+import dev.gavenda.kozeki.ui.components.BulkAddedSnackbarEffect
+import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
-import dev.gavenda.kozeki.ui.components.nameRes
 import dev.gavenda.kozeki.ui.components.OwnedBadge
-import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.SelectionToolbarRoom
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
+import dev.gavenda.kozeki.ui.components.nameRes
+import dev.gavenda.kozeki.ui.components.onClick
+import dev.gavenda.kozeki.ui.components.onLongClick
+import dev.gavenda.kozeki.ui.components.rememberResultSelection
 import dev.gavenda.kozeki.ui.components.sourceAttributionItem
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -80,6 +88,8 @@ fun AddBookScreen(
     viewModel: AddBookViewModel = koinViewModel { addBookViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    BulkAddedSnackbarEffect(viewModel.added, snackbarHostState)
     AddBookContent(
         state = state,
         onBack = onBack,
@@ -93,6 +103,8 @@ fun AddBookScreen(
         onOpenBook = onOpenBook,
         onOpenAuthor = onOpenAuthor,
         onOpenSettings = onOpenSettings,
+        snackbarHostState = snackbarHostState,
+        onAddAll = viewModel::addAll,
     )
 }
 
@@ -111,7 +123,15 @@ fun AddBookContent(
     modifier: Modifier = Modifier,
     onComicsChange: (Boolean) -> Unit = {},
     onComicSourceChange: (Long) -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onAddAll: (List<BookMetadata>, Acquisition) -> Unit = { _, _ -> },
 ) {
+    // The results the user does not have can be picked, to be added together. What was picked
+    // in one catalogue is not carried to the next.
+    val selection = rememberResultSelection()
+    LaunchedEffect(state.source, state.comicSourceId) { selection.clear() }
+    val addable = state.results.orEmpty().filter { it.sourceId !in state.owned }
+    val picked = selection.of(addable)
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -123,6 +143,7 @@ fun AddBookContent(
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.add_book_title)) },
@@ -294,23 +315,45 @@ fun AddBookContent(
                     else -> {
                         val listState = rememberLazyListState()
                         LoadMoreEffect(listState, results.size, state.canLoadMore, onLoadMore)
-                        LazyColumn(state = listState) {
+                        LazyColumn(
+                            state = listState,
+                            // Room for the last row above the toolbar.
+                            contentPadding = PaddingValues(bottom = if (selection.active) SelectionToolbarRoom else 0.dp),
+                        ) {
                             sourceAttributionItem(state.source)
                             items(results, key = { it.sourceId }) { result ->
                                 val owned = state.owned[result.sourceId]
                                 MetadataResultItem(
                                     result = result,
                                     // One the user already has opens as their book; there is nothing left to add.
-                                    onClick = { if (owned != null) onOpenBook(owned.id) else onOpenResult(result) },
+                                    onClick = selection.onClick(result, owned = owned != null) {
+                                        if (owned != null) onOpenBook(owned.id) else onOpenResult(result)
+                                    },
                                     trailingContent = owned?.let { book -> { OwnedBadge(book) } },
-                                    onOpenAuthor = onOpenAuthor,
+                                    // While picking, a tap on a name picks the row like the rest of it.
+                                    onOpenAuthor = onOpenAuthor.takeIf { !selection.active },
                                     sourceLabel = state.comicLabel(result),
+                                    selected = result.sourceId in selection.ids,
+                                    onLongClick = selection.onLongClick(result, owned = owned != null),
                                 )
                             }
                             loadingMoreItem(state.loadingMore)
                         }
                     }
                 }
+            }
+            if (picked.isNotEmpty()) {
+                AddSelectedToolbar(
+                    count = picked.size,
+                    allSelected = picked.size == addable.size,
+                    comics = state.source == MetadataSource.COMICS,
+                    onClear = selection::clear,
+                    onSelectAll = { selection.selectAll(addable) },
+                    onAdd = { acquisition ->
+                        onAddAll(picked, acquisition)
+                        selection.clear()
+                    },
+                )
             }
         }
     }

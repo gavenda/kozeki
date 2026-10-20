@@ -5,26 +5,31 @@ import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
-import dev.gavenda.kozeki.data.metadata.sortedBySeries
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.OwnedBooks
+import dev.gavenda.kozeki.data.metadata.sortedBySeries
+import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
+import dev.gavenda.kozeki.ui.components.BulkAdded
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -61,7 +66,7 @@ data class AddBookUiState(
 
 class AddBookViewModel(
     private val metadata: MetadataRepository,
-    library: LibraryRepository,
+    private val library: LibraryRepository,
     private val settings: SettingsRepository,
     comicSources: ComicSources,
 ) : ViewModel() {
@@ -103,6 +108,20 @@ class AddBookViewModel(
     init {
         // Comics are browsed, so they open on what is popular instead of waiting for a query.
         if (_uiState.value.source == MetadataSource.COMICS) search() else checkAvailability()
+    }
+
+    private val addedChannel = Channel<BulkAdded>(Channel.BUFFERED)
+
+    /** Picked results that were added, for the snackbar. */
+    val added: Flow<BulkAdded> = addedChannel.receiveAsFlow()
+
+    /** Adds the picked [results] to the library together, as [acquisition]. */
+    fun addAll(results: List<BookMetadata>, acquisition: Acquisition) {
+        if (results.isEmpty()) return
+        viewModelScope.launch {
+            val count = library.addAllFromMetadata(results, acquisition)
+            addedChannel.send(BulkAdded(count, acquisition))
+        }
     }
 
     /** Points the search at [source], repeats it there, and remembers the choice for next time. */

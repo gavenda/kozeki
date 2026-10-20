@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -56,13 +59,19 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.authorViewModel
+import dev.gavenda.kozeki.ui.components.AddSelectedToolbar
+import dev.gavenda.kozeki.ui.components.BulkAddedSnackbarEffect
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
+import dev.gavenda.kozeki.ui.components.SelectionToolbarRoom
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
+import dev.gavenda.kozeki.ui.components.onClick
+import dev.gavenda.kozeki.ui.components.onLongClick
+import dev.gavenda.kozeki.ui.components.rememberResultSelection
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 
@@ -77,6 +86,8 @@ fun AuthorScreen(
     viewModel: AuthorViewModel = koinViewModel(key = authorId) { authorViewModel(authorId, name) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    BulkAddedSnackbarEffect(viewModel.added, snackbarHostState)
     AuthorContent(
         state = state,
         onBack = onBack,
@@ -84,6 +95,8 @@ fun AuthorScreen(
         onLoadMore = viewModel::loadMore,
         onOpenResult = onOpenResult,
         onOpenBook = onOpenBook,
+        snackbarHostState = snackbarHostState,
+        onAddAll = viewModel::addAll,
     )
 }
 
@@ -96,8 +109,14 @@ fun AuthorContent(
     onOpenResult: (BookMetadata) -> Unit,
     onOpenBook: (String) -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onAddAll: (List<BookMetadata>, Acquisition) -> Unit = { _, _ -> },
 ) {
     val listState = rememberLazyListState()
+    // The author's books the user does not have can be picked, to be added together.
+    val selection = rememberResultSelection()
+    val addable = state.books.filter { it.sourceId !in state.owned }
+    val picked = selection.of(addable)
     val author = state.author
     // The header carries the name, so the bar only takes it over once the header's copy has
     // scrolled under it. The name is centred on the photo, so that is the photo's midpoint.
@@ -114,6 +133,7 @@ fun AuthorContent(
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -160,7 +180,12 @@ fun AuthorContent(
 
                 else -> {
                     LoadMoreEffect(listState, state.books.size, state.canLoadMore, onLoadMore)
-                    LazyColumn(state = listState, modifier = Modifier.widthIn(max = 720.dp)) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.widthIn(max = 720.dp),
+                        // Room for the last row above the toolbar.
+                        contentPadding = PaddingValues(bottom = if (selection.active) SelectionToolbarRoom else 0.dp),
+                    ) {
                         item(key = "author", contentType = "author") { AuthorHeader(author) }
                         if (state.books.isEmpty() && !state.canLoadMore) {
                             item(key = "no-books", contentType = "no-books") {
@@ -185,13 +210,30 @@ fun AuthorContent(
                             MetadataResultItem(
                                 result = result,
                                 // One the user already has opens as their book; there is nothing left to add.
-                                onClick = { if (owned != null) onOpenBook(owned.id) else onOpenResult(result) },
+                                onClick = selection.onClick(result, owned = owned != null) {
+                                    if (owned != null) onOpenBook(owned.id) else onOpenResult(result)
+                                },
                                 trailingContent = owned?.let { book -> { OwnedBadge(book) } },
+                                selected = result.sourceId in selection.ids,
+                                onLongClick = selection.onLongClick(result, owned = owned != null),
                             )
                         }
                         loadingMoreItem(state.loadingMore)
                     }
                 }
+            }
+            if (picked.isNotEmpty()) {
+                AddSelectedToolbar(
+                    count = picked.size,
+                    allSelected = picked.size == addable.size,
+                    comics = false,
+                    onClear = selection::clear,
+                    onSelectAll = { selection.selectAll(addable) },
+                    onAdd = { acquisition ->
+                        onAddAll(picked, acquisition)
+                        selection.clear()
+                    },
+                )
             }
         }
     }

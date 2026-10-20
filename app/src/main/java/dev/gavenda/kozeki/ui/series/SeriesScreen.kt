@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,10 +20,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -38,7 +42,14 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.formatSeriesNumber
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
+import dev.gavenda.kozeki.ui.components.AddSelectedToolbar
 import dev.gavenda.kozeki.ui.components.BookCover
+import dev.gavenda.kozeki.ui.components.BulkAddedSnackbarEffect
+import dev.gavenda.kozeki.ui.components.ResultSelection
+import dev.gavenda.kozeki.ui.components.SelectionToolbarRoom
+import dev.gavenda.kozeki.ui.components.onClick
+import dev.gavenda.kozeki.ui.components.onLongClick
+import dev.gavenda.kozeki.ui.components.rememberResultSelection
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
@@ -58,12 +69,16 @@ fun SeriesScreen(
     viewModel: SeriesViewModel = koinViewModel(key = "series-$name") { seriesViewModel(name) },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    BulkAddedSnackbarEffect(viewModel.added, snackbarHostState)
     SeriesContent(
         state = state,
         onBack = onBack,
         onRetry = viewModel::load,
         onOpenBook = onOpenBook,
         onOpenResult = onOpenResult,
+        snackbarHostState = snackbarHostState,
+        onAddAll = viewModel::addAll,
     )
 }
 
@@ -75,9 +90,15 @@ fun SeriesContent(
     onOpenBook: (String) -> Unit,
     onOpenResult: (BookMetadata) -> Unit,
     modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    onAddAll: (List<BookMetadata>, Acquisition) -> Unit = { _, _ -> },
 ) {
+    // Only the books of the series the user does not have can be picked, to be added together.
+    val selection = rememberResultSelection()
+    val picked = selection.of(state.others)
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -94,21 +115,43 @@ fun SeriesContent(
         },
     ) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.TopCenter) {
-            LazyColumn(modifier = Modifier.widthIn(max = 720.dp)) {
+            LazyColumn(
+                modifier = Modifier.widthIn(max = 720.dp),
+                // Room for the last row above the toolbar.
+                contentPadding = PaddingValues(bottom = if (selection.active) SelectionToolbarRoom else 0.dp),
+            ) {
                 if (state.owned.isNotEmpty()) {
                     sectionHeader("owned-header", R.string.series_your_books)
                     items(state.owned, key = { "owned-${it.book.id}" }, contentType = { "owned" }) { entry ->
                         OwnedSeriesRow(entry, onClick = { onOpenBook(entry.book.id) })
                     }
                 }
-                remoteSection(state, onRetry, onOpenResult)
+                remoteSection(state, selection, onRetry, onOpenResult)
+            }
+            if (picked.isNotEmpty()) {
+                AddSelectedToolbar(
+                    count = picked.size,
+                    allSelected = picked.size == state.others.size,
+                    comics = false,
+                    onClear = selection::clear,
+                    onSelectAll = { selection.selectAll(state.others) },
+                    onAdd = { acquisition ->
+                        onAddAll(picked, acquisition)
+                        selection.clear()
+                    },
+                )
             }
         }
     }
 }
 
 /** What the source has of the series beyond the user's books, or why it has nothing to show. */
-private fun LazyListScope.remoteSection(state: SeriesUiState, onRetry: () -> Unit, onOpenResult: (BookMetadata) -> Unit) {
+private fun LazyListScope.remoteSection(
+    state: SeriesUiState,
+    selection: ResultSelection,
+    onRetry: () -> Unit,
+    onOpenResult: (BookMetadata) -> Unit,
+) {
     when {
         state.loading -> item(key = "loading", contentType = "loading") {
             Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) { HaloLoadingIndicator() }
@@ -147,8 +190,10 @@ private fun LazyListScope.remoteSection(state: SeriesUiState, onRetry: () -> Uni
             items(state.others, key = { "other-${it.sourceId}" }, contentType = { "other" }) { result ->
                 MetadataResultItem(
                     result = result,
-                    onClick = { onOpenResult(result) },
+                    onClick = selection.onClick(result, owned = false) { onOpenResult(result) },
                     trailingContent = result.seriesNumber?.let { number -> { SeriesNumber(number) } },
+                    selected = result.sourceId in selection.ids,
+                    onLongClick = selection.onLongClick(result, owned = false),
                 )
             }
         }
