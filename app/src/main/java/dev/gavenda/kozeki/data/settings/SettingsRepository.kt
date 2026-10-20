@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.gavenda.kozeki.data.backup.DriveLink
 import dev.gavenda.kozeki.data.backup.drive.DriveLinkStore
@@ -94,6 +95,13 @@ class SettingsRepository(context: Context) : DriveLinkStore {
 
     /** Name of the kind of book the library is showing, or null while the user has not picked one. */
     val libraryKind: Flow<String?> = store.data.map { it[Keys.LibraryKind] }.distinctUntilChanged()
+
+    /**
+     * The series and shelves of the library folded away under their headers, by the keys the library
+     * gives them. How the library looks on this device rather than what is in it, so no part of a backup.
+     */
+    val collapsedLibraryGroups: Flow<Set<String>> =
+        store.data.map { it[Keys.CollapsedLibraryGroups].orEmpty() }.distinctUntilChanged()
 
     /** Hours between the checks of followed comics for new chapters, or 0 for none. */
     val updateIntervalHours: Flow<Int> =
@@ -203,6 +211,14 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.LibraryKind] = name }
     }
 
+    /** Folds the group under [key] away, or opens it again. */
+    suspend fun setLibraryGroupCollapsed(key: String, collapsed: Boolean) {
+        store.edit { prefs ->
+            val now = prefs[Keys.CollapsedLibraryGroups].orEmpty()
+            prefs[Keys.CollapsedLibraryGroups] = if (collapsed) now + key else now - key
+        }
+    }
+
     suspend fun setUpdateIntervalHours(hours: Int) {
         store.edit { it[Keys.UpdateIntervalHours] = hours.coerceAtLeast(0) }
     }
@@ -220,6 +236,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val LibrarySortReversed = booleanPreferencesKey("library_sort_reversed")
         val LibraryDisplay = stringPreferencesKey("library_display")
         val LibraryKind = stringPreferencesKey("library_kind")
+        val CollapsedLibraryGroups = stringSetPreferencesKey("library_collapsed_groups")
         val DriveLink = stringPreferencesKey("drive_link")
         val UpdateIntervalHours = intPreferencesKey("update_interval_hours")
     }

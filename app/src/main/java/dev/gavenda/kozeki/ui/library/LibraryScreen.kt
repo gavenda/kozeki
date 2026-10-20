@@ -10,6 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -19,6 +20,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +100,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -215,6 +218,7 @@ fun LibraryScreen(
         onRefresh = viewModel::checkForUpdates,
         onRefreshMetadata = viewModel::refreshMetadata,
         onCancelRefresh = viewModel::cancelUpdateCheck,
+        onToggleGroup = viewModel::toggleGroup,
     )
 }
 
@@ -261,6 +265,7 @@ fun LibraryContent(
     onRefresh: () -> Unit = {},
     onRefreshMetadata: () -> Unit = {},
     onCancelRefresh: () -> Unit = {},
+    onToggleGroup: (String) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyGridState()
@@ -439,6 +444,7 @@ fun LibraryContent(
                     val list = state.display == LibraryDisplay.LIST
                     // A row brings its own margins, which the tint of a picked one fills.
                     val edge = if (list) 8.dp else 16.dp
+                    val rowGap = if (list) 0.dp else 16.dp
                     val pullState = rememberPullToRefreshState()
                     PullToRefreshBox(
                         // The sheet shows the check, so the indicator goes back up once let go.
@@ -492,7 +498,8 @@ fun LibraryContent(
                                 bottom = innerPadding.calculateBottomPadding() + 96.dp,
                             ),
                             horizontalArrangement = Arrangement.spacedBy(if (list) 8.dp else 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(if (list) 0.dp else 16.dp),
+                            // The gap between rows of covers is under each cover rather than between every item,
+                            // so folded headers sit one on the next as they do in the list.
                             modifier = Modifier.fillMaxSize().nestedScroll(scrollTurn),
                         ) {
                             // A book on several shelves is in the grid once for each, so its key says which.
@@ -503,7 +510,7 @@ fun LibraryContent(
                                             SectionHeader(
                                                 text = stringResource(heading.label),
                                                 // In line with the text of the rows under it.
-                                                modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier,
+                                                modifier = if (list) Modifier.padding(horizontal = 8.dp) else Modifier.padding(bottom = rowGap),
                                             )
                                         }
                                     }
@@ -526,7 +533,7 @@ fun LibraryContent(
                                                 actions = selectionActions,
                                                 onOpen = onBookClick,
                                                 onOpenAuthor = onAuthorClick,
-                                                modifier = Modifier.animateItem(),
+                                                modifier = Modifier.animateItem().padding(bottom = rowGap),
                                             )
                                         }
                                     }
@@ -534,9 +541,13 @@ fun LibraryContent(
                             }
                             if (state.inShelves) {
                                 state.shelfGroups.forEach { group ->
+                                    val groupKey = state.groupKey(group)
+                                    val collapsed = state.isCollapsed(groupKey)
                                     stickyHeader(key = "shelf-${group.shelf.id}") {
                                         ShelfHeader(
                                             shelf = group.shelf,
+                                            collapsed = collapsed,
+                                            onToggle = { onToggleGroup(groupKey) },
                                             // Extends over the grid's own side padding, so the books slide under all of it.
                                             modifier = Modifier.fillMaxWidth(),
                                             // In line with the rows' text in a list, with the covers' edge in a grid.
@@ -546,6 +557,7 @@ fun LibraryContent(
                                             onDelete = { shelfPrompt = ShelfPrompt.Delete(group.shelf) },
                                         )
                                     }
+                                    if (collapsed) return@forEach
                                     if (group.sections.isEmpty()) {
                                         item(key = "shelf-${group.shelf.id}-empty", span = { GridItemSpan(maxLineSpan) }) {
                                             EmptyShelfLine(
@@ -559,23 +571,31 @@ fun LibraryContent(
                             } else if (state.bySeries) {
                                 state.seriesGroups.forEach { group ->
                                     val key = group.name?.lowercase() ?: ""
+                                    val groupKey = state.groupKey(group)
+                                    val collapsed = state.isCollapsed(groupKey)
                                     stickyHeader(key = "series-$key") {
                                         GroupHeader(
                                             title = group.name ?: stringResource(R.string.library_no_series),
                                             count = group.books.size,
+                                            collapsed = collapsed,
+                                            onToggle = { onToggleGroup(groupKey) },
                                             modifier = Modifier.fillMaxWidth(),
                                             indent = if (list) 8.dp else 0.dp,
                                         )
                                     }
-                                    sectionItems("series-$key/", group.sections)
+                                    if (!collapsed) sectionItems("series-$key/", group.sections)
                                 }
                             } else {
                                 sectionItems("", state.sections)
                             }
                             item(key = "end", span = { GridItemSpan(maxLineSpan) }) {
                                 // Centred, and the bubble kept to the width of an empty state's text on a wide window.
+                                // Inset in a list as the headers are, so it stays put when the layout changes.
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 16.dp)
+                                        .padding(horizontal = if (list) 8.dp else 0.dp),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
@@ -1034,6 +1054,8 @@ private fun SortMenu(
 @Composable
 private fun ShelfHeader(
     shelf: Shelf,
+    collapsed: Boolean,
+    onToggle: () -> Unit,
     onAddBooks: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
@@ -1041,7 +1063,14 @@ private fun ShelfHeader(
     indent: Dp = 8.dp,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
-    GroupHeader(title = shelf.name, count = shelf.bookCount, modifier = modifier, indent = indent) {
+    GroupHeader(
+        title = shelf.name,
+        count = shelf.bookCount,
+        collapsed = collapsed,
+        onToggle = onToggle,
+        modifier = modifier,
+        indent = indent,
+    ) {
         Box {
             IconButton(onClick = { menuOpen = true }) {
                 Icon(
@@ -1082,20 +1111,30 @@ private fun ShelfHeader(
 
 /**
  * The name of a run of books, a shelf or a series, pinned over them with how many there are, and
- * whatever [trailing] puts at its end. It is filled in, as the books scroll under it.
+ * whatever [trailing] puts at its end. It is filled in, as the books scroll under it. A tap folds
+ * the books away under it, or opens them again, and the arrow at its end turns to say which.
  */
 @Composable
 private fun GroupHeader(
     title: String,
     count: Int,
+    collapsed: Boolean,
+    onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     indent: Dp = 8.dp,
     trailing: @Composable () -> Unit = {},
 ) {
+    val turn by animateFloatAsState(if (collapsed) 180f else 0f, label = "group arrow")
+    val toggleLabel = stringResource(if (collapsed) R.string.library_group_expand else R.string.library_group_collapse)
     Column(modifier.background(MaterialTheme.colorScheme.surface)) {
         Row(
             // As tall as a header with a menu button, whether this one has one or not.
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = indent),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clickable(onClickLabel = toggleLabel, onClick = onToggle)
+                // The same on both sides, so the arrow ends where the rule under it does.
+                .padding(horizontal = indent),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
@@ -1114,6 +1153,13 @@ private fun GroupHeader(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            // Up while the books show, down once they are folded away.
+            Icon(
+                painterResource(R.drawable.keyboard_arrow_up_48px),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp).size(24.dp).rotate(turn),
+            )
             trailing()
         }
         // A faint grey rule, as wide as the books under it.

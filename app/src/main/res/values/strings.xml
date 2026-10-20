@@ -673,6 +673,8 @@
     <string name="shelf_delete_title">Delete “%1$s”?</string>
     <string name="shelf_delete_message">The books stay in your library.</string>
     <string name="shelf_more_actions">Shelf actions</string>
+    <string name="library_group_collapse">Fold away</string>
+    <string name="library_group_expand">Show the books</string>
     <plurals name="shelf_book_count">
         <item quantity="one">%1$d book</item>
         <item quantity="other">%1$d books</item>

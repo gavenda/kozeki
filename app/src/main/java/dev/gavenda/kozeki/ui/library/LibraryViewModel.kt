@@ -262,6 +262,8 @@ data class LibraryUiState(
     val shelfGroups: List<ShelfGroup> = emptyList(),
     /** The shelf books are being picked for, if any. */
     val addingTo: Shelf? = null,
+    /** The keys of the series and shelves folded away under their headers: see [groupKey]. */
+    val collapsedGroups: Set<String> = emptySet(),
     /** The books of the library that are not on [addingTo]. */
     val shelfCandidates: List<Book> = emptyList(),
 ) {
@@ -271,14 +273,29 @@ data class LibraryUiState(
     val selecting: Boolean get() = !selection.isEmpty
     /** A check is running in the sheet. */
     val refreshing: Boolean get() = updateCheck != null
-    /** Every book on screen, in the order shown. One on several shelves counts once. */
+    /** Every book the filter shows, in the order shown, folded away or not. One on several shelves counts once. */
     val books: List<Book> get() = when {
         inShelves -> shelfGroups.flatMap { it.books }.distinctBy { it.id }
         bySeries -> seriesGroups.flatMap { it.books }
         else -> sections.flatMap { it.books }
     }
 
-    val allSelected: Boolean get() = selection.size == books.size
+    /** The [books] not folded away under a header, which are the ones picking all of them takes. */
+    val unfoldedBooks: List<Book> get() = when {
+        inShelves -> shelfGroups.filterNot { isCollapsed(groupKey(it)) }.flatMap { it.books }.distinctBy { it.id }
+        bySeries -> seriesGroups.filterNot { isCollapsed(groupKey(it)) }.flatMap { it.books }
+        else -> books
+    }
+
+    /** What a shelf is kept as among the folded groups. */
+    fun groupKey(group: ShelfGroup): String = "shelf/${group.shelf.id}"
+
+    /** What a series is kept as among the folded groups: the books' and the comics' apart. */
+    fun groupKey(group: SeriesGroup): String = "series/${kind.name}/${group.name?.lowercase().orEmpty()}"
+
+    fun isCollapsed(key: String): Boolean = key in collapsedGroups
+
+    val allSelected: Boolean get() = unfoldedBooks.all { it.id in selection.ids }
 
     val isLibraryEmpty: Boolean get() = !loading && (libraryBooks ?: totalBooks) == 0
     /** The shelves are shown and there are none yet, which has no filter to blame. */
@@ -358,6 +375,7 @@ class LibraryViewModel(
     )
 
     private val view = combine(chosenFilter, sort, display, kind, ::ViewOptions)
+        .combine(settings.collapsedLibraryGroups, ::Pair)
 
     init {
         // A lookup of imported books shows in the same sheet, unless a refresh started here has it.
@@ -397,7 +415,7 @@ class LibraryViewModel(
     private val extras = combine(purchaseDefaults, shelfData, ::Pair)
 
     val uiState: StateFlow<LibraryUiState> =
-        combine(books, view, busy, selectedIds, extras) { allBooks, view, busy, selected, extras ->
+        combine(books, view, busy, selectedIds, extras) { allBooks, (view, collapsed), busy, selected, extras ->
             val (filter, display) = view.filter to view.display
             val (sort, sortReversed) = view.sort
             val (defaults, shelfData) = extras
@@ -433,6 +451,7 @@ class LibraryViewModel(
                 shelves = shelfData.shelves,
                 shelfGroups = if (inShelves) shelfGroups(shelfData.shelves, shelfData.memberships, shown, filter) else emptyList(),
                 addingTo = shelfData.shelves.firstOrNull { it.id == shelfData.adding },
+                collapsedGroups = collapsed,
                 shelfCandidates = shelfData.adding?.let { id ->
                     val onShelf = shelfData.memberships[id].orEmpty()
                     allBooks.filter { it.id !in onShelf }.sortedBy { b -> b.title.lowercase() }
@@ -531,13 +550,19 @@ class LibraryViewModel(
         viewModelScope.launch { settings.setLibraryDisplay(display.name) }
     }
 
+    /** Folds a series or shelf away under its header, or opens it again, by its [LibraryUiState.groupKey]. */
+    fun toggleGroup(key: String) {
+        val collapsed = !uiState.value.isCollapsed(key)
+        viewModelScope.launch { settings.setLibraryGroupCollapsed(key, collapsed) }
+    }
+
     fun toggleSelection(book: Book) {
         selectedIds.update { if (book.id in it) it - book.id else it + book.id }
     }
 
     fun selectAll() {
         val state = uiState.value
-        selectedIds.value = state.books.mapTo(HashSet()) { it.id }
+        selectedIds.value = state.unfoldedBooks.mapTo(HashSet()) { it.id }
     }
 
     fun clearSelection() {
