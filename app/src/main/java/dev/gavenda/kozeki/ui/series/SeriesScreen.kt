@@ -55,6 +55,8 @@ import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
+import dev.gavenda.kozeki.ui.components.Portrait
+import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.seriesViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -176,13 +178,19 @@ private fun LazyListScope.remoteSection(
             )
         }
 
-        state.others.isEmpty() -> item(key = "complete", contentType = "note") {
-            Text(
-                text = stringResource(R.string.series_complete),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-            )
+        state.others.isEmpty() -> item(key = "end", contentType = "end") {
+            // As the library ends: centred, and the bubble kept to the width of an empty state's text.
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 16.dp, end = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Portrait(Expression.HAPPY, Modifier.width(96.dp))
+                SpeechBubble(
+                    stringResource(R.string.series_end_bubble),
+                    Modifier.weight(1f, fill = false).widthIn(max = 360.dp),
+                )
+            }
         }
 
         else -> {

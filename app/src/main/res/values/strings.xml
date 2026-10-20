@@ -471,7 +471,7 @@
     <string name="series_error_title">S-Sorry. I can\'t fetch this series right now.</string>
     <string name="series_not_found_title">Series unavailable</string>
     <string name="series_not_found">Huh…? Hardcover has no page for this series.</string>
-    <string name="series_complete">Every book Hardcover lists in this series is in the library.</string>
+    <string name="series_end_bubble">That\'s every book in this series, and each one is already in the library. The set is complete!</string>
     <string name="action_open_series">Open series</string>
 
     <!-- Calendar -->
