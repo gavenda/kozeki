@@ -118,11 +118,13 @@ It stays the portrait, themed layer included. The halo does not go here.
 
 `Portrait(expression)` in `ui/components/Expression.kt` shows Ui from the shoulders up in front of a plate, Material's nine-sided cookie shape in `primaryContainer`. The plate cuts her off below, while her head stands clear of it and her halo rises out of its top. It is 128dp wide unless given another width.
 
-Inside the app her portrait is in three kinds of place and nowhere else: wherever a screen has nothing to show or has failed, at the end of some content, and About.
+Inside the app her portrait is in four kinds of place and nowhere else: wherever a screen has nothing to show or has failed, at the end of some content, About, and the update sheet when nothing was due.
 
 **Empty and error screens.** `EmptyState` requires an `expression` and an `icon`. The icon sits on a 40dp gold badge (`secondaryContainer`) at the plate's lower end corner, over the book she holds. Smaller messages inside a sheet or a card, such as a book with no notes yet, are plain text with no face.
 
 **About.** The last thing in Settings, with no card and no heading: her `CONTENT` face at 96dp, a speech bubble beside it with her line, and "Kozeki" with the version underneath. Under the version are two plain lines in the third person: "Kept by Ui, Magician of the Old Library" and "Character design and illustration by CHILD, from Blue Archive". On 23 April the bubble says "It's my birthday today. A book read would be present enough." instead.
+
+**The update sheet.** When a pull to refresh among the comics finds none due for new chapters, the sheet titled "Already up to date" shows her `HAPPY` face at 96dp where the tick would be, with no line under it and no speech bubble, then Close.
 
 **Ends of content.** Her face at 96dp with a speech bubble beside it, centred, the bubble no wider than 360dp: after the last book in the library (`CONTENT`, a different line for comics), at the foot of the manual book form, and on a series' page when every book in this series is already in the library (`HAPPY`, "The set is complete!"). The bubble is drawn by `SpeechBubble`, its tail pointing back at her.
 
@@ -130,7 +132,7 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 
 | Face | Shows | Source | Used for |
 |---|---|---|---|
-| `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library |
+| `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due |
 | `CONTENT` | Slight smile | 3 | All-time statistics with nothing on record; About |
 | `NEUTRAL` | Her usual flat look | 1 | A library filter with nothing under it |
 | `CURIOUS` | A small "o" | 8 | Library search, before typing |

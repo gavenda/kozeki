@@ -220,6 +220,7 @@ fun LibraryScreen(
         onRefresh = viewModel::checkForUpdates,
         onRefreshMetadata = viewModel::refreshMetadata,
         onCancelRefresh = viewModel::cancelUpdateCheck,
+        onUpToDateShown = viewModel::upToDateShown,
         onToggleGroup = viewModel::toggleGroup,
     )
 }
@@ -267,6 +268,7 @@ fun LibraryContent(
     onRefresh: () -> Unit = {},
     onRefreshMetadata: () -> Unit = {},
     onCancelRefresh: () -> Unit = {},
+    onUpToDateShown: () -> Unit = {},
     onToggleGroup: (String) -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -688,6 +690,8 @@ fun LibraryContent(
         kind = state.updateCheckKind,
         finished = state.updateCheckFinished,
         hidden = updateSheetHidden,
+        upToDate = state.updateCheckUpToDate,
+        onUpToDateShown = onUpToDateShown,
         onCancel = onCancelRefresh,
         onDismiss = { updateSheetHidden = true },
     )

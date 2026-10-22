@@ -250,6 +250,11 @@ data class LibraryUiState(
     val updateCheckFinished: Boolean = false,
     /** What [updateCheck] is going through: the comics' chapters, the books' details, or new books. */
     val updateCheckKind: UpdateCheckKind = UpdateCheckKind.CHAPTERS,
+    /**
+     * How many comics the last pull left alone when none was due, so there was nothing to ask: the
+     * sheet says all are up to date. Back to none once the sheet has it.
+     */
+    val updateCheckUpToDate: Int = 0,
     val lastCurrency: String? = null,
     val purchaseLocations: List<String> = emptyList(),
     val selection: LibrarySelection = LibrarySelection(),
@@ -343,6 +348,7 @@ class LibraryViewModel(
     private val updateCheck = MutableStateFlow<UpdateCheckProgress?>(null)
     private val updateCheckFinished = MutableStateFlow(false)
     private val updateCheckKind = MutableStateFlow(UpdateCheckKind.CHAPTERS)
+    private val updateCheckUpToDate = MutableStateFlow(0)
     private var updateJob: Job? = null
 
     private val eventChannel = Channel<LibraryEvent>(Channel.BUFFERED)
@@ -401,8 +407,9 @@ class LibraryViewModel(
         updateCheck,
         updateCheckFinished,
         updateCheckKind,
-    ) { imports, check, finished, checkKind ->
-        Busy(imports > 0, check, finished, checkKind)
+        updateCheckUpToDate,
+    ) { imports, check, finished, checkKind, upToDate ->
+        Busy(imports > 0, check, finished, checkKind, upToDate)
     }
 
     private class Busy(
@@ -410,6 +417,7 @@ class LibraryViewModel(
         val checking: UpdateCheckProgress?,
         val checkFinished: Boolean,
         val checkKind: UpdateCheckKind,
+        val upToDate: Int,
     )
 
     private val purchaseDefaults = combine(settings.lastCurrency, library.observePurchaseLocations(), ::Pair)
@@ -450,6 +458,7 @@ class LibraryViewModel(
                 updateCheck = busy.checking,
                 updateCheckFinished = busy.checkFinished,
                 updateCheckKind = busy.checkKind,
+                updateCheckUpToDate = busy.upToDate,
                 lastCurrency = currency,
                 purchaseLocations = locations,
                 // Only what is on screen: a book that left the filter is no longer picked.
@@ -484,15 +493,27 @@ class LibraryViewModel(
         updateCheckKind.value = kind
         updateCheck.value = UpdateCheckProgress(checked = 0, total = 0, current = null)
         updateCheckFinished.value = false
+        updateCheckUpToDate.value = 0
         updateJob = viewModelScope.launch {
             try {
-                check { updateCheck.value = it }
-                // Not reached when cancelled.
+                var last: UpdateCheckProgress? = null
+                check {
+                    last = it
+                    updateCheck.value = it
+                }
+                // Not reached when cancelled. With nothing asked, the last count may never reach the
+                // sheet, so what was skipped is kept for it here.
+                if (kind == UpdateCheckKind.CHAPTERS) last?.takeIf { it.total == 0 }?.let { updateCheckUpToDate.value = it.skipped }
                 updateCheckFinished.value = true
             } finally {
                 updateCheck.value = null
             }
         }
+    }
+
+    /** The sheet has said the comics are all up to date, and will not say it again. */
+    fun upToDateShown() {
+        updateCheckUpToDate.value = 0
     }
 
     /** Stops a check part way. What was found or refreshed up to then is kept. */

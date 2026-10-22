@@ -49,7 +49,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.comic.UpdateCheckProgress
+import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlinx.coroutines.delay
@@ -63,8 +65,15 @@ enum class UpdateCheckKind(
     @param:StringRes val title: Int,
     @param:PluralsRes val count: Int,
     @param:PluralsRes val skipped: Int,
+    /** Said when every one was skipped and none asked; only the comics' check can end that way. */
+    @param:StringRes val upToDate: Int = R.string.update_check_done,
 ) {
-    CHAPTERS(R.string.update_check_title, R.plurals.update_check_count, R.plurals.update_check_skipped),
+    CHAPTERS(
+        R.string.update_check_title,
+        R.plurals.update_check_count,
+        R.plurals.update_check_skipped,
+        R.string.update_check_up_to_date,
+    ),
     METADATA(R.string.metadata_refresh_title, R.plurals.metadata_refresh_count, R.plurals.metadata_refresh_skipped),
 
     /** The books just imported, being looked up for the first time. Nothing is skipped. */
@@ -87,14 +96,21 @@ fun UpdateCheckSheet(
     hidden: Boolean,
     onCancel: () -> Unit,
     onDismiss: () -> Unit,
+    upToDate: Int = 0,
+    onUpToDateShown: () -> Unit = {},
 ) {
     // The last of the check seen, kept after it ends so the sheet can say it is done. It waits for
-    // the comics to be counted, so a library with none to ask does not flash one up.
+    // the comics to be counted, so a library with none to ask does not flash one up. When every
+    // comic was left for later, [upToDate] of them, it says they are all up to date instead.
     var last by remember { mutableStateOf<UpdateCheckProgress?>(null) }
-    LaunchedEffect(progress, hidden) {
+    LaunchedEffect(progress, hidden, upToDate) {
         when {
             hidden -> last = null
             progress != null && progress.total > 0 -> last = progress
+            progress == null && upToDate > 0 -> {
+                last = UpdateCheckProgress(checked = 0, total = 0, current = null, skipped = upToDate)
+                onUpToDateShown()
+            }
         }
     }
     val seen = last ?: return
@@ -147,6 +163,8 @@ private fun UpdateCheckContent(
     onCancel: () -> Unit,
     onClose: () -> Unit,
 ) {
+    // Nothing was asked: every one was left for later.
+    val noneDue = progress.total == 0
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -154,13 +172,22 @@ private fun UpdateCheckContent(
     ) {
         AnimatedContent(targetState = finished, transitionSpec = { crossfade() }, label = "title") { done ->
             Text(
-                text = stringResource(if (done) R.string.update_check_done else kind.title),
+                text = stringResource(
+                    when {
+                        noneDue -> kind.upToDate
+                        done -> R.string.update_check_done
+                        else -> kind.title
+                    },
+                ),
                 style = MaterialTheme.typography.titleLargeEmphasized,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        AnimatedContent(
+        // Nothing to wait on: she is pleased the shelves are in order, where the tick would be.
+        if (noneDue) {
+            Portrait(Expression.HAPPY, Modifier.padding(vertical = 8.dp).width(96.dp))
+        } else AnimatedContent(
             targetState = finished,
             transitionSpec = {
                 (fadeIn(tween(220, delayMillis = 90)) + scaleIn(spring(Spring.DampingRatioMediumBouncy), 0.6f))
@@ -180,27 +207,32 @@ private fun UpdateCheckContent(
                 )
             }
         }
-        Text(
-            text = pluralStringResource(kind.count, progress.total, progress.checked, progress.total),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (progress.skipped > 0) {
+        if (!noneDue) {
             Text(
-                text = pluralStringResource(kind.skipped, progress.skipped, progress.skipped),
-                style = MaterialTheme.typography.labelMedium,
+                text = pluralStringResource(kind.count, progress.total, progress.checked, progress.total),
+                style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            if (progress.skipped > 0) {
+                Text(
+                    text = pluralStringResource(kind.skipped, progress.skipped, progress.skipped),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         // The comic or book being asked; the line keeps its place once done, so the sheet does not jump.
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = progress.current ?: " ",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+        // With none asked there is nothing to keep it for.
+        if (!noneDue) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = progress.current ?: " ",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         AnimatedContent(
             targetState = finished,
@@ -291,6 +323,22 @@ private fun UpdateCheckDonePreview() {
         Surface {
             UpdateCheckContent(
                 UpdateCheckProgress(checked = 12, total = 12, current = null, skipped = 8),
+                UpdateCheckKind.CHAPTERS,
+                finished = true,
+                onCancel = {},
+                onClose = {},
+            )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun UpdateCheckUpToDatePreview() {
+    AppTheme {
+        Surface {
+            UpdateCheckContent(
+                UpdateCheckProgress(checked = 0, total = 0, current = null, skipped = 8),
                 UpdateCheckKind.CHAPTERS,
                 finished = true,
                 onCancel = {},

@@ -84,6 +84,7 @@
         <item quantity="one">%1$d of %2$d comic</item>
         <item quantity="other">%1$d of %2$d comics</item>
     </plurals>
+    <string name="update_check_up_to_date">Already up to date</string>
     <plurals name="update_check_skipped">
         <item quantity="one">%1$d more not due yet, left for later</item>
         <item quantity="other">%1$d more not due yet, left for later</item>
