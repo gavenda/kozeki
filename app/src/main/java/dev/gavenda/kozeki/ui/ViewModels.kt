@@ -35,7 +35,7 @@ inline fun <reified VM : ViewModel> koinViewModel(key: String? = null, crossinli
 private val koin get() = GlobalContext.get()
 
 fun libraryViewModel() =
-    LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), cancelMatching())
+    LibraryViewModel(koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), cancelMatching())
 
 fun addBookViewModel() = AddBookViewModel(koin.get(), koin.get(), koin.get(), koin.get())
 
@@ -57,6 +57,7 @@ fun foundBookViewModel(result: BookMetadata) =
 fun bookDetailViewModel(bookId: String) =
     BookDetailViewModel(
         bookId, koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), koin.get(), koin.get(), koin.get(),
+        koin.get(),
     )
 
 fun readerViewModel(bookId: String) = ReaderViewModel(
@@ -72,6 +73,7 @@ fun readerViewModel(bookId: String) = ReaderViewModel(
 fun comicReaderViewModel(bookId: String, chapterUrl: String) = ComicReaderViewModel(
     bookId,
     chapterUrl,
+    koin.get(),
     koin.get(),
     koin.get(),
     koin.get(),

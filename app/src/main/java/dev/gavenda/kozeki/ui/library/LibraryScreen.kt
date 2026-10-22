@@ -925,7 +925,7 @@ private fun FilterRow(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                LibraryFilter.entries.forEach { filter ->
+                LibraryFilter.entries.filter { it.shownFor(state.kind) }.forEach { filter ->
                     val selected = filter == state.filter
                     FilterChip(
                         selected = selected,

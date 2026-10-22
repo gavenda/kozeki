@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.comic.ComicChapterRepository
 import dev.gavenda.kozeki.data.comic.ComicChapterPages
+import dev.gavenda.kozeki.data.comic.ComicDownloads
 import dev.gavenda.kozeki.data.comic.ComicPages
 import dev.gavenda.kozeki.data.comic.ComicProvider
 import dev.gavenda.kozeki.data.comic.ComicReaderPreferences
@@ -71,6 +72,7 @@ class ComicReaderViewModel(
     private val library: LibraryRepository,
     private val chapters: ComicChapterRepository,
     private val pages: ComicPages,
+    private val downloads: ComicDownloads,
     private val preferences: ComicReaderPreferences,
     private val appScope: CoroutineScope,
 ) : ViewModel() {
@@ -189,7 +191,7 @@ class ComicReaderViewModel(
         val generationAtStart = generation
         viewModelScope.launch {
             try {
-                val opened = pages.open(sourceId, target)
+                val opened = open(target)
                 // The reader moved on to other chapters meanwhile.
                 if (generationAtStart != generation) {
                     opened.close()
@@ -299,7 +301,7 @@ class ComicReaderViewModel(
                 return@launch
             }
             val opened = try {
-                pages.open(sourceId, chapter)
+                open(chapter, sourceId)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: MetadataException) {
@@ -327,10 +329,15 @@ class ComicReaderViewModel(
             opened.request(start)
             // The chapter after this one is listed ahead of time, so that turning to it does not wait.
             ordered.getOrNull(index + 1)?.let { next ->
-                launch { runCatching { pages.list(sourceId, next) } }
+                launch { if (downloads.files(bookId, next.url) == null) runCatching { pages.list(sourceId, next) } }
             }
         }
     }
+
+    /** The pages of [chapter]: from this device when it is downloaded, from its source otherwise. */
+    private suspend fun open(chapter: ComicChapter, source: Long = sourceId): ComicChapterPages =
+        downloads.files(bookId, chapter.url)?.let { pages.openLocal(source, chapter.url, it) }
+            ?: pages.open(source, chapter)
 
     private fun snapshot(ready: ComicReaderUiState.Ready, page: Int): SessionTracker.Snapshot {
         // Chapters finished before this one, and the part of this one that has been turned through.

@@ -48,6 +48,8 @@ data class Book(
     val inLibrary: Boolean = false,
     /** A comic: read chapter by chapter through a Mihon source, with no file of its own. */
     val isComic: Boolean = false,
+    /** How many chapters of a comic are downloaded to this device. Not stored with the book. */
+    val downloadedChapters: Int = 0,
     /** The EPUB is on this device. False after a restore, until the file is imported again. */
     val hasFile: Boolean = false,
     /** Readium locator of the last read position, as JSON. */

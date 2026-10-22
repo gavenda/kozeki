@@ -25,6 +25,8 @@ class ComicPageRef(
     val chapterUrl: String,
     val index: Int,
     internal val page: Page,
+    /** The page as a downloaded file, for a chapter kept on this device; null for one read from its source. */
+    internal val local: File? = null,
 ) {
     /** Names the page in the cache, so the same page is never fetched twice. */
     internal val key: String get() = "$sourceId|$chapterUrl|$index"
@@ -75,9 +77,20 @@ class ComicPages(context: Context, private val sources: ComicSources) {
     suspend fun open(sourceId: Long, chapter: ComicChapter): ComicChapterPages =
         ComicChapterPages(list(sourceId, chapter), this)
 
-    /** The image of [ref] if it is in the cache already. */
+    /**
+     * The pages of a downloaded chapter, [files] in reading order, as one thing to read. Nothing is
+     * asked of the source.
+     */
+    fun openLocal(sourceId: Long, chapterUrl: String, files: List<File>): ComicChapterPages =
+        ComicChapterPages(
+            files.mapIndexed { index, file -> ComicPageRef(sourceId, chapterUrl, index, Page(index), local = file) },
+            this,
+        )
+
+    /** The image of [ref] if it is downloaded or in the cache already. */
     internal fun cached(ref: ComicPageRef): File? =
-        File(dir, hash(ref.key)).takeIf { it.isFile && it.length() > 0 }
+        ref.local?.takeIf { it.isFile && it.length() > 0 }
+            ?: File(dir, hash(ref.key)).takeIf { it.isFile && it.length() > 0 }
 
     /**
      * The image of [ref], fetched first if it is not in the cache. Throws when the source refuses.
@@ -99,12 +112,24 @@ class ComicPages(context: Context, private val sources: ComicSources) {
         }
     }
 
+    /**
+     * Fetches the image of [ref] into [target], for a chapter being downloaded. A page already in
+     * the cache is copied from there rather than asked for again. Throws when the source refuses.
+     */
+    internal suspend fun fetchTo(ref: ComicPageRef, target: File) = withContext(Dispatchers.IO) {
+        cached(ref)?.let {
+            it.copyTo(target, overwrite = true)
+            return@withContext
+        }
+        guardSource(site = { sources.siteOf(ref.sourceId) }) { download(ref, target) {} }
+    }
+
     private suspend fun download(ref: ComicPageRef, target: File, onProgress: (Float) -> Unit) {
         val source = sources.get(ref.sourceId) as? HttpSource
             ?: throw IOException("Comic source ${ref.sourceId} is not installed")
         val page = ref.page
         if (page.imageUrl.isNullOrEmpty()) page.imageUrl = source.getImageUrl(page)
-        val temporary = File(dir, target.name + ".tmp")
+        val temporary = File(target.parentFile, target.name + ".tmp")
         try {
             source.getImage(page).use { response ->
                 val body = response.body

@@ -42,6 +42,7 @@
     <!-- Library -->
     <string name="filter_planning">Planning</string>
     <string name="filter_all">All</string>
+    <string name="filter_downloaded">Downloaded</string>
     <string name="sort_books">Sort books</string>
     <string name="filter_books">Filter books</string>
     <string name="display_as_list">Show as list</string>
@@ -205,6 +206,19 @@
     <string name="track_stop">Stop tracking</string>
     <string name="track_remove">Remove from my list</string>
     <string name="comic_mark_below_read">Mark all below as read</string>
+    <string name="comic_download_menu">Download chapters</string>
+    <string name="comic_download_unread">Unread chapters</string>
+    <string name="comic_download_all">All chapters</string>
+    <string name="comic_download_delete_all">Delete downloaded chapters</string>
+    <string name="comic_download">Download</string>
+    <string name="comic_download_queued">Waiting to download</string>
+    <string name="comic_download_running">Downloading</string>
+    <string name="comic_download_failed">The download stopped</string>
+    <string name="comic_downloaded">Downloaded</string>
+    <string name="comic_download_cancel">Cancel download</string>
+    <string name="comic_download_retry">Try again</string>
+    <string name="comic_download_delete">Delete download</string>
+    <string name="comic_download_delete_picked">Delete downloads</string>
     <string name="comic_reader_chapter_missing">This chapter is no longer listed by its source.</string>
     <string name="comic_reader_page_description">Page %1$d</string>
     <string name="comic_reader_page_failed">This page could not be loaded.</string>

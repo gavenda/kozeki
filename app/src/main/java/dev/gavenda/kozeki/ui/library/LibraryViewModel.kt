@@ -14,6 +14,7 @@ import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.LEGACY_COMICS
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.comic.ComicChapterRepository
+import dev.gavenda.kozeki.data.comic.ComicDownloads
 import dev.gavenda.kozeki.data.comic.UpdateCheckProgress
 import dev.gavenda.kozeki.data.model.Shelf
 import dev.gavenda.kozeki.data.repository.LibraryRepository
@@ -41,7 +42,8 @@ import kotlinx.coroutines.launch
  * The reading states sort the books the user has by where they are with them. A book that is only
  * wanted is kept apart under its own filter, so Planning is what is already there to be read.
  * Purchased is every book with a purchase on record, with or without an EPUB; an EPUB alone does
- * not put a book there. Favorites cut across all of that.
+ * not put a book there. Favorites cut across all of that, and so do the comics with chapters
+ * downloaded to this device.
  */
 enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<ReadingState>?) {
     ALL(R.string.filter_all, null),
@@ -53,7 +55,11 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
     PURCHASED(R.string.purchased_tab, null),
     PAUSED(R.string.state_paused, setOf(ReadingState.PAUSED)),
     DROPPED(R.string.state_dropped, setOf(ReadingState.DROPPED)),
+    DOWNLOADED(R.string.filter_downloaded, null),
     ;
+
+    /** Whether the filter has a chip among [kind]'s: only comics are downloaded. */
+    fun shownFor(kind: LibraryKind): Boolean = this != DOWNLOADED || kind != LibraryKind.BOOKS
 
     fun matches(book: Book): Boolean {
         val wished = book.acquisition == Acquisition.WISHLIST
@@ -62,6 +68,7 @@ enum class LibraryFilter(@param:StringRes val label: Int, val states: Set<Readin
             FAVORITES -> book.isFavorite
             WISHLIST -> wished
             PURCHASED -> book.acquisition == Acquisition.PURCHASED
+            DOWNLOADED -> book.downloadedChapters > 0
             else -> !wished && states != null && book.state in states
         }
     }
@@ -322,6 +329,7 @@ class LibraryViewModel(
     private val matchService: MatchService,
     private val incoming: IncomingEpubs,
     private val chapters: ComicChapterRepository,
+    private val downloads: ComicDownloads,
     private val scheduleMatching: () -> Unit,
     private val cancelMatching: () -> Unit = {},
 ) : ViewModel() {
@@ -341,8 +349,14 @@ class LibraryViewModel(
     val events: Flow<LibraryEvent> = eventChannel.receiveAsFlow()
 
     // Books with an EPUB come first, most recently read at the top, then the ones still without a file.
-    private val books = combine(library.observeLibrary(), library.observeWithoutFile()) { withFile, without ->
-        withFile + without
+    private val books = combine(
+        library.observeLibrary(),
+        library.observeWithoutFile(),
+        downloads.counts,
+    ) { withFile, without, downloaded ->
+        (withFile + without).map { book ->
+            downloaded[book.id]?.let { book.copy(downloadedChapters = it) } ?: book
+        }
     }
 
     private val sort = settings.librarySort.map { name ->
@@ -534,6 +548,7 @@ class LibraryViewModel(
     fun selectKind(kind: LibraryKind) {
         if (kind == uiState.value.kind) return
         viewModelScope.launch { settings.setLibraryKind(kind.name) }
+        if (!chosenFilter.value.shownFor(kind)) chosenFilter.value = LibraryFilter.ALL
         // What was picked among the other kind's books is not on screen any more.
         clearSelection()
     }

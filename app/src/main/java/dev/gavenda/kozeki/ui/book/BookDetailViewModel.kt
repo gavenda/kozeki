@@ -4,7 +4,9 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.db.ComicTrackEntity
+import dev.gavenda.kozeki.data.comic.ChapterDownload
 import dev.gavenda.kozeki.data.comic.ComicChapterRepository
+import dev.gavenda.kozeki.data.comic.ComicDownloads
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
 import dev.gavenda.kozeki.data.metadata.BookReviews
@@ -84,6 +86,8 @@ data class ComicChaptersUiState(
     val error: LookupError? = null,
     /** Where the captcha the source asks for is solved, when that is why [error] is set. */
     val captchaUrl: String? = null,
+    /** The chapters downloaded or on their way, by URL. One not in it is read from its source. */
+    val downloads: Map<String, ChapterDownload> = emptyMap(),
 ) {
     /** Where reading goes on from, which is the last chapter once every one is read. */
     val resume: ComicChapter? get() = chapters.resumeChapter() ?: chapters.lastOrNull()
@@ -164,12 +168,13 @@ class BookDetailViewModel(
     private val tracker: TrackRepository,
     private val aniListAuth: AniListAuth,
     private val shelfRepository: ShelfRepository,
+    private val downloads: ComicDownloads,
 ) : ViewModel() {
 
     private data class Activity(
         val importing: Boolean,
         val matching: Boolean,
-        val chapters: List<ComicChapter>,
+        val chapters: Pair<List<ComicChapter>, Map<String, ChapterDownload>>,
         val chaptersStatus: ComicChaptersUiState,
         val refreshing: Boolean,
     )
@@ -243,7 +248,7 @@ class BookDetailViewModel(
             combine(
                 importing,
                 matchService.matching.map { bookId in it },
-                comicChapters.observe(bookId),
+                combine(comicChapters.observe(bookId), downloads.observe(bookId), ::Pair),
                 chaptersStatus,
                 refreshing,
                 ::Activity,
@@ -255,7 +260,10 @@ class BookDetailViewModel(
             BookDetailUiState(
                 loading = false,
                 chapters = if (data.book?.isComic == true) {
-                    activity.chaptersStatus.copy(chapters = activity.chapters.inReadingOrder())
+                    activity.chaptersStatus.copy(
+                        chapters = activity.chapters.first.inReadingOrder(),
+                        downloads = activity.chapters.second,
+                    )
                 } else {
                     null
                 },
@@ -310,6 +318,33 @@ class BookDetailViewModel(
 
     /** Marks chapters of a comic read, or puts them back to unread. */
     fun setChaptersRead(urls: List<String>, read: Boolean) = launch { comicChapters.markRead(bookId, urls, read) }
+
+    /** Downloads the chapters with [urls], in reading order, to read them without the source. */
+    fun downloadChapters(urls: Collection<String>) {
+        val chapters = uiState.value.chapters?.chapters ?: return
+        downloads.enqueue(bookId, chapters.filter { it.url in urls })
+    }
+
+    /** Downloads every chapter not read yet, the first to be read first. */
+    fun downloadUnread() {
+        val chapters = uiState.value.chapters?.chapters ?: return
+        downloads.enqueue(bookId, chapters.filter { !it.read })
+    }
+
+    /** Downloads every chapter there is, the first to be read first. */
+    fun downloadAll() {
+        val chapters = uiState.value.chapters?.chapters ?: return
+        downloads.enqueue(bookId, chapters)
+    }
+
+    /** Stops the chapters with [urls] from downloading, or deletes them where they are downloaded. */
+    fun deleteDownloads(urls: Collection<String>) = downloads.delete(bookId, urls)
+
+    /** Deletes every downloaded chapter of the comic, and stops the ones on their way. */
+    fun deleteAllDownloads() {
+        val known = uiState.value.chapters?.downloads?.keys.orEmpty()
+        downloads.delete(bookId, known + downloads.downloaded.value[bookId].orEmpty())
+    }
 
     /** Asks the source for its chapters again, after it failed or to see whether new ones came out. */
     fun retryChapters() = refreshChapters()

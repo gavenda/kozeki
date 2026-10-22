@@ -1,5 +1,12 @@
 package dev.gavenda.kozeki.ui.book
 
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.AnimatedContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -81,6 +88,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
@@ -103,6 +111,7 @@ import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.ui.library.ShelfChecklistSheet
+import dev.gavenda.kozeki.data.comic.ChapterDownload
 import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -173,6 +182,12 @@ class BookDetailActions(
     val onReadChapter: (String) -> Unit = {},
     val onSetChaptersRead: (List<String>, Boolean) -> Unit = { _, _ -> },
     val onRetryChapters: () -> Unit = {},
+    val onDownloadChapters: (List<String>) -> Unit = {},
+    val onDownloadUnread: () -> Unit = {},
+    val onDownloadAll: () -> Unit = {},
+    /** Deletes the downloads of these chapters, or stops them on their way. */
+    val onDeleteDownloads: (List<String>) -> Unit = {},
+    val onDeleteAllDownloads: () -> Unit = {},
     val onRefresh: () -> Unit = {},
     val onOpenTrack: () -> Unit = {},
     val onOpenShelves: () -> Unit = {},
@@ -248,6 +263,11 @@ fun BookDetailScreen(
             onReadChapter = { onReadChapter(bookId, it) },
             onSetChaptersRead = viewModel::setChaptersRead,
             onRetryChapters = viewModel::retryChapters,
+            onDownloadChapters = viewModel::downloadChapters,
+            onDownloadUnread = viewModel::downloadUnread,
+            onDownloadAll = viewModel::downloadAll,
+            onDeleteDownloads = viewModel::deleteDownloads,
+            onDeleteAllDownloads = viewModel::deleteAllDownloads,
             onRefresh = viewModel::refresh,
             onOpenTrack = viewModel::openTrackSheet,
             onOpenShelves = { choosingShelves = true },
@@ -382,6 +402,10 @@ fun BookDetailContent(
                 },
                 actions = {
                     if (book != null && owned) {
+                        val chapters = state.chapters
+                        if (book.isComic && chapters != null && chapters.chapters.isNotEmpty()) {
+                            DownloadMenu(chapters, actions)
+                        }
                         if (book.canFavorite) {
                             IconToggleButton(checked = book.isFavorite, onCheckedChange = actions.onSetFavorite) {
                                 Icon(
@@ -470,8 +494,17 @@ fun BookDetailContent(
                     ChapterSelectionToolbar(
                         picked = pickedChapters,
                         chapters = state.chapters?.chapters.orEmpty(),
+                        downloads = state.chapters?.downloads.orEmpty(),
                         onSetRead = { urls, read ->
                             actions.onSetChaptersRead(urls, read)
+                            selectedChapters = emptyList()
+                        },
+                        onDownload = { urls ->
+                            actions.onDownloadChapters(urls)
+                            selectedChapters = emptyList()
+                        },
+                        onDeleteDownloads = { urls ->
+                            actions.onDeleteDownloads(urls)
                             selectedChapters = emptyList()
                         },
                         onSelectAll = { selectedChapters = state.chapters?.chapters.orEmpty().map(ComicChapter::url) },
@@ -940,6 +973,15 @@ private fun LazyListScope.chaptersSection(
                 ChapterRow(
                     chapter = chapter,
                     selected = isSelected,
+                    download = state.downloads[chapter.url],
+                    // Only a comic of the user's own is kept on the device, and not while picking.
+                    onDownload = if (owned && selected.isEmpty()) {
+                        { actions.onDownloadChapters(listOf(chapter.url)) }
+                    } else {
+                        null
+                    },
+                    onDeleteDownload = { actions.onDeleteDownloads(listOf(chapter.url)) },
+                    downloadable = owned,
                     // Once picking has begun a tap picks too, as it does in a gallery.
                     onClick = {
                         if (selected.isNotEmpty()) toggle() else actions.onReadChapter(chapter.url)
@@ -978,7 +1020,10 @@ private fun LazyListScope.chaptersSection(
 private fun ChapterSelectionToolbar(
     picked: List<ComicChapter>,
     chapters: List<ComicChapter>,
+    downloads: Map<String, ChapterDownload>,
     onSetRead: (urls: List<String>, read: Boolean) -> Unit,
+    onDownload: (urls: List<String>) -> Unit,
+    onDeleteDownloads: (urls: List<String>) -> Unit,
     onSelectAll: () -> Unit,
     onClear: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1035,8 +1080,175 @@ private fun ChapterSelectionToolbar(
                 )
             }
         }
+        val notKept = picked.filter { it.url !in downloads }
+        if (notKept.isNotEmpty()) {
+            IconButton(onClick = { onDownload(notKept.map(ComicChapter::url)) }) {
+                Icon(
+                    painterResource(R.drawable.arrow_circle_down_48px),
+                    contentDescription = stringResource(R.string.comic_download),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+        val kept = picked.filter { it.url in downloads }
+        if (kept.isNotEmpty()) {
+            IconButton(onClick = { onDeleteDownloads(kept.map(ComicChapter::url)) }) {
+                Icon(
+                    painterResource(R.drawable.delete_fill_48px),
+                    contentDescription = stringResource(R.string.comic_download_delete_picked),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
     }
 }
+
+/**
+ * The download button of a comic's top bar, as Mihon has it: a menu to download the chapters not
+ * read yet or all of them, and to delete the ones downloaded.
+ */
+@Composable
+private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActions) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                painterResource(R.drawable.download_48px),
+                contentDescription = stringResource(R.string.comic_download_menu),
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            val notKept = chapters.chapters.filter { it.url !in chapters.downloads }
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.comic_download_unread)) },
+                enabled = notKept.any { !it.read },
+                onClick = {
+                    expanded = false
+                    actions.onDownloadUnread()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.comic_download_all)) },
+                enabled = notKept.isNotEmpty(),
+                onClick = {
+                    expanded = false
+                    actions.onDownloadAll()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.comic_download_delete_all)) },
+                enabled = chapters.downloads.isNotEmpty(),
+                onClick = {
+                    expanded = false
+                    actions.onDeleteAllDownloads()
+                },
+            )
+        }
+    }
+}
+
+/**
+ * Where a chapter is with being downloaded, at the end of its row: a button to download it, the
+ * halo while it comes, or the mark of one that is downloaded. A tap on any but the first opens a
+ * menu to stop, try again or delete. Each change of state is animated; a finished chapter's halo
+ * completes its turn, then gives way to the mark springing in.
+ */
+@Composable
+private fun ChapterDownloadIndicator(
+    download: ChapterDownload?,
+    onDownload: () -> Unit,
+    onDelete: () -> Unit,
+    contentColor: Color,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        AnimatedContent(
+            targetState = download,
+            // Only a change of kind animates; pages coming in move the halo's hands instead.
+            contentKey = { it?.let { state -> state::class } },
+            transitionSpec = {
+                val finished = targetState == ChapterDownload.Downloaded && initialState is ChapterDownload.Downloading
+                if (finished) {
+                    (fadeIn(tween(220, delayMillis = DownloadDoneHoldMs + 90)) +
+                        scaleIn(spring(Spring.DampingRatioMediumBouncy), 0.6f))
+                        .togetherWith(fadeOut(tween(90, delayMillis = DownloadDoneHoldMs)) + scaleOut(tween(90, delayMillis = DownloadDoneHoldMs), targetScale = 0.8f))
+                } else {
+                    (fadeIn(tween(220, delayMillis = 90)) + scaleIn(initialScale = 0.8f))
+                        .togetherWith(fadeOut(tween(90)))
+                }
+            },
+            contentAlignment = Alignment.Center,
+            label = "chapter download",
+        ) { state ->
+            IconButton(onClick = { if (state == null) onDownload() else expanded = true }) {
+                when (state) {
+                    null -> Icon(
+                        painterResource(R.drawable.arrow_circle_down_48px),
+                        contentDescription = stringResource(R.string.comic_download),
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+
+                    // The halo waits, faded, while the chapter is queued; its hands follow the pages once it comes.
+                    ChapterDownload.Queued -> {
+                        val label = stringResource(R.string.comic_download_queued)
+                        HaloLoadingIndicator(Modifier.size(24.dp).alpha(0.5f).semantics { contentDescription = label })
+                    }
+
+                    is ChapterDownload.Downloading -> {
+                        val label = stringResource(R.string.comic_download_running)
+                        HaloLoadingIndicator(
+                            Modifier.size(24.dp).semantics { contentDescription = label },
+                            progress = { state.progress },
+                        )
+                    }
+
+                    is ChapterDownload.Failed -> Icon(
+                        painterResource(R.drawable.error_fill_48px),
+                        contentDescription = stringResource(R.string.comic_download_failed),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(24.dp),
+                    )
+
+                    ChapterDownload.Downloaded -> Icon(
+                        painterResource(R.drawable.check_circle_fill_48px),
+                        contentDescription = stringResource(R.string.comic_downloaded),
+                        tint = contentColor,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+        DropdownMenu(expanded = expanded && download != null, onDismissRequest = { expanded = false }) {
+            if (download is ChapterDownload.Failed) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.comic_download_retry)) },
+                    onClick = {
+                        expanded = false
+                        onDownload()
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(
+                            if (download == ChapterDownload.Downloaded) R.string.comic_download_delete else R.string.comic_download_cancel,
+                        ),
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onDelete()
+                },
+            )
+        }
+    }
+}
+
+/** How long a finished chapter's halo stays, for its hands to finish going round, before the mark comes. */
+private const val DownloadDoneHoldMs = 300
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1045,6 +1257,12 @@ private fun ChapterRow(
     selected: Boolean,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
+    download: ChapterDownload? = null,
+    /** Null where a chapter cannot be downloaded from its row; the mark of one downloaded still shows. */
+    onDownload: (() -> Unit)? = null,
+    onDeleteDownload: () -> Unit = {},
+    /** Whether the row keeps a slot at its end for downloading, even while it shows nothing there. */
+    downloadable: Boolean = false,
 ) {
     // On the picked row's container the text takes the colours made for it.
     val muted = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
@@ -1083,15 +1301,31 @@ private fun ChapterRow(
                 )
             }
         }
-        if (selected) {
-            // The same badge the library puts on a picked book.
-            Surface(
-                modifier = Modifier.padding(start = 8.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary,
-            ) {
-                Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
+        // The download button, the downloaded mark and the picked badge share one slot of one size,
+        // so nothing moves or changes size as picking begins or a row is picked.
+        if (downloadable || download == ChapterDownload.Downloaded || selected) {
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                when {
+                    selected -> {
+                        // The same badge the library puts on a picked book.
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary,
+                        ) {
+                            Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.padding(3.dp).size(18.dp))
+                        }
+                    }
+
+                    onDownload != null -> ChapterDownloadIndicator(download, onDownload, onDeleteDownload, contentColor = muted)
+
+                    download == ChapterDownload.Downloaded -> Icon(
+                        painterResource(R.drawable.check_circle_fill_48px),
+                        contentDescription = stringResource(R.string.comic_downloaded),
+                        tint = muted,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             }
         }
     }

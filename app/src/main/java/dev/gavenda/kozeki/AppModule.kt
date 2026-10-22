@@ -14,6 +14,7 @@ import dev.gavenda.kozeki.data.files.BookStorage
 import dev.gavenda.kozeki.data.files.IncomingEpubs
 import dev.gavenda.kozeki.data.comic.ComicChapterRepository
 import dev.gavenda.kozeki.data.comic.ComicImages
+import dev.gavenda.kozeki.data.comic.ComicDownloads
 import dev.gavenda.kozeki.data.comic.ComicPages
 import dev.gavenda.kozeki.data.comic.ComicReaderPreferences
 import dev.gavenda.kozeki.data.comic.ComicProvider
@@ -177,6 +178,8 @@ fun appModule(app: Application) = module {
     single { ComicChapterRepository(get(), get(), get()) }
 
     single { ComicPages(app, get()) }
+
+    single { ComicDownloads(app, get(), get(), get()) }
 
     single { AniListApi(get()) }
 
