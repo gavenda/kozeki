@@ -123,6 +123,8 @@ import dev.gavenda.kozeki.ui.book.PurchaseDialog
 import dev.gavenda.kozeki.ui.components.AdaptiveColumns
 import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
+import dev.gavenda.kozeki.ui.components.BookDisplay
+import dev.gavenda.kozeki.ui.components.DisplayToggle
 import dev.gavenda.kozeki.ui.components.DraggableScrollbar
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
@@ -251,7 +253,7 @@ fun LibraryContent(
     onSearchQueryChange: (String) -> Unit,
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
-    onDisplaySelected: (LibraryDisplay) -> Unit,
+    onDisplaySelected: (BookDisplay) -> Unit,
     onImportClick: () -> Unit,
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
@@ -441,7 +443,7 @@ fun LibraryContent(
                 } else {
                     // A list is the same grid with rows for cells, so the place scrolled to and the
                     // headings carry over. A wide window sets the rows side by side.
-                    val list = state.display == LibraryDisplay.LIST
+                    val list = state.display == BookDisplay.LIST
                     // A row brings its own margins, which the tint of a picked one fills.
                     val edge = if (list) 8.dp else 16.dp
                     val rowGap = if (list) 0.dp else 16.dp
@@ -876,7 +878,7 @@ private fun FilterRow(
     state: LibraryUiState,
     onFilterSelected: (LibraryFilter) -> Unit,
     onSortSelected: (LibrarySort) -> Unit,
-    onDisplaySelected: (LibraryDisplay) -> Unit,
+    onDisplaySelected: (BookDisplay) -> Unit,
     onKindSelected: (LibraryKind) -> Unit,
 ) {
     var filtersOpen by rememberSaveable { mutableStateOf(false) }
@@ -944,21 +946,6 @@ private fun FilterRow(
                 }
             }
         }
-    }
-}
-
-/** Flips between covers and a list. The button shows the layout a tap leads to. */
-@Composable
-private fun DisplayToggle(display: LibraryDisplay, onDisplaySelected: (LibraryDisplay) -> Unit) {
-    val other = if (display == LibraryDisplay.LIST) LibraryDisplay.COVERS else LibraryDisplay.LIST
-    IconButton(onClick = { onDisplaySelected(other) }) {
-        Icon(
-            painter = if (other == LibraryDisplay.LIST) painterResource(R.drawable.view_list_fill_48px) else painterResource(R.drawable.grid_view_fill_48px),
-            contentDescription = stringResource(
-                if (other == LibraryDisplay.LIST) R.string.display_as_list else R.string.display_as_covers,
-            ),
-            modifier = Modifier.size(24.dp),
-        )
     }
 }
 
@@ -1667,7 +1654,7 @@ private fun LibraryListPreview() {
             state = LibraryUiState(
                 loading = false,
                 filter = LibraryFilter.ALL,
-                display = LibraryDisplay.LIST,
+                display = BookDisplay.LIST,
                 sections = librarySections(LibraryFilter.ALL, books),
                 counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) },
                 totalBooks = books.size,

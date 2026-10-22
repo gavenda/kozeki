@@ -55,6 +55,7 @@ data class SettingsSnapshot(
     val librarySort: String? = null,
     val librarySortReversed: Boolean? = null,
     val libraryDisplay: String? = null,
+    val searchDisplay: String? = null,
     val searchSource: MetadataSource? = null,
 )
 
@@ -92,6 +93,9 @@ class SettingsRepository(context: Context) : DriveLinkStore {
 
     /** Name of the way the library's books were last laid out, or null while the user has not picked one. */
     val libraryDisplay: Flow<String?> = store.data.map { it[Keys.LibraryDisplay] }.distinctUntilChanged()
+
+    /** Name of the way the results of the online search were last laid out, or null while the user has not picked one. */
+    val searchDisplay: Flow<String?> = store.data.map { it[Keys.SearchDisplay] }.distinctUntilChanged()
 
     /** Name of the kind of book the library is showing, or null while the user has not picked one. */
     val libraryKind: Flow<String?> = store.data.map { it[Keys.LibraryKind] }.distinctUntilChanged()
@@ -174,6 +178,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
             librarySort = prefs[Keys.LibrarySort],
             librarySortReversed = prefs[Keys.LibrarySortReversed],
             libraryDisplay = prefs[Keys.LibraryDisplay],
+            searchDisplay = prefs[Keys.SearchDisplay],
             searchSource = MetadataSource.named(searchPreferences.getString(SEARCH_SOURCE, null)),
         )
     }
@@ -188,6 +193,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
             snapshot.librarySort?.let { prefs[Keys.LibrarySort] = it }
             snapshot.librarySortReversed?.let { prefs[Keys.LibrarySortReversed] = it }
             snapshot.libraryDisplay?.let { prefs[Keys.LibraryDisplay] = it }
+            snapshot.searchDisplay?.let { prefs[Keys.SearchDisplay] = it }
         }
         snapshot.searchSource?.let { searchSource = it }
     }
@@ -244,6 +250,10 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.LibraryDisplay] = name }
     }
 
+    suspend fun setSearchDisplay(name: String) {
+        store.edit { it[Keys.SearchDisplay] = name }
+    }
+
     private object Keys {
         val DailyGoalMinutes = intPreferencesKey("daily_goal_minutes")
         val ThemeMode = stringPreferencesKey("theme_mode")
@@ -252,6 +262,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val LibrarySort = stringPreferencesKey("library_sort")
         val LibrarySortReversed = booleanPreferencesKey("library_sort_reversed")
         val LibraryDisplay = stringPreferencesKey("library_display")
+        val SearchDisplay = stringPreferencesKey("search_display")
         val LibraryKind = stringPreferencesKey("library_kind")
         val CollapsedLibraryGroups = stringSetPreferencesKey("library_collapsed_groups")
         val DriveLink = stringPreferencesKey("drive_link")

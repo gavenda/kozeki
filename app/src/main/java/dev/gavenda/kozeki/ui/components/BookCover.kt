@@ -64,7 +64,7 @@ fun BookCover(
             .aspectRatio(CoverAspectRatio)
             .clip(shape),
     ) {
-        CoverPlaceholder(book, showTitleOnPlaceholder)
+        CoverPlaceholder(book.title, showTitle = showTitleOnPlaceholder)
         book.coverModel?.let { model ->
             AsyncImage(
                 model = model,
@@ -85,10 +85,10 @@ fun BookCover(
  * all the way round instead.
  */
 @Composable
-private fun CoverPlaceholder(book: Book, showTitle: Boolean) {
+fun CoverPlaceholder(title: String, showTitle: Boolean = true) {
     val scheme = MaterialTheme.colorScheme
     // Stable per book, so a given title always gets the same colour.
-    val (container, content) = when (book.title.hashCode().absoluteValue % 3) {
+    val (container, content) = when (title.hashCode().absoluteValue % 3) {
         0 -> scheme.primaryContainer to scheme.onPrimaryContainer
         1 -> scheme.secondaryContainer to scheme.onSecondaryContainer
         else -> scheme.tertiaryContainer to scheme.onTertiaryContainer
@@ -110,7 +110,7 @@ private fun CoverPlaceholder(book: Book, showTitle: Boolean) {
         Box(Modifier.weight(1f - Spine - 2 * (FrameInset + TitleGap)), contentAlignment = Alignment.Center) {
             if (showTitle) {
                 Text(
-                    text = book.title,
+                    text = title,
                     color = content,
                     style = MaterialTheme.typography.labelMediumEmphasized,
                     textAlign = TextAlign.Center,
@@ -119,7 +119,7 @@ private fun CoverPlaceholder(book: Book, showTitle: Boolean) {
                 )
             } else {
                 Text(
-                    text = book.title.take(1).uppercase(),
+                    text = title.take(1).uppercase(),
                     color = content,
                     style = MaterialTheme.typography.titleMediumEmphasized,
                 )

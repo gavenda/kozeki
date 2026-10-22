@@ -5,6 +5,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -22,13 +25,32 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun LoadMoreEffect(listState: LazyListState, itemCount: Int, enabled: Boolean, onLoadMore: () -> Unit) {
-    val nearEnd by remember(listState) {
+    val nearEnd = remember(listState) {
         derivedStateOf {
             val layout = listState.layoutInfo
-            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: return@derivedStateOf false
-            lastVisible >= layout.totalItemsCount - 1 - LOAD_MORE_THRESHOLD
+            isNearEnd(layout.visibleItemsInfo.lastOrNull()?.index, layout.totalItemsCount)
         }
     }
+    LoadMoreOnArrival(nearEnd.value, itemCount, enabled, onLoadMore)
+}
+
+/** [LoadMoreEffect] for a grid, counting in items rather than rows. */
+@Composable
+fun LoadMoreEffect(gridState: LazyGridState, itemCount: Int, enabled: Boolean, onLoadMore: () -> Unit) {
+    val nearEnd = remember(gridState) {
+        derivedStateOf {
+            val layout = gridState.layoutInfo
+            isNearEnd(layout.visibleItemsInfo.lastOrNull()?.index, layout.totalItemsCount)
+        }
+    }
+    LoadMoreOnArrival(nearEnd.value, itemCount, enabled, onLoadMore)
+}
+
+private fun isNearEnd(lastVisible: Int?, total: Int): Boolean =
+    lastVisible != null && lastVisible >= total - 1 - LOAD_MORE_THRESHOLD
+
+@Composable
+private fun LoadMoreOnArrival(nearEnd: Boolean, itemCount: Int, enabled: Boolean, onLoadMore: () -> Unit) {
     val currentOnLoadMore by rememberUpdatedState(onLoadMore)
     LaunchedEffect(nearEnd, itemCount, enabled) {
         if (nearEnd && enabled) currentOnLoadMore()
@@ -39,6 +61,16 @@ fun LoadMoreEffect(listState: LazyListState, itemCount: Int, enabled: Boolean, o
 fun LazyListScope.loadingMoreItem(visible: Boolean) {
     if (!visible) return
     item(key = "loading-more", contentType = "loading-more") {
+        Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+            HaloLoadingIndicator()
+        }
+    }
+}
+
+/** The last row of a grid while its next results are on their way, across all its columns. */
+fun LazyGridScope.loadingMoreItem(visible: Boolean) {
+    if (!visible) return
+    item(key = "loading-more", contentType = "loading-more", span = { GridItemSpan(maxLineSpan) }) {
         Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
             HaloLoadingIndicator()
         }

@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -58,13 +61,17 @@ import dev.gavenda.kozeki.ui.CaptchaActivity
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.addBookViewModel
+import dev.gavenda.kozeki.ui.components.AdaptiveColumns
 import dev.gavenda.kozeki.ui.components.AddSelectedToolbar
+import dev.gavenda.kozeki.ui.components.BookDisplay
 import dev.gavenda.kozeki.ui.components.BulkAddedSnackbarEffect
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.DisplayToggle
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
+import dev.gavenda.kozeki.ui.components.MetadataResultCover
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
 import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.SelectionToolbarRoom
@@ -104,6 +111,7 @@ fun AddBookScreen(
         onOpenSettings = onOpenSettings,
         snackbarHostState = snackbarHostState,
         onAddAll = viewModel::addAll,
+        onDisplayChange = viewModel::setDisplay,
     )
 }
 
@@ -124,6 +132,7 @@ fun AddBookContent(
     onComicSourceChange: (Long) -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onAddAll: (List<BookMetadata>, Acquisition) -> Unit = { _, _ -> },
+    onDisplayChange: (BookDisplay) -> Unit = {},
 ) {
     // The results the user does not have can be picked, to be added together. What was picked
     // in one catalogue is not carried to the next.
@@ -155,6 +164,7 @@ fun AddBookContent(
                         )
                     }
                 },
+                actions = { DisplayToggle(state.display, onDisplayChange) },
             )
         },
     ) { innerPadding ->
@@ -312,30 +322,61 @@ fun AddBookContent(
                     )
 
                     else -> {
-                        val listState = rememberLazyListState()
-                        LoadMoreEffect(listState, results.size, state.canLoadMore, onLoadMore)
-                        LazyColumn(
-                            state = listState,
-                            // Room for the last row above the toolbar.
-                            contentPadding = PaddingValues(bottom = if (selection.active) SelectionToolbarRoom else 0.dp),
-                        ) {
-                            sourceAttributionItem(state.source)
-                            items(results, key = { it.sourceId }) { result ->
-                                val owned = state.owned[result.sourceId]
-                                MetadataResultItem(
-                                    result = result,
-                                    // One the user already has opens as their book; there is nothing left to add.
-                                    onClick = selection.onClick(result, owned = owned != null) {
-                                        if (owned != null) onOpenBook(owned.id) else onOpenResult(result)
-                                    },
-                                    trailingContent = owned?.let { book -> { OwnedBadge(book) } },
-                                    // While picking, a tap on a name picks the row like the rest of it.
-                                    onOpenAuthor = onOpenAuthor.takeIf { !selection.active },
-                                    selected = result.sourceId in selection.ids,
-                                    onLongClick = selection.onLongClick(result, owned = owned != null),
-                                )
+                        val ownedOf = { result: BookMetadata -> state.owned[result.sourceId] }
+                        // One the user already has opens as their book; there is nothing left to add.
+                        val open = { result: BookMetadata ->
+                            val owned = ownedOf(result)
+                            selection.onClick(result, owned = owned != null) {
+                                if (owned != null) onOpenBook(owned.id) else onOpenResult(result)
                             }
-                            loadingMoreItem(state.loadingMore)
+                        }
+                        // While picking, a tap on a name picks the result like the rest of it.
+                        val openAuthor = onOpenAuthor.takeIf { !selection.active }
+                        // Room for the last row above the toolbar.
+                        val bottom = if (selection.active) SelectionToolbarRoom else 0.dp
+                        if (state.display == BookDisplay.COVERS) {
+                            val gridState = rememberLazyGridState()
+                            LoadMoreEffect(gridState, results.size, state.canLoadMore, onLoadMore)
+                            // The library's grid: three covers on a phone, more where there is room.
+                            LazyVerticalGrid(
+                                columns = AdaptiveColumns(minColumns = 3, minCellWidth = 112.dp),
+                                state = gridState,
+                                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottom + 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                sourceAttributionItem(state.source)
+                                items(results, key = { it.sourceId }) { result ->
+                                    val owned = ownedOf(result)
+                                    MetadataResultCover(
+                                        result = result,
+                                        onClick = open(result),
+                                        owned = owned,
+                                        onOpenAuthor = openAuthor,
+                                        selected = result.sourceId in selection.ids,
+                                        onLongClick = selection.onLongClick(result, owned = owned != null),
+                                    )
+                                }
+                                loadingMoreItem(state.loadingMore)
+                            }
+                        } else {
+                            val listState = rememberLazyListState()
+                            LoadMoreEffect(listState, results.size, state.canLoadMore, onLoadMore)
+                            LazyColumn(state = listState, contentPadding = PaddingValues(bottom = bottom)) {
+                                sourceAttributionItem(state.source)
+                                items(results, key = { it.sourceId }) { result ->
+                                    val owned = ownedOf(result)
+                                    MetadataResultItem(
+                                        result = result,
+                                        onClick = open(result),
+                                        trailingContent = owned?.let { book -> { OwnedBadge(book) } },
+                                        onOpenAuthor = openAuthor,
+                                        selected = result.sourceId in selection.ids,
+                                        onLongClick = selection.onLongClick(result, owned = owned != null),
+                                    )
+                                }
+                                loadingMoreItem(state.loadingMore)
+                            }
                         }
                     }
                 }
@@ -429,6 +470,30 @@ private fun AddBookResultsPreview() {
                     ),
                     "b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED),
                 ),
+            ),
+            onBack = {},
+            onQueryChange = {},
+            onSourceChange = {},
+            onSearch = {},
+            onLoadMore = {},
+            onOpenResult = {},
+            onOpenBook = {},
+            onOpenAuthor = {},
+            onOpenSettings = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun AddBookCoversPreview() {
+    AppTheme {
+        AddBookContent(
+            state = AddBookUiState(
+                query = "le guin",
+                results = PreviewResults,
+                owned = mapOf("b" to Book(id = "b", title = "The Lathe of Heaven", acquisition = Acquisition.PURCHASED)),
+                display = BookDisplay.COVERS,
             ),
             onBack = {},
             onQueryChange = {},

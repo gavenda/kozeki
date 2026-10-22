@@ -16,6 +16,7 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
+import dev.gavenda.kozeki.ui.components.BookDisplay
 import dev.gavenda.kozeki.ui.components.BulkAdded
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.Dispatchers
@@ -56,6 +57,8 @@ data class AddBookUiState(
     val comicSources: List<ComicSourceOption> = emptyList(),
     /** The one of [comicSources] searched, or 0 when there is none. */
     val comicSourceId: Long = 0L,
+    /** How the results are laid out: rows, as they always were, until the user picks covers. */
+    val display: BookDisplay = BookDisplay.LIST,
 ) {
     /**
      * How much of a query is searched. Comics are browsed too, so with nothing typed the source
@@ -82,7 +85,8 @@ class AddBookViewModel(
             library.observeAll().map(::OwnedBooks),
             comicSources.sources,
             pickedComic,
-        ) { state, owned, sources, picked ->
+            settings.searchDisplay,
+        ) { state, owned, sources, picked, display ->
             val labels = comicSourceLabels(sources.map { it.name to it.lang })
             val options = sources.mapIndexed { i, source -> ComicSourceOption(source.id, labels[i]) }
             state.copy(
@@ -90,6 +94,7 @@ class AddBookViewModel(
                 comicSources = options,
                 // The same fallback the search itself makes while the picked source is not installed.
                 comicSourceId = (options.firstOrNull { it.id == picked } ?: options.firstOrNull())?.id ?: 0L,
+                display = BookDisplay.named(display, BookDisplay.LIST),
             )
         }
             .flowOn(Dispatchers.Default)
@@ -139,6 +144,11 @@ class AddBookViewModel(
         } else {
             checkAvailability()
         }
+    }
+
+    /** Lays the results out as [display], and keeps it for the next search. */
+    fun setDisplay(display: BookDisplay) {
+        viewModelScope.launch { settings.setSearchDisplay(display.name) }
     }
 
     /** Switches between books and comics, books going back to the catalogue they were last searched in. */

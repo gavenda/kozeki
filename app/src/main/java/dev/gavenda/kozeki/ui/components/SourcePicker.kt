@@ -3,6 +3,8 @@ package dev.gavenda.kozeki.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -49,14 +51,23 @@ fun SourcePicker(
  */
 fun LazyListScope.sourceAttributionItem(source: MetadataSource) {
     if (source != MetadataSource.GOOGLE_BOOKS) return
-    item(key = "attribution", contentType = "attribution") {
-        Text(
-            text = stringResource(R.string.attribution_google),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
-        )
-    }
+    item(key = "attribution", contentType = "attribution") { SourceAttribution() }
+}
+
+/** [sourceAttributionItem] for a grid of results, across all its columns. */
+fun LazyGridScope.sourceAttributionItem(source: MetadataSource) {
+    if (source != MetadataSource.GOOGLE_BOOKS) return
+    item(key = "attribution", contentType = "attribution", span = { GridItemSpan(maxLineSpan) }) { SourceAttribution() }
+}
+
+@Composable
+private fun SourceAttribution() {
+    Text(
+        text = stringResource(R.string.attribution_google),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
+    )
 }
 
 @PreviewLightDark

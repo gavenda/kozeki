@@ -19,6 +19,7 @@ import dev.gavenda.kozeki.data.model.Shelf
 import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.repository.ShelfRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.ui.components.BookDisplay
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -161,15 +162,6 @@ enum class LibrarySort(@param:StringRes val label: Int, val descending: Boolean)
     private fun <T> Comparator<T>.flip(reversed: Boolean): Comparator<T> = if (reversed) reversed() else this
 }
 
-/** How the books of the library are laid out. */
-enum class LibraryDisplay {
-    /** A grid of covers. */
-    COVERS,
-
-    /** One row per book, with a small cover and more of its details in words. */
-    LIST,
-}
-
 /** The books picked in the grid, and which of them each action applies to. */
 data class LibrarySelection(val books: List<Book> = emptyList()) {
     val ids: Set<String> = books.mapTo(HashSet()) { it.id }
@@ -236,7 +228,7 @@ data class LibraryUiState(
     val sort: LibrarySort = LibrarySort.RECENT,
     /** Whether [sort] runs the other way round from its usual direction. */
     val sortReversed: Boolean = false,
-    val display: LibraryDisplay = LibraryDisplay.COVERS,
+    val display: BookDisplay = BookDisplay.COVERS,
     val kind: LibraryKind = LibraryKind.BOOKS,
     val sections: List<LibrarySection> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
@@ -358,7 +350,7 @@ class LibraryViewModel(
     }.combine(settings.librarySortReversed, ::Pair)
 
     private val display = settings.libraryDisplay.map { name ->
-        LibraryDisplay.entries.firstOrNull { it.name == name } ?: LibraryDisplay.COVERS
+        BookDisplay.named(name, BookDisplay.COVERS)
     }
 
     private val kind = settings.libraryKind.map { name ->
@@ -370,7 +362,7 @@ class LibraryViewModel(
     private data class ViewOptions(
         val filter: LibraryFilter,
         val sort: Pair<LibrarySort, Boolean>,
-        val display: LibraryDisplay,
+        val display: BookDisplay,
         val kind: LibraryKind,
     )
 
@@ -546,7 +538,7 @@ class LibraryViewModel(
         clearSelection()
     }
 
-    fun selectDisplay(display: LibraryDisplay) {
+    fun selectDisplay(display: BookDisplay) {
         viewModelScope.launch { settings.setLibraryDisplay(display.name) }
     }
 
