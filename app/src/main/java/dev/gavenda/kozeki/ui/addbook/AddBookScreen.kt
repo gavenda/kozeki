@@ -22,6 +22,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -53,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
+import dev.gavenda.kozeki.data.metadata.BrowseOrder
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -112,6 +116,7 @@ fun AddBookScreen(
         snackbarHostState = snackbarHostState,
         onAddAll = viewModel::addAll,
         onDisplayChange = viewModel::setDisplay,
+        onBrowseOrderChange = viewModel::setBrowseOrder,
     )
 }
 
@@ -133,15 +138,17 @@ fun AddBookContent(
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     onAddAll: (List<BookMetadata>, Acquisition) -> Unit = { _, _ -> },
     onDisplayChange: (BookDisplay) -> Unit = {},
+    onBrowseOrderChange: (BrowseOrder) -> Unit = {},
 ) {
     // The results the user does not have can be picked, to be added together. What was picked
     // in one catalogue is not carried to the next.
     val selection = rememberResultSelection()
-    LaunchedEffect(state.source, state.comicSourceId) { selection.clear() }
+    LaunchedEffect(state.source, state.comicSourceId, state.browseOrder) { selection.clear() }
     val addable = state.results.orEmpty().filter { it.sourceId !in state.owned }
     val picked = selection.of(addable)
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     val submit = {
@@ -164,7 +171,22 @@ fun AddBookContent(
                         )
                     }
                 },
-                actions = { DisplayToggle(state.display, onDisplayChange) },
+                actions = {
+                    // The lists are what is shown with nothing typed, so the menu is there only then.
+                    if (state.query.isBlank() && state.browseOrders.isNotEmpty()) {
+                        // A list picked is a list to look through: the field lets go, or its
+                        // keyboard comes back over the list when the menu closes.
+                        BrowseMenu(
+                            orders = state.browseOrders,
+                            picked = state.browseOrder,
+                            onPick = { order ->
+                                focusManager.clearFocus()
+                                onBrowseOrderChange(order)
+                            },
+                        )
+                    }
+                    DisplayToggle(state.display, onDisplayChange)
+                },
             )
         },
     ) { innerPadding ->
@@ -397,6 +419,39 @@ fun AddBookContent(
         }
     }
 
+}
+
+/** The lists the source can show with nothing typed, the one shown ticked. */
+@Composable
+private fun BrowseMenu(
+    orders: List<BrowseOrder>,
+    picked: BrowseOrder?,
+    onPick: (BrowseOrder) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier) {
+        IconButton(onClick = { expanded = true }) {
+            Icon(painterResource(R.drawable.sort_48px), contentDescription = stringResource(R.string.browse_lists), modifier = Modifier.size(24.dp))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            orders.forEach { order ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(order.label)) },
+                    onClick = {
+                        expanded = false
+                        onPick(order)
+                    },
+                    leadingIcon = {
+                        // An empty slot keeps the other labels in line.
+                        if (order == picked) {
+                            Icon(painterResource(R.drawable.check_48px), contentDescription = null, modifier = Modifier.size(24.dp))
+                        }
+                    },
+                )
+            }
+        }
+    }
 }
 
 /** The sources to search, one of them picked: comic sources or book catalogues. Scrolls when there are many. */

@@ -8,6 +8,7 @@ import dev.gavenda.kozeki.data.metadata.BookPage
 import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.metadata.BookMatcher
+import dev.gavenda.kozeki.data.metadata.BrowseOrder
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataProvider
 import dev.gavenda.kozeki.data.metadata.SeriesPage
@@ -16,6 +17,7 @@ import dev.gavenda.kozeki.data.model.Isbn
 import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.data.model.singleLineOrNull
 import dev.gavenda.kozeki.data.model.singleLines
+import java.time.Clock
 import java.time.LocalDate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -42,6 +44,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class HardcoverProvider(
     private val client: OkHttpClient,
     private val auth: HardcoverAuth,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : MetadataProvider {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -57,6 +60,67 @@ class HardcoverProvider(
         return BookPage(
             books = hits.documents.filterNot(::isCollection).mapNotNull { toMetadata(it, queriedIsbn = null) },
             hasMore = hits.hasMore,
+        )
+    }
+
+    override suspend fun browseOrders(): List<BrowseOrder> = BrowseOrders
+
+    override suspend fun browse(order: BrowseOrder, page: Int): BookPage {
+        val offset = (page - 1) * BROWSE_PAGE_SIZE
+        return when (order) {
+            BrowseOrder.TRENDING_WEEK -> trending("week", offset)
+            BrowseOrder.TRENDING_MONTH -> trending("month", offset)
+            BrowseOrder.TRENDING_YEAR -> trending("one_year", offset)
+            BrowseOrder.POPULAR -> trending("all", offset)
+            BrowseOrder.TOP_RATED -> bookList(TOP_RATED_QUERY, offset)
+            BrowseOrder.NEW_RELEASES -> bookList(NEW_RELEASES_QUERY, offset, today = LocalDate.now(clock).toString())
+            BrowseOrder.LATEST_UPDATES -> BookPage()
+        }
+    }
+
+    /**
+     * The books most read over [duration], as Hardcover's own trending list. It only names them,
+     * so their details take a second request, and come back in no order of their own.
+     */
+    private suspend fun trending(duration: String, offset: Int): BookPage {
+        val idsBody = buildJsonObject {
+            put("query", TRENDING_QUERY)
+            putJsonObject("variables") {
+                put("duration", duration)
+                put("limit", BROWSE_PAGE_SIZE)
+                put("offset", offset)
+            }
+        }.toString()
+        val ids = (execute(idsBody)["books_trending"].asObject()?.get("ids") as? JsonArray).orEmpty()
+            .mapNotNull { (it as? JsonPrimitive)?.intOrNull }
+        if (ids.isEmpty()) return BookPage()
+
+        val booksBody = buildJsonObject {
+            put("query", BOOKS_BY_IDS_QUERY)
+            putJsonObject("variables") { put("ids", JsonArray(ids.map(::JsonPrimitive))) }
+        }.toString()
+        val rows = (execute(booksBody)["books"] as? JsonArray).orEmpty().mapNotNull { it.asObject() }
+        val byId = rows.associateBy { it.string("id")?.toIntOrNull() }
+        return BookPage(
+            books = ids.mapNotNull { byId[it] }.filterNot(::isCollection).mapNotNull(::bookToMetadata),
+            hasMore = ids.size >= BROWSE_PAGE_SIZE,
+        )
+    }
+
+    /** A page of the `books` table as [query] filters and orders it. */
+    private suspend fun bookList(query: String, offset: Int, today: String? = null): BookPage {
+        val body = buildJsonObject {
+            put("query", query)
+            putJsonObject("variables") {
+                put("limit", BROWSE_PAGE_SIZE)
+                put("offset", offset)
+                today?.let { put("today", it) }
+            }
+        }.toString()
+        val rows = (execute(body)["books"] as? JsonArray).orEmpty().mapNotNull { it.asObject() }
+        return BookPage(
+            books = rows.filterNot(::isCollection).mapNotNull(::bookToMetadata),
+            hasMore = rows.size >= BROWSE_PAGE_SIZE,
         )
     }
 
@@ -420,6 +484,36 @@ class HardcoverProvider(
             $$"series(where: { id: { _eq: $id } }, limit: 1) { $$SERIES_FIELDS } }"
         const val SERIES_SEARCH_QUERY = $$"query SeriesSearch($query: String!) { " +
             $$"search(query: $query, query_type: \"Series\", per_page: 1, page: 1) { results } }"
+
+        val BrowseOrders = listOf(
+            BrowseOrder.TRENDING_MONTH,
+            BrowseOrder.TRENDING_WEEK,
+            BrowseOrder.TRENDING_YEAR,
+            BrowseOrder.POPULAR,
+            BrowseOrder.TOP_RATED,
+            BrowseOrder.NEW_RELEASES,
+        )
+
+        const val BROWSE_PAGE_SIZE = 24
+
+        const val TRENDING_QUERY = $$"query Trending($duration: TrendingDuration!, $limit: Int!, $offset: Int!) { " +
+            $$"books_trending(duration: $duration, limit: $limit, offset: $offset) { ids } }"
+        const val BOOKS_BY_IDS_QUERY = $$"query Books($ids: [Int!]!) { " +
+            $$"books(where: { id: { _in: $ids } }) { $$AUTHOR_BOOK_FIELDS } }"
+
+        // Books on their own, not merged into another, not part of one, not several in a box.
+        private const val WHOLE_BOOKS =
+            "canonical_id: { _is_null: true }, compilation: { _eq: false }, is_partial_book: { _eq: false }"
+
+        // Enough ratings that one reader's five stars cannot put a book at the top.
+        const val TOP_RATED_QUERY = $$"query TopRated($limit: Int!, $offset: Int!) { " +
+            "books(where: { $WHOLE_BOOKS, ratings_count: { _gte: 1000 } }, " +
+            $$"order_by: [{ rating: desc_nulls_last }, { id: asc }], limit: $limit, offset: $offset) { $$AUTHOR_BOOK_FIELDS } }"
+
+        // Out already, and read by enough people that it is not just any book with a date.
+        const val NEW_RELEASES_QUERY = $$"query NewReleases($today: date!, $limit: Int!, $offset: Int!) { " +
+            $$"books(where: { $$WHOLE_BOOKS, release_date: { _lte: $today }, users_count: { _gte: 50 } }, " +
+            $$"order_by: [{ release_date: desc }, { users_count: desc }], limit: $limit, offset: $offset) { $$AUTHOR_BOOK_FIELDS } }"
 
         const val BOOK_QUERY = $$"query Book($id: Int!) { books_by_pk(id: $id) { $$AUTHOR_BOOK_FIELDS } }"
 

@@ -423,6 +423,14 @@
     <string name="add_book_search_comics">Search comics</string>
     <string name="add_book_prompt_title">Ask for a book</string>
     <string name="add_book_prompt_message">Was there something you needed? Give me a title, an author or an ISBN and I\'ll look it up. I keep what I find on this device, so asking twice costs nothing.</string>
+    <string name="browse_lists">Lists</string>
+    <string name="browse_trending_week">Trending this week</string>
+    <string name="browse_trending_month">Popular this month</string>
+    <string name="browse_trending_year">Popular this year</string>
+    <string name="browse_popular">Most popular</string>
+    <string name="browse_top_rated">Top rated</string>
+    <string name="browse_new_releases">New releases</string>
+    <string name="browse_latest_updates">Latest updates</string>
     <string name="add_book_no_results_title">Not in the catalogue</string>
     <string name="add_book_no_results_message">I couldn\'t find it… Try fewer or different words, or the ISBN.</string>
     <string name="add_book_comic_none_title">No comic sources</string>

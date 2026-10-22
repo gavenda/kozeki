@@ -4,6 +4,7 @@ import dev.gavenda.kozeki.data.metadata.AuthorPage
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookPage
 import dev.gavenda.kozeki.data.metadata.BookReviews
+import dev.gavenda.kozeki.data.metadata.BrowseOrder
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataProvider
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -40,6 +41,23 @@ class ComicProvider(
             source.getPopularManga(page)
         } else {
             source.getSearchManga(page, query.trim(), source.getFilterList())
+        }
+        BookPage(books = result.mangas.filter { it.hasUrl() }.map { it.toMetadata(source) }, hasMore = result.hasNextPage)
+    }
+
+    /** Every source has a popular list; only some keep one of their latest updates. */
+    override suspend fun browseOrders(): List<BrowseOrder> {
+        val source = runCatching { pickedSource() }.getOrNull() ?: return listOf(BrowseOrder.POPULAR)
+        val latest = runCatching { source.supportsLatest }.getOrDefault(false)
+        return listOfNotNull(BrowseOrder.POPULAR, BrowseOrder.LATEST_UPDATES.takeIf { latest })
+    }
+
+    override suspend fun browse(order: BrowseOrder, page: Int): BookPage = guardSource(site = { pickedSource().id.let { sources.siteOf(it) } }) {
+        val source = pickedSource()
+        val result = if (order == BrowseOrder.LATEST_UPDATES && source.supportsLatest) {
+            source.getLatestUpdates(page)
+        } else {
+            source.getPopularManga(page)
         }
         BookPage(books = result.mangas.filter { it.hasUrl() }.map { it.toMetadata(source) }, hasMore = result.hasNextPage)
     }

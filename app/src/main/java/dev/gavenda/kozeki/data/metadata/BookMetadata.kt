@@ -128,6 +128,12 @@ interface MetadataProvider {
     /** The results on [page] of a search for [query], the first page being 1. */
     suspend fun search(query: String, page: Int = 1): BookPage
 
+    /** The lists this source can show with nothing searched for, the one to open on first. */
+    suspend fun browseOrders(): List<BrowseOrder> = emptyList()
+
+    /** The books on [page] of the list [order], the first page being 1. */
+    suspend fun browse(order: BrowseOrder, page: Int = 1): BookPage = BookPage()
+
     suspend fun findByIsbn(isbn13: String): List<BookMetadata>
 
     suspend fun searchByTitleAndAuthor(title: String, author: String?): List<BookMetadata> =

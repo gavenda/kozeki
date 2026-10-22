@@ -14,6 +14,10 @@ class BookSearch(private val readPage: suspend (page: Int) -> BookPage) {
     constructor(metadata: MetadataRepository, source: MetadataSource, query: String) :
         this({ page -> metadata.search(source, query, page) })
 
+    /** The list [order] of [source], as shown with nothing searched for. */
+    constructor(metadata: MetadataRepository, source: MetadataSource, order: BrowseOrder) :
+        this({ page -> metadata.browse(source, order, page) })
+
     private var page = 0
     private val seen = mutableSetOf<String>()
 

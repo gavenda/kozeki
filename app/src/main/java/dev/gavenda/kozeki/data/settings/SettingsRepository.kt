@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.gavenda.kozeki.data.backup.DriveLink
 import dev.gavenda.kozeki.data.backup.drive.DriveLinkStore
+import dev.gavenda.kozeki.data.metadata.BrowseOrder
 import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -153,6 +154,16 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         get() = searchPreferences.getLong(COMIC_SOURCE, searchPreferences.getLong(LEGACY_COMIC_SOURCE, 0L))
         set(value) = searchPreferences.edit { putLong(COMIC_SOURCE, value) }
 
+    /** The list the online search of books shows with nothing typed, or null until one is picked. */
+    var bookBrowseOrder: BrowseOrder?
+        get() = BrowseOrder.named(searchPreferences.getString(BOOK_BROWSE, null))
+        set(value) = searchPreferences.edit { putString(BOOK_BROWSE, value?.name) }
+
+    /** The list the online search of comics shows with nothing typed, or null until one is picked. */
+    var comicBrowseOrder: BrowseOrder?
+        get() = BrowseOrder.named(searchPreferences.getString(COMIC_BROWSE, null))
+        set(value) = searchPreferences.edit { putString(COMIC_BROWSE, value?.name) }
+
     /**
      * The Google account backups go to, or null while nobody is signed in. It says where the
      * backup is, not what is in the library, so it is no part of a [SettingsSnapshot].
@@ -279,6 +290,8 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         private const val SEARCH_SOURCE = "source"
         private const val COMIC_SOURCE = "comic_source"
         private const val BOOK_SOURCE = "book_source"
+        private const val BOOK_BROWSE = "book_browse"
+        private const val COMIC_BROWSE = "comic_browse"
 
         /** Where [comicSourceId] was kept before comics were called comics. */
         private const val LEGACY_COMIC_SOURCE = "manga_source"

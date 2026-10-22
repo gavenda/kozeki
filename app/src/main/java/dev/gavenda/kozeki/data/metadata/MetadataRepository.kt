@@ -54,6 +54,18 @@ class MetadataRepository(
         ) { provider(source).search(query.trim(), page) }
     }
 
+    /** The lists [source] can show with nothing searched for, the one to open on first. */
+    suspend fun browseOrders(source: MetadataSource): List<BrowseOrder> = provider(source).browseOrders()
+
+    /** One page of the list [order] on [source], the first being 1. Lists change by the day, and are kept that long. */
+    suspend fun browse(source: MetadataSource, order: BrowseOrder, page: Int = 1): BookPage =
+        cached(
+            source = source,
+            key = "browse|$SEARCH_VERSION|${order.name}|$page",
+            serializer = BookPage.serializer(),
+            lifetime = { BROWSE_TTL },
+        ) { provider(source).browse(order, page) }
+
     suspend fun findByIsbn(source: MetadataSource, isbn13: String): List<BookMetadata> =
         books(source, "isbn|$SEARCH_VERSION|$isbn13", LOOKUP_TTL) { provider(source).findByIsbn(isbn13) }
 
@@ -182,6 +194,7 @@ class MetadataRepository(
         val LOOKUP_TTL: Duration = Duration.ofDays(30)
         val EMPTY_TTL: Duration = Duration.ofDays(1)
         val AUTHOR_TTL: Duration = Duration.ofDays(7)
+        val BROWSE_TTL: Duration = Duration.ofDays(1)
 
         /** Reviews keep arriving, so they are refreshed far sooner than a book's own details. */
         val REVIEWS_TTL: Duration = Duration.ofDays(1)

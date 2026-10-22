@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookSearch
+import dev.gavenda.kozeki.data.metadata.BrowseOrder
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.OwnedBooks
@@ -59,12 +60,13 @@ data class AddBookUiState(
     val comicSourceId: Long = 0L,
     /** How the results are laid out: rows, as they always were, until the user picks covers. */
     val display: BookDisplay = BookDisplay.LIST,
+    /** The lists the source can show with nothing typed; empty when it has none, as Google Books. */
+    val browseOrders: List<BrowseOrder> = emptyList(),
+    /** The one of [browseOrders] shown while nothing is typed. */
+    val browseOrder: BrowseOrder? = null,
 ) {
-    /**
-     * How much of a query is searched. Comics are browsed too, so with nothing typed the source
-     * lists what is popular on it, and titles there can be short.
-     */
-    val minQueryLength: Int get() = if (source == MetadataSource.COMICS) 0 else 3
+    /** How much of a query is searched. Titles of comics can be short. */
+    val minQueryLength: Int get() = if (source == MetadataSource.COMICS) 1 else 3
 }
 
 class AddBookViewModel(
@@ -107,12 +109,12 @@ class AddBookViewModel(
     /** The search the results on screen are the start of, when there may be more of it. */
     private var pager: BookSearch? = null
 
-    /** The query the last search was started for. */
+    /** The query the last search was started for, empty for a list shown with nothing typed. */
     private var searched: String? = null
 
     init {
-        // Comics are browsed, so they open on what is popular instead of waiting for a query.
-        if (_uiState.value.source == MetadataSource.COMICS) search() else checkAvailability()
+        // Nothing is typed yet, so it opens on what the source finds popular.
+        search()
     }
 
     private val addedChannel = Channel<BulkAdded>(Channel.BUFFERED)
@@ -135,15 +137,30 @@ class AddBookViewModel(
         cancelSearch()
         // What is on screen came from the other source, its failures included.
         _uiState.update {
-            it.copy(source = source, loading = false, results = null, canLoadMore = false, error = null)
+            it.copy(
+                source = source,
+                loading = false,
+                results = null,
+                canLoadMore = false,
+                error = null,
+                browseOrders = emptyList(),
+                browseOrder = null,
+            )
         }
         settings.searchSource = source
         if (source != MetadataSource.COMICS) settings.bookSearchSource = source
-        if (source == MetadataSource.COMICS || _uiState.value.query.trim().length >= MIN_QUERY_LENGTH) {
-            search()
-        } else {
-            checkAvailability()
-        }
+        val query = _uiState.value.query.trim()
+        if (query.isEmpty() || query.length >= _uiState.value.minQueryLength) search() else checkAvailability()
+    }
+
+    /** Shows the list [order] while nothing is typed, and keeps it for the next time books or comics are browsed. */
+    fun setBrowseOrder(order: BrowseOrder) {
+        val state = _uiState.value
+        if (order !in state.browseOrders) return
+        if (state.source == MetadataSource.COMICS) settings.comicBrowseOrder = order else settings.bookBrowseOrder = order
+        if (order == state.browseOrder && state.results != null) return
+        _uiState.update { it.copy(browseOrder = order) }
+        if (state.query.isBlank()) browse(debounceMs = 0)
     }
 
     /** Lays the results out as [display], and keeps it for the next search. */
@@ -189,10 +206,16 @@ class AddBookViewModel(
      */
     private fun search(debounceMs: Long) {
         val query = _uiState.value.query.trim()
-        val browsing = _uiState.value.source == MetadataSource.COMICS
-        if (!browsing && query.length < MIN_QUERY_LENGTH) {
-            // Too short to search, and the results on screen were for something longer.
-            if (debounceMs > 0) {
+        if (query.isEmpty()) {
+            // Typing that clears the field puts the list back, unless it is already on screen.
+            if (debounceMs > 0 && searched == "") return
+            browse(debounceMs)
+            return
+        }
+        if (query.length < _uiState.value.minQueryLength) {
+            // Too short to search. A list shown with nothing typed stays while the first letters
+            // go in; results for something longer go.
+            if (debounceMs > 0 && searched != "") {
                 cancelSearch()
                 _uiState.update { it.copy(loading = false, results = null, canLoadMore = false) }
             }
@@ -204,6 +227,7 @@ class AddBookViewModel(
         searchJob = viewModelScope.launch {
             delay(debounceMs.milliseconds)
             searched = query
+            browsed = false
             val source = _uiState.value.source
             _uiState.update { it.copy(loading = true, error = null, captchaUrl = null) }
             try {
@@ -227,6 +251,52 @@ class AddBookViewModel(
         }
     }
 
+    /** Whether the results on screen are a list shown with nothing typed, ranked by the source. */
+    private var browsed = false
+
+    /**
+     * Shows the list the user picked last time for this kind, or the source's first, while nothing
+     * is typed. A source with no lists says why it cannot be searched, or waits for a query.
+     */
+    private fun browse(debounceMs: Long) {
+        cancelSearch()
+        searchJob = viewModelScope.launch {
+            delay(debounceMs.milliseconds)
+            searched = ""
+            val source = _uiState.value.source
+            _uiState.update { it.copy(loading = true, error = null, captchaUrl = null) }
+            try {
+                val orders = metadata.browseOrders(source)
+                val saved = if (source == MetadataSource.COMICS) settings.comicBrowseOrder else settings.bookBrowseOrder
+                val order = _uiState.value.browseOrder?.takeIf { it in orders }
+                    ?: saved?.takeIf { it in orders }
+                    ?: orders.firstOrNull()
+                _uiState.update { it.copy(browseOrders = orders, browseOrder = order) }
+                if (order == null) {
+                    _uiState.update { it.copy(loading = false, results = null, canLoadMore = false) }
+                    checkAvailability()
+                    return@launch
+                }
+                val search = BookSearch(metadata, source, order)
+                // In the source's order: the point of the list is what comes first.
+                val results = search.next()
+                pager = search
+                browsed = true
+                _uiState.update { it.copy(loading = false, results = results, canLoadMore = search.hasMore) }
+            } catch (e: MetadataException) {
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        results = null,
+                        canLoadMore = false,
+                        error = LookupError.from(e),
+                        captchaUrl = (e as? MetadataException.Captcha)?.url,
+                    )
+                }
+            }
+        }
+    }
+
     /** Fetches the results after the ones on screen, for when the list is scrolled to its end. */
     fun loadMore() {
         val search = pager ?: return
@@ -235,9 +305,11 @@ class AddBookViewModel(
             _uiState.update { it.copy(loadingMore = true) }
             try {
                 val more = search.next()
-                // Sorted as a whole, so a volume on a later page joins the rest of its series.
+                // Sorted as a whole, so a volume on a later page joins the rest of its series. A
+                // ranked list keeps its ranks.
                 _uiState.update {
-                    it.copy(results = (it.results.orEmpty() + more).sortedBySeries(), canLoadMore = search.hasMore)
+                    val all = it.results.orEmpty() + more
+                    it.copy(results = if (browsed) all else all.sortedBySeries(), canLoadMore = search.hasMore)
                 }
             } catch (_: MetadataException) {
                 // What is on screen stays; scrolling back to the end asks again.
@@ -271,7 +343,6 @@ class AddBookViewModel(
             }
         }
 
-        private const val MIN_QUERY_LENGTH = 3
         private const val SEARCH_DEBOUNCE_MS = 500L
     }
 }
