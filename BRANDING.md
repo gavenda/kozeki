@@ -48,8 +48,8 @@ The halo is used where it means something: starting up, waiting, a goal reached,
 | Where | What it does |
 |---|---|
 | Launch screen | Draws itself in over half a second. The rings run round from the top, then the second hand swings from twelve to three. |
-| Anything loading, at 32dp and up | `HaloLoadingIndicator`, 48dp unless given another size. The rings drift one way while the hands go round the other. |
-| Checking followed comics for new chapters | A 96dp loading halo in the middle of the sheet a pull to refresh opens in the library. Its hands go round once over the whole check (`progress`), and it is the plain wait until the comics are counted. |
+| Anything loading, at 32dp and up | `HaloLoadingIndicator`, 48dp unless given another size. The rings drift one way while the hands go round the other at an even pace, like clockwork, the second five times as fast as the first. With a `progress`, the first hand goes round once as the work is done and the dial fills faintly behind it from twelve, while the second hand keeps lapping it, so a stall still looks at work. |
+| Checking followed comics for new chapters | A 96dp loading halo in the middle of the sheet a pull to refresh opens in the library. Its first hand goes round once over the whole check, the dial filling behind it (`progress`), and it is the plain wait until the comics are counted. |
 | A cover whose details are being looked up | The loading halo over the dimmed cover, with `glow = true`. Nothing else glows, since the glow only shows against something dark. |
 | A goal that is met | The day's and the year's goal ring (`GoalRing`) become the halo. The full ring takes the halo's colour and gains the inner ring and the ties, and the percentage stays where the dial would be. |
 | The calendar | The cell for 23 April, her birthday and World Book Day, is ringed with the halo every year. It is the rings only (`dial = false`), as wide as the cell's cover box and centred on it, over whatever the cell shows. |

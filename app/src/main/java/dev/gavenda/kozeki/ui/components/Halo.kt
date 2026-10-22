@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
@@ -61,13 +62,14 @@ fun HaloMark(
  * The halo at work, shown while something loads. It stands in for the stock loading indicator and
  * is the same 48dp unless given another size.
  *
- * With a [progress], from 0 to 1, the hands stop wandering and show how far along it is: the
- * first goes round once as the work is done, the second kept a quarter turn ahead of it. While
- * [progress] is null, or has no value yet, it is the plain wait. The rings drift either way.
+ * While [progress] is null, or has no value yet, it is the plain wait, run like clockwork: the
+ * rings drift one way while the hands go round the other at an even pace, the second five times as
+ * fast as the first, so that it laps it once with each quarter turn of the first.
  *
- * The rings drift one way while the hands go round the other, as a clock's would: with each
- * quarter turn of the first, the second laps it once. Every quarter turn so ends on the halo as it
- * is at rest, only turned.
+ * With a [progress], from 0 to 1, the first hand goes round once as the work is done and the dial
+ * fills behind it from twelve. The second hand keeps lapping it, easing out of each lap and into
+ * the next and coming back to a quarter turn ahead, so that the halo still looks at work while the
+ * progress stalls. The rings drift as in the plain wait.
  */
 @Composable
 fun HaloLoadingIndicator(
@@ -90,25 +92,23 @@ fun HaloLoadingIndicator(
         glow = glow,
         dial = true,
         ringDegrees = { -90f * quarterTurns.value },
-        firstHandDegrees = {
-            if (known != null) 360f * shown.value
-            else 90f * (floor(quarterTurns.value) + quarterTurnProgress(quarterTurns.value))
-        },
+        firstHandDegrees = { if (known != null) 360f * shown.value else 90f * quarterTurns.value },
         secondHandDegrees = {
-            if (known != null) 360f * shown.value + 90f
-            else {
-                val turn = quarterTurnProgress(quarterTurns.value)
-                90f + 90f * (floor(quarterTurns.value) + turn) + 360f * turn
-            }
+            if (known != null) 360f * shown.value + 90f + 360f * lapProgress(quarterTurns.value)
+            else 90f + 450f * quarterTurns.value
         },
+        filledDegrees = { if (known != null) 360f * shown.value else 0f },
     )
 }
 
-/** How far the hands are through the quarter turn they are in. They start and stop gently. */
-private fun quarterTurnProgress(quarterTurns: Float): Float =
+/** How far the second hand is through its lap of the first, with progress. It starts and stops gently. */
+private fun lapProgress(quarterTurns: Float): Float =
     FastOutSlowInEasing.transform(quarterTurns - floor(quarterTurns))
 
-/** The angles are in degrees clockwise, the hands' from twelve o'clock. */
+/**
+ * The angles are in degrees clockwise, the hands' from twelve o'clock. [filledDegrees] is how far
+ * clockwise from twelve the dial is filled.
+ */
 @Composable
 private fun Halo(
     modifier: Modifier,
@@ -117,6 +117,7 @@ private fun Halo(
     ringDegrees: () -> Float,
     firstHandDegrees: () -> Float,
     secondHandDegrees: () -> Float,
+    filledDegrees: () -> Float = { 0f },
 ) {
     val color = colorResource(R.color.halo)
     Box(modifier) {
@@ -130,11 +131,11 @@ private fun Halo(
                         renderEffect = BlurEffect(spread, spread, TileMode.Decal)
                     },
             ) {
-                drawHalo(color.copy(alpha = GlowAlpha), dial, ringDegrees(), firstHandDegrees(), secondHandDegrees())
+                drawHalo(color.copy(alpha = GlowAlpha), dial, ringDegrees(), firstHandDegrees(), secondHandDegrees(), filledDegrees())
             }
         }
         Canvas(Modifier.matchParentSize()) {
-            drawHalo(color, dial, ringDegrees(), firstHandDegrees(), secondHandDegrees())
+            drawHalo(color, dial, ringDegrees(), firstHandDegrees(), secondHandDegrees(), filledDegrees())
         }
     }
 }
@@ -145,6 +146,7 @@ private fun DrawScope.drawHalo(
     ringDegrees: Float,
     firstHandDegrees: Float,
     secondHandDegrees: Float,
+    filledDegrees: Float,
 ) {
     val radius = size.minDimension / 2
     // The thinnest lines would thin out to nothing on a small halo.
@@ -159,6 +161,16 @@ private fun DrawScope.drawHalo(
     repeat(4) { spoke(ringDegrees + 90f * it, InnerRing, OuterRing, SpokeStroke) }
     if (!dial) return
 
+    if (filledDegrees > 0f) {
+        drawArc(
+            color = color.copy(alpha = color.alpha * FillAlpha),
+            startAngle = -90f,
+            sweepAngle = filledDegrees,
+            useCenter = true,
+            topLeft = center - Offset(radius * Dial, radius * Dial),
+            size = Size(2 * radius * Dial, 2 * radius * Dial),
+        )
+    }
     drawCircle(color, radius * Dial, style = Stroke(width(DialStroke)))
     drawCircle(color, radius * Hub, style = Stroke(width(HubStroke)))
     spoke(firstHandDegrees, Hub, Dial, SpokeStroke)
@@ -181,6 +193,9 @@ private const val SpokeStroke = 0.061f
 private const val GlowSpread = 0.06f
 private const val GlowAlpha = 0.7f
 
+/** How strongly the dial is filled as progress is made. */
+private const val FillAlpha = 0.28f
+
 private const val QuarterTurnMillis = 1400
 
 /**
@@ -201,6 +216,7 @@ private fun HaloPreview() {
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             HaloLoadingIndicator()
                             HaloLoadingIndicator(Modifier.size(32.dp))
+                            HaloLoadingIndicator(progress = { 0.6f })
                             HaloMark(Modifier.size(96.dp), dial = false)
                             // As over a cover whose details are being looked up.
                             Row(
