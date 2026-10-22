@@ -652,6 +652,15 @@
     <string name="settings_comic_none_title">No extensions found</string>
     <string name="settings_comic_none_description">Installed Mihon extensions</string>
     <string name="settings_comic_nsfw">18+</string>
+    <plurals name="settings_comic_languages_shown">
+        <item quantity="one">%1$d of %2$d language</item>
+        <item quantity="other">%1$d of %2$d languages</item>
+    </plurals>
+    <string name="settings_comic_languages_show">Show languages</string>
+    <string name="settings_comic_languages_hide">Hide languages</string>
+    <string name="settings_comic_language_all">Several languages</string>
+    <string name="settings_comic_language_other">Other</string>
+    <string name="settings_comic_source_settings">Source settings</string>
     <string name="settings_comic_broken_lib">Built for extension library %1$s. Only 1.6 is used.</string>
     <string name="settings_comic_broken_lib_unknown">Does not say which extension library it was built for. Only 1.6 is used.</string>
     <string name="settings_comic_broken_malformed">Its package is missing what an extension needs.</string>

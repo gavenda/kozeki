@@ -59,10 +59,12 @@ class ComicProvider(
 
     override suspend fun reviews(sourceId: String): BookReviews = BookReviews()
 
-    private fun searchable(): List<CatalogueSource> =
-        sources.extensions.value.orEmpty().filterIsInstance<LoadedExtension>().flatMap { it.sources }
+    private suspend fun searchable(): List<CatalogueSource> = sources.searchable()
 
-    /** The source the user picked, or the first one while that is not installed or nothing was picked. */
+    /**
+     * The source the user picked, or the first one while that is not installed, is in a language
+     * switched off, or nothing was picked.
+     */
     private suspend fun pickedSource(): CatalogueSource {
         sources.ensureLoaded()
         val all = searchable()

@@ -44,6 +44,8 @@ data class SettingsUiState(
     val cachedLookups: Int = 0,
     /** The Mihon extensions installed on the device, or null until they have been looked for. */
     val extensions: List<ComicExtension>? = null,
+    /** The languages of extensions switched off, as [SettingsRepository.comicLanguageKey] gives them. */
+    val hiddenComicLanguages: Set<String> = emptySet(),
     /** Hours between the checks of followed comics for new chapters, 0 being never. */
     val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
     val versionName: String = "",
@@ -62,6 +64,7 @@ private data class LibrarySettings(
     val updateIntervalHours: Int,
     val aniList: AniListAccount,
     val aniListSignIn: AniListAuth.Status,
+    val hiddenComicLanguages: Set<String>,
 )
 
 class SettingsViewModel(
@@ -92,6 +95,7 @@ class SettingsViewModel(
                 settings.updateIntervalHours,
                 aniListAuth.account,
                 aniListAuth.status,
+                settings.hiddenComicLanguages,
                 ::LibrarySettings,
             ),
             ::Pair,
@@ -102,7 +106,7 @@ class SettingsViewModel(
         metadata.observeCacheSize(),
     ) { (accountsState, comicState), themeMode, dailyGoal, yearlyGoal, cached ->
         val (hardcover, signIn, backup) = accountsState
-        val (extensions, updateIntervalHours, aniList, aniListSignIn) = comicState
+        val (extensions, updateIntervalHours, aniList, aniListSignIn, hiddenComicLanguages) = comicState
         SettingsUiState(
             hardcover = hardcover,
             signIn = signIn,
@@ -116,6 +120,7 @@ class SettingsViewModel(
             yearlyGoalBooks = yearlyGoal,
             cachedLookups = cached,
             extensions = extensions,
+            hiddenComicLanguages = hiddenComicLanguages,
             updateIntervalHours = updateIntervalHours,
             versionName = versionName,
             birthday = isUiBirthday(today),
@@ -140,6 +145,11 @@ class SettingsViewModel(
     /** Looks for the installed extensions again, for after one was installed or removed. */
     fun refreshExtensions() {
         viewModelScope.launch { comicSources.refresh() }
+    }
+
+    /** Shows or leaves out, in the search of comics, the sources of one extension in one language. */
+    fun setComicLanguageShown(packageName: String, language: String, shown: Boolean) {
+        viewModelScope.launch { settings.setComicLanguageShown(packageName, language, shown) }
     }
 
     fun signIn() {

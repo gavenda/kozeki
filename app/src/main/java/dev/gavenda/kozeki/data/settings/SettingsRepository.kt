@@ -103,6 +103,14 @@ class SettingsRepository(context: Context) : DriveLinkStore {
     val collapsedLibraryGroups: Flow<Set<String>> =
         store.data.map { it[Keys.CollapsedLibraryGroups].orEmpty() }.distinctUntilChanged()
 
+    /**
+     * The languages of an extension, each as [comicLanguageKey] gives it, whose sources the online
+     * search of comics leaves out. Every language is shown until the user switches one off. Which
+     * extensions are installed is up to each device, so this is no part of a backup either.
+     */
+    val hiddenComicLanguages: Flow<Set<String>> =
+        store.data.map { it[Keys.HiddenComicLanguages].orEmpty() }.distinctUntilChanged()
+
     /** Hours between the checks of followed comics for new chapters, or 0 for none. */
     val updateIntervalHours: Flow<Int> =
         store.data.map { it[Keys.UpdateIntervalHours] ?: DEFAULT_UPDATE_INTERVAL_HOURS }.distinctUntilChanged()
@@ -223,6 +231,15 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         store.edit { it[Keys.UpdateIntervalHours] = hours.coerceAtLeast(0) }
     }
 
+    /** Shows or leaves out the sources of the extension [packageName] in [language] ("en", "all"). */
+    suspend fun setComicLanguageShown(packageName: String, language: String, shown: Boolean) {
+        val key = comicLanguageKey(packageName, language)
+        store.edit { prefs ->
+            val now = prefs[Keys.HiddenComicLanguages].orEmpty()
+            prefs[Keys.HiddenComicLanguages] = if (shown) now - key else now + key
+        }
+    }
+
     suspend fun setLibraryDisplay(name: String) {
         store.edit { it[Keys.LibraryDisplay] = name }
     }
@@ -239,9 +256,13 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val CollapsedLibraryGroups = stringSetPreferencesKey("library_collapsed_groups")
         val DriveLink = stringPreferencesKey("drive_link")
         val UpdateIntervalHours = intPreferencesKey("update_interval_hours")
+        val HiddenComicLanguages = stringSetPreferencesKey("comic_hidden_languages")
     }
 
     companion object {
+        /** How a language of one extension is kept in [hiddenComicLanguages]. */
+        fun comicLanguageKey(packageName: String, language: String): String = "$packageName/$language"
+
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
         const val DEFAULT_UPDATE_INTERVAL_HOURS = 12
         private const val SEARCH_SOURCE = "source"

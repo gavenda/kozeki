@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -160,6 +162,7 @@ fun SettingsScreen(
         onClearCache = viewModel::clearCache,
         backupActions = backupActions,
         onRefreshExtensions = viewModel::refreshExtensions,
+        onSetComicLanguageShown = viewModel::setComicLanguageShown,
         onSetUpdateInterval = viewModel::setUpdateInterval,
         onAniListSignIn = viewModel::signInToAniList,
         onAniListSignOut = viewModel::signOutOfAniList,
@@ -181,6 +184,7 @@ fun SettingsContent(
     backupActions: BackupActions,
     modifier: Modifier = Modifier,
     onRefreshExtensions: () -> Unit = {},
+    onSetComicLanguageShown: (packageName: String, language: String, shown: Boolean) -> Unit = { _, _, _ -> },
     onSetUpdateInterval: (Int) -> Unit = {},
     onAniListSignIn: () -> Unit = {},
     onAniListSignOut: () -> Unit = {},
@@ -217,7 +221,12 @@ fun SettingsContent(
                 item(key = "source") {
                     Section(title = stringResource(R.string.settings_source_title)) {
                         HardcoverSetting(state, onSignIn, onSignOut, onDismissSignInError)
-                        ComicSourcesSetting(state.extensions, onRefreshExtensions)
+                        ComicSourcesSetting(
+                            extensions = state.extensions,
+                            hiddenLanguages = state.hiddenComicLanguages,
+                            onRefresh = onRefreshExtensions,
+                            onSetLanguageShown = onSetComicLanguageShown,
+                        )
                         UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
                     }
                 }
@@ -312,10 +321,13 @@ internal fun SettingRow(
     leading: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    // Less inside a container of its own that is already inset, so the text lines up with the rest.
+    horizontalPadding: Dp = 20.dp,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = horizontalPadding, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -326,7 +338,7 @@ internal fun SettingRow(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = subtitleColor,
                 )
             }
         }

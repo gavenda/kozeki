@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import androidx.core.content.ContextCompat
+import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.settings.SettingsRepository.Companion.comicLanguageKey
 import eu.kanade.tachiyomi.source.CatalogueSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -13,7 +15,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -23,7 +26,11 @@ import kotlin.time.Duration.Companion.milliseconds
  * The Mihon extensions installed on this device and the sources they provide. Nothing is loaded
  * until the first call that needs it, and the list follows apps being installed and removed after.
  */
-class ComicSources(private val context: Context, private val scope: CoroutineScope) {
+class ComicSources(
+    private val context: Context,
+    private val scope: CoroutineScope,
+    private val settings: SettingsRepository,
+) {
 
     private val loader = ExtensionLoader(context)
     private val loading = Mutex()
@@ -34,17 +41,29 @@ class ComicSources(private val context: Context, private val scope: CoroutineSco
     /** The installed extensions, or null until they have been looked for the first time. */
     val extensions: StateFlow<List<ComicExtension>?> = _extensions.asStateFlow()
 
-    /** Every source that can be searched, in the order of their extensions' names. Empty until loaded. */
-    val sources: Flow<List<CatalogueSource>> = _extensions.map { list ->
-        list.orEmpty().filterIsInstance<LoadedExtension>().flatMap { it.sources }
-    }
+    /**
+     * Every source that can be searched, in the order of their extensions' names, but for those in a
+     * language the user switched off for their extension. Empty until loaded.
+     */
+    val sources: Flow<List<CatalogueSource>> =
+        combine(_extensions, settings.hiddenComicLanguages) { list, hidden ->
+            list.orEmpty().filterIsInstance<LoadedExtension>().flatMap { extension ->
+                extension.sources.filter { comicLanguageKey(extension.packageName, it.lang) !in hidden }
+            }
+        }
+
+    /** The sources that can be searched now, as [sources] has them. */
+    suspend fun searchable(): List<CatalogueSource> = sources.first()
 
     /** Looks for extensions if that has not happened yet. */
     suspend fun ensureLoaded() {
         if (_extensions.value == null) refresh()
     }
 
-    /** The source with this ID, once extensions have loaded. Null when its extension is not installed. */
+    /**
+     * The source with this ID, once extensions have loaded. Null when its extension is not installed.
+     * A source in a language switched off is still found, so the comics already taken from it open.
+     */
     suspend fun get(sourceId: Long): CatalogueSource? {
         ensureLoaded()
         return _extensions.value.orEmpty()

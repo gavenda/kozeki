@@ -48,7 +48,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.gavenda.kozeki.R
-import dev.gavenda.kozeki.data.comic.ComicProvider
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.model.Acquisition
@@ -332,7 +331,6 @@ fun AddBookContent(
                                     trailingContent = owned?.let { book -> { OwnedBadge(book) } },
                                     // While picking, a tap on a name picks the row like the rest of it.
                                     onOpenAuthor = onOpenAuthor.takeIf { !selection.active },
-                                    sourceLabel = state.comicLabel(result),
                                     selected = result.sourceId in selection.ids,
                                     onLongClick = selection.onLongClick(result, owned = owned != null),
                                 )
@@ -358,13 +356,6 @@ fun AddBookContent(
         }
     }
 
-}
-
-/** The chip of the comic source [result] came from, when it is one of the sources listed. */
-private fun AddBookUiState.comicLabel(result: BookMetadata): String? {
-    if (result.source != MetadataSource.COMICS) return null
-    val id = ComicProvider.parseSourceId(result.sourceId)?.first ?: return null
-    return comicSources.firstOrNull { it.id == id }?.label
 }
 
 /** The sources to search, one of them picked: comic sources or book catalogues. Scrolls when there are many. */

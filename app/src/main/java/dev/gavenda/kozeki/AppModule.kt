@@ -170,7 +170,7 @@ fun appModule(app: Application) = module {
 
     single { JavaScriptEngine(app) }
 
-    single { ComicSources(app, get()) }
+    single { ComicSources(app, get(), get()) }
 
     single { ComicImages(get(), get()) }
 
