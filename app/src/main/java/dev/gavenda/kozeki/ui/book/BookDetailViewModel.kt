@@ -155,6 +155,9 @@ sealed interface BookDetailEvent {
 
     /** The picture picked as the cover could not be read. */
     data object CoverFailed : BookDetailEvent
+
+    /** A pull to refresh of a book's details could not reach its source. */
+    data class RefreshFailed(val error: LookupError) : BookDetailEvent
 }
 
 class BookDetailViewModel(
@@ -350,16 +353,24 @@ class BookDetailViewModel(
     fun retryChapters() = refreshChapters()
 
     /**
-     * Asks the source for the comic's details and chapters together, for a pull to refresh. What it
-     * says of the comic replaces what is kept; a failure shows as the chapters' error.
+     * Asks the source again, for a pull to refresh. A comic's details and chapters come together, and
+     * a failure shows as the chapters' error. A book linked to a catalogue has its details asked for
+     * past the cache, as the update check in Settings does, and its reviews too; a failure is an event.
+     * What the source says replaces what is kept.
      */
     fun refresh() {
         if (refreshing.value) return
-        chaptersJob?.cancel()
-        chaptersJob = viewModelScope.launch {
+        viewModelScope.launch {
             val book = library.observeBook(bookId).first() ?: return@launch
-            val sourceId = book.sourceId ?: return@launch
-            refreshing.value = true
+            if (book.isComic) refreshComic(book) else refreshDetails(book)
+        }
+    }
+
+    private fun refreshComic(book: Book) {
+        val sourceId = book.sourceId ?: return
+        chaptersJob?.cancel()
+        refreshing.value = true
+        chaptersJob = viewModelScope.launch {
             try {
                 val update = comicChapters.fetch(sourceId, book.title, book.sourceMemo, details = true)
                 update.details?.let { library.applyMetadata(bookId, it) }
@@ -377,6 +388,21 @@ class BookDetailViewModel(
             } finally {
                 refreshing.value = false
             }
+        }
+    }
+
+    private suspend fun refreshDetails(book: Book) {
+        val source = book.source?.takeIf { it in MetadataSource.matchable } ?: return
+        val sourceId = book.sourceId ?: return
+        refreshing.value = true
+        try {
+            // A book the source no longer has keeps what it was given before.
+            metadata.book(source, sourceId, fresh = true)?.let { library.applyMetadata(bookId, it) }
+            if (reviewed != null) loadReviews(fresh = true)
+        } catch (e: MetadataException) {
+            eventChannel.send(BookDetailEvent.RefreshFailed(LookupError.from(e)))
+        } finally {
+            refreshing.value = false
         }
     }
 
@@ -522,7 +548,7 @@ class BookDetailViewModel(
         return source to (sourceId ?: return null)
     }
 
-    private fun loadReviews() {
+    private fun loadReviews(fresh: Boolean = false) {
         reviewsJob?.cancel()
         val (source, sourceId) = reviewed ?: run {
             reviews.value = null
@@ -531,7 +557,7 @@ class BookDetailViewModel(
         reviewsJob = viewModelScope.launch {
             reviews.value = ReviewsUiState(loading = true)
             reviews.value = try {
-                ReviewsUiState(reviews = metadata.reviews(source, sourceId))
+                ReviewsUiState(reviews = metadata.reviews(source, sourceId, fresh))
             } catch (e: MetadataException) {
                 ReviewsUiState(error = LookupError.from(e))
             }

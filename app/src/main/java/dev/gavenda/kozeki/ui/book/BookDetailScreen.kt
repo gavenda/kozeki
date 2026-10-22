@@ -227,6 +227,8 @@ fun BookDetailScreen(
                 is BookDetailEvent.ImportFinished ->
                     snackbarHostState.showSnackbar(importMessage(resources, listOf(event.result)))
                 BookDetailEvent.CoverFailed -> snackbarHostState.showSnackbar(resources.getString(R.string.cover_failed))
+                is BookDetailEvent.RefreshFailed ->
+                    snackbarHostState.showSnackbar(resources.getString(event.error.message))
             }
         }
     }
@@ -513,12 +515,13 @@ fun BookDetailContent(
                     )
                 }
             }
-            // Only a comic of the user's own is asked of its source again by a pull.
+            // Only a book of the user's own is asked of its source again by a pull: a comic of its
+            // extension, any other of the catalogue it is linked to.
             val pullState = rememberPullToRefreshState()
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
                 onRefresh = actions.onRefresh,
-                enabled = owned && book.isComic && book.sourceId != null,
+                enabled = owned && book.sourceId != null && (book.isComic || book.source in MetadataSource.matchable),
                 state = pullState,
                 indicator = {
                     Box(

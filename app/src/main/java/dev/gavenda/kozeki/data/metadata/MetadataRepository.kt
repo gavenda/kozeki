@@ -100,9 +100,9 @@ class MetadataRepository(
             lifetime = { if (it.name == null) EMPTY_TTL else AUTHOR_TTL },
         ) { provider(source).series(name) }
 
-    /** What the readers of [source] think of the book with [sourceId]. */
-    suspend fun reviews(source: MetadataSource, sourceId: String): BookReviews =
-        cached(source, "reviews|$sourceId", BookReviews.serializer(), { REVIEWS_TTL }) {
+    /** What the readers of [source] think of the book with [sourceId]. [fresh] asks past the cache. */
+    suspend fun reviews(source: MetadataSource, sourceId: String, fresh: Boolean = false): BookReviews =
+        cached(source, "reviews|$sourceId", BookReviews.serializer(), { REVIEWS_TTL }, fresh) {
             provider(source).reviews(sourceId)
         }
 
