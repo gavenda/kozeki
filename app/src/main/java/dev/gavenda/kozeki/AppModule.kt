@@ -21,6 +21,8 @@ import dev.gavenda.kozeki.data.comic.ComicPages
 import dev.gavenda.kozeki.data.comic.ComicReaderPreferences
 import dev.gavenda.kozeki.data.comic.ComicProvider
 import dev.gavenda.kozeki.data.comic.ComicSources
+import dev.gavenda.kozeki.data.comic.repo.ExtensionInstaller
+import dev.gavenda.kozeki.data.comic.repo.ExtensionRepos
 import dev.gavenda.kozeki.data.metadata.CoverDownloader
 import dev.gavenda.kozeki.data.metadata.MatchService
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -194,6 +196,10 @@ fun appModule(app: Application) = module {
     single { JavaScriptEngine(app) }
 
     single { ComicSources(app, get(), get()) }
+
+    single { ExtensionRepos(get(), get(), get(), get()) }
+
+    single { ExtensionInstaller(app, get(), get(), get()) }
 
     single { ComicImages(get(), get()) }
 

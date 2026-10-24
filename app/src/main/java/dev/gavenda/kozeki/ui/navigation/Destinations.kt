@@ -49,6 +49,13 @@ data object DownloadQueueRoute : NavKey
 data object SettingsRoute : NavKey
 
 /**
+ * The repositories Mihon extensions are installed from, reached from Settings or a website's link.
+ * [addUrl] is a repository from such a link, shown in the add dialog to be confirmed.
+ */
+@Serializable
+data class ExtensionReposRoute(val addUrl: String? = null) : NavKey
+
+/**
  * A book found on a metadata source that is not among the user's own yet. [metadata] is the whole
  * [dev.gavenda.kozeki.data.metadata.BookMetadata] as JSON, since nothing is stored to look it up from.
  */

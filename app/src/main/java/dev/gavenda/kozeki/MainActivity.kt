@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity(), KoinComponent {
     /** Taps on the download notification, each asking for the download queue. */
     private val openDownloads = Channel<Unit>(Channel.CONFLATED)
 
+    /** Repository URLs from a website's add-repository link, each to be confirmed in the add dialog. */
+    private val addRepos = Channel<String>(Channel.CONFLATED)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -58,7 +61,7 @@ class MainActivity : ComponentActivity(), KoinComponent {
                 enableEdgeToEdge()
             }
             AppTheme {
-                KozekiApp(incomingEpubs, openDownloads.receiveAsFlow())
+                KozekiApp(incomingEpubs, openDownloads.receiveAsFlow(), addRepos.receiveAsFlow())
             }
         }
     }
@@ -86,6 +89,17 @@ class MainActivity : ComponentActivity(), KoinComponent {
         handleRedirect(intent)
         receiveEpubs(intent)
         if (intent?.action == DownloadWorker.ACTION_OPEN_QUEUE) openDownloads.trySend(Unit)
+        receiveRepoLink(intent)
+    }
+
+    /** A website's link to add a repository of extensions, as Mihon takes them: `mihon://extension-store?url=…`. */
+    private fun receiveRepoLink(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        // The recents screen can replay the link the app was first opened with.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        val uri = intent.data ?: return
+        if (uri.scheme != "mihon" || uri.host != "extension-store") return
+        uri.getQueryParameter("url")?.takeIf { it.isNotBlank() }?.let { addRepos.trySend(it) }
     }
 
     /** Hardcover sends the browser back here once the user has approved or denied the sign-in. */

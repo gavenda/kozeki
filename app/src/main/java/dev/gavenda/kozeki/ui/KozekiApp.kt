@@ -61,9 +61,11 @@ import dev.gavenda.kozeki.ui.navigation.BookFormRoute
 import dev.gavenda.kozeki.ui.navigation.ComicReaderRoute
 import dev.gavenda.kozeki.ui.navigation.ReaderRoute
 import dev.gavenda.kozeki.ui.navigation.SettingsRoute
+import dev.gavenda.kozeki.ui.navigation.ExtensionReposRoute
 import dev.gavenda.kozeki.ui.navigation.StatisticsRoute
 import dev.gavenda.kozeki.ui.navigation.TopLevelDestination
 import dev.gavenda.kozeki.ui.reader.ReaderScreen
+import dev.gavenda.kozeki.ui.settings.ExtensionReposScreen
 import dev.gavenda.kozeki.ui.settings.SettingsScreen
 import dev.gavenda.kozeki.ui.statistics.StatisticsScreen
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -75,7 +77,11 @@ import kotlinx.serialization.json.Json
 
 /** The whole app: the navigation frame around the back stack of screens. */
 @Composable
-fun KozekiApp(incomingEpubs: IncomingEpubs, openDownloads: Flow<Unit> = emptyFlow()) {
+fun KozekiApp(
+    incomingEpubs: IncomingEpubs,
+    openDownloads: Flow<Unit> = emptyFlow(),
+    addRepos: Flow<String> = emptyFlow(),
+) {
     // Kept across process death, like the rest of the saved state.
     val backStack = rememberNavBackStack(LibraryRoute)
     val topLevel = TopLevelDestination.entries.firstOrNull { it.route == backStack.last() }
@@ -87,6 +93,15 @@ fun KozekiApp(incomingEpubs: IncomingEpubs, openDownloads: Flow<Unit> = emptyFlo
     LaunchedEffect(backStack, openDownloads) {
         openDownloads.collect {
             if (backStack.lastOrNull() != DownloadQueueRoute) backStack.add(DownloadQueueRoute)
+        }
+    }
+
+    // A website's link to add a repository opens its screen over whatever was showing, with the
+    // add dialog asking about it. One already on top gives way, so Back does not lead to a stale one.
+    LaunchedEffect(backStack, addRepos) {
+        addRepos.collect { url ->
+            if (backStack.lastOrNull() is ExtensionReposRoute) backStack.removeAt(backStack.lastIndex)
+            backStack.add(ExtensionReposRoute(addUrl = url))
         }
     }
 
@@ -208,7 +223,11 @@ fun KozekiApp(incomingEpubs: IncomingEpubs, openDownloads: Flow<Unit> = emptyFlo
                 }
                 entry<SettingsRoute> {
                     val nav = rememberEntryNavigator(backStack)
-                    SettingsScreen(onBack = nav::back)
+                    SettingsScreen(onBack = nav::back, onOpenExtensionRepos = { nav.open(ExtensionReposRoute()) })
+                }
+                entry<ExtensionReposRoute> { route ->
+                    val nav = rememberEntryNavigator(backStack)
+                    ExtensionReposScreen(onBack = nav::back, addUrl = route.addUrl)
                 }
                 entry<BookRoute> { route ->
                     val nav = rememberEntryNavigator(backStack)

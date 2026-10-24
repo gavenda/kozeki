@@ -13,6 +13,10 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- Installing and removing Mihon extensions from the repositories added in Settings. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
     <!-- The notifications of chapter downloads and update checks, which keep long runs going. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -60,6 +64,18 @@
                     android:host="${aniListRedirectHost}"
                     android:path="${aniListRedirectPath}"
                     android:scheme="${aniListRedirectScheme}" />
+            </intent-filter>
+
+            <!--
+               A website's link to add a repository of Mihon extensions (Mihon's own scheme), which
+               opens the add dialog with its URL filled in.
+            -->
+            <intent-filter android:label="@string/extension_repos_add">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mihon" />
+                <data android:host="extension-store" />
             </intent-filter>
 
             <!-- Opening an EPUB from another app, such as a file manager or a browser's downloads. -->
@@ -115,6 +131,11 @@
 
         <activity
             android:name=".ui.settings.SourcePreferencesActivity"
+            android:exported="false" />
+
+        <!-- The package installer's answers about extensions being installed. -->
+        <receiver
+            android:name=".data.comic.repo.ExtensionInstallReceiver"
             android:exported="false" />
 
         <!-- WorkManager's foreground service, run by chapter downloads and update checks. -->

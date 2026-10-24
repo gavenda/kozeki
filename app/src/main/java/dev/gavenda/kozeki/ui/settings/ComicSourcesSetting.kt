@@ -243,7 +243,7 @@ private val InsetRowPadding = 12.dp
 
 /** A Mihon language tag ("en", "pt-BR", "all") as a name to read, in the device's language. */
 @Composable
-private fun languageName(language: String): String = when (language) {
+internal fun languageName(language: String): String = when (language) {
     "all" -> stringResource(R.string.settings_comic_language_all)
     "other" -> stringResource(R.string.settings_comic_language_other)
     else -> {

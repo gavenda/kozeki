@@ -123,6 +123,7 @@ private val ABOUT_PORTRAIT_WIDTH = 96.dp
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenExtensionRepos: () -> Unit = {},
     viewModel: SettingsViewModel = koinViewModel { settingsViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -230,6 +231,7 @@ fun SettingsScreen(
         onAniListSignOut = viewModel::signOutOfAniList,
         onDismissAniListError = viewModel::dismissAniListError,
         onCheckForAppUpdate = viewModel::checkForAppUpdate,
+        onOpenExtensionRepos = onOpenExtensionRepos,
     )
 }
 
@@ -257,6 +259,7 @@ fun SettingsContent(
     onAniListSignOut: () -> Unit = {},
     onDismissAniListError: () -> Unit = {},
     onCheckForAppUpdate: () -> Unit = {},
+    onOpenExtensionRepos: () -> Unit = {},
 ) {
     // The bar takes the surface container once the page scrolls under it, as the library's does.
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -301,6 +304,20 @@ fun SettingsContent(
                                 hiddenLanguages = state.hiddenComicLanguages,
                                 onRefresh = onRefreshExtensions,
                                 onSetLanguageShown = onSetComicLanguageShown,
+                            )
+                            SettingRow(
+                                icon = painterResource(R.drawable.extension_48px),
+                                title = stringResource(R.string.settings_extension_repos_title),
+                                subtitle = if (state.extensionRepoCount > 0) {
+                                    pluralStringResource(
+                                        R.plurals.settings_extension_repos_count,
+                                        state.extensionRepoCount,
+                                        state.extensionRepoCount,
+                                    )
+                                } else {
+                                    stringResource(R.string.settings_extension_repos_none)
+                                },
+                                modifier = Modifier.clickable(role = Role.Button, onClick = onOpenExtensionRepos),
                             )
                             UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
                             SettingRow(
@@ -440,7 +457,7 @@ internal fun SplitSection(title: String, content: @Composable ColumnScope.() -> 
 }
 
 @Composable
-private fun SectionTitle(title: String) {
+internal fun SectionTitle(title: String) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,

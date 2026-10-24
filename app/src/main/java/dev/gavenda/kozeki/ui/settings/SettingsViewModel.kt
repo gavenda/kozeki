@@ -53,6 +53,8 @@ data class SettingsUiState(
     val extensions: List<ComicExtension>? = null,
     /** The languages of extensions switched off, as [SettingsRepository.comicLanguageKey] gives them. */
     val hiddenComicLanguages: Set<String> = emptySet(),
+    /** How many repositories of extensions have been added. */
+    val extensionRepoCount: Int = 0,
     /** Hours between the checks of followed comics for new chapters, 0 being never. */
     val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
     /** A comic's chapter is downloaded when it is opened. */
@@ -159,6 +161,7 @@ class SettingsViewModel(
         .combine(settings.downloadWhileReading) { state, on -> state.copy(downloadWhileReading = on) }
         .combine(comicPages.temporaryBytes) { state, bytes -> state.copy(temporaryPagesBytes = bytes) }
         .combine(settings.temporaryPagesMegabytes) { state, megabytes -> state.copy(temporaryPagesMegabytes = megabytes) }
+        .combine(settings.extensionRepos) { state, repos -> state.copy(extensionRepoCount = repos.size) }
         .stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),

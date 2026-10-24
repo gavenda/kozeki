@@ -118,6 +118,31 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
     val hiddenComicLanguages: Flow<Set<String>> =
         store.data.map { it[Keys.HiddenComicLanguages].orEmpty() }.distinctUntilChanged()
 
+    /**
+     * The index URLs of the repositories of Mihon extensions the user added, in the order added.
+     * Kept on this device only, as the extensions themselves are.
+     */
+    val extensionRepos: Flow<List<String>> = store.data
+        .map { prefs ->
+            prefs[Keys.ExtensionRepos]
+                ?.let { runCatching { json.decodeFromString<List<String>>(it) }.getOrNull() }
+                .orEmpty()
+        }
+        .distinctUntilChanged()
+
+    suspend fun addExtensionRepo(url: String) = editExtensionRepos { if (url in it) it else it + url }
+
+    suspend fun removeExtensionRepo(url: String) = editExtensionRepos { it - url }
+
+    private suspend fun editExtensionRepos(change: (List<String>) -> List<String>) {
+        store.edit { prefs ->
+            val now = prefs[Keys.ExtensionRepos]
+                ?.let { runCatching { json.decodeFromString<List<String>>(it) }.getOrNull() }
+                .orEmpty()
+            prefs[Keys.ExtensionRepos] = json.encodeToString(change(now))
+        }
+    }
+
     /** Hours between the checks of followed comics for new chapters, or 0 for none. */
     val updateIntervalHours: Flow<Int> =
         store.data.map { it[Keys.UpdateIntervalHours] ?: DEFAULT_UPDATE_INTERVAL_HOURS }.distinctUntilChanged()
@@ -319,6 +344,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         val LocalBackup = stringPreferencesKey("local_backup")
         val UpdateIntervalHours = intPreferencesKey("update_interval_hours")
         val HiddenComicLanguages = stringSetPreferencesKey("comic_hidden_languages")
+        val ExtensionRepos = stringPreferencesKey("comic_extension_repos")
     }
 
     companion object {

@@ -20,6 +20,7 @@ import dev.gavenda.kozeki.ui.library.LibraryViewModel
 import dev.gavenda.kozeki.ui.comic.ComicReaderViewModel
 import dev.gavenda.kozeki.ui.reader.ReaderViewModel
 import dev.gavenda.kozeki.ui.search.SearchViewModel
+import dev.gavenda.kozeki.ui.settings.ExtensionReposViewModel
 import dev.gavenda.kozeki.ui.settings.SettingsViewModel
 import dev.gavenda.kozeki.ui.statistics.StatisticsViewModel
 import java.time.LocalDate
@@ -47,6 +48,8 @@ fun authorViewModel(authorId: String, name: String) = AuthorViewModel(authorId, 
 fun seriesViewModel(name: String) = SeriesViewModel(name, koin.get(), koin.get())
 
 fun downloadQueueViewModel() = DownloadQueueViewModel(koin.get(), koin.get())
+
+fun extensionReposViewModel() = ExtensionReposViewModel(koin.get(), koin.get(), koin.get())
 
 fun searchViewModel() = SearchViewModel(koin.get())
 
