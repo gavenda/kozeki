@@ -75,7 +75,7 @@
     <string name="library_imported_epub">Imported EPUB</string>
     <string name="selection_select">Select</string>
     <string name="settings_updates_title">Check for new chapters</string>
-    <string name="settings_updates_description">How often followed comics are asked for new chapters, while the app is closed</string>
+    <string name="settings_updates_description">How often to check followed comics</string>
     <string name="settings_updates_off">Off</string>
     <string name="settings_updates_hours">%1$d h</string>
     <string name="update_check_title">Checking for new chapters</string>
@@ -86,8 +86,8 @@
     </plurals>
     <string name="update_check_up_to_date">Already up to date</string>
     <plurals name="update_check_skipped">
-        <item quantity="one">%1$d more not due yet, left for later</item>
-        <item quantity="other">%1$d more not due yet, left for later</item>
+        <item quantity="one">%1$d more not due yet</item>
+        <item quantity="other">%1$d more not due yet</item>
     </plurals>
     <string name="metadata_refresh_title">Refreshing book details</string>
     <plurals name="metadata_refresh_count">
@@ -95,8 +95,8 @@
         <item quantity="other">%1$d of %2$d books</item>
     </plurals>
     <plurals name="metadata_refresh_skipped">
-        <item quantity="one">%1$d more not linked to a source, left as it is</item>
-        <item quantity="other">%1$d more not linked to a source, left as they are</item>
+        <item quantity="one">%1$d more not linked to a source</item>
+        <item quantity="other">%1$d more not linked to a source</item>
     </plurals>
     <!-- Over the lookup of books just imported. -->
     <string name="lookup_title">Looking up new books</string>
@@ -142,7 +142,7 @@
     <string name="import_attached">Added the EPUB to “%1$s”</string>
     <string name="import_duplicate">“%1$s” is already in your library</string>
     <string name="import_failed_not_epub">That file is not a readable EPUB</string>
-    <string name="import_failed_protected">That EPUB is protected by DRM and cannot be opened</string>
+    <string name="import_failed_protected">That EPUB is DRM-protected</string>
     <string name="import_failed_unreadable">The file could not be read</string>
     <plurals name="import_summary">
         <item quantity="one">Imported %1$d of %2$d files.</item>
@@ -183,7 +183,7 @@
     <string name="comic_mark_read">Mark as read</string>
     <string name="comic_mark_unread">Mark as unread</string>
     <string name="track_title">Tracking</string>
-    <string name="track_add">Keep track of this comic on AniList</string>
+    <string name="track_add">Track on AniList</string>
     <string name="track_sheet_title">Find it on AniList</string>
     <string name="track_chapters_total">%1$d chapters</string>
     <string name="track_already_listed">On your list</string>
@@ -202,7 +202,7 @@
     <string name="track_progress_more">One chapter more</string>
     <string name="track_score">Score</string>
     <string name="track_score_none">None</string>
-    <string name="track_pending">AniList could not be reached. I will tell it when I can.</string>
+    <string name="track_pending">AniList could not be reached.</string>
     <string name="track_open">Open on AniList</string>
     <string name="track_stop">Stop tracking</string>
     <string name="track_remove">Remove from my list</string>
@@ -234,12 +234,12 @@
     <string name="downloads_more_actions">More options</string>
     <string name="downloads_chapter_actions">Chapter options</string>
     <string name="downloads_empty_title">Nothing to fetch</string>
-    <string name="downloads_empty_message">I\'m not fetching any chapters. Ask for some from a comic\'s page and I\'ll keep them here for reading without the source.</string>
-    <string name="comic_reader_chapter_missing">This chapter is no longer listed by its source.</string>
+    <string name="downloads_empty_message">I\'m not fetching any chapters. Ask for some from a comic\'s page.</string>
+    <string name="comic_reader_chapter_missing">This chapter is gone.</string>
     <string name="comic_reader_page_description">Page %1$d</string>
     <string name="comic_reader_page_failed">This page could not be loaded.</string>
-    <string name="comic_reader_end_latest">That is the latest chapter the source has.</string>
-    <string name="comic_reader_end_back">Back to the book</string>
+    <string name="comic_reader_end_latest">This is the last chapter</string>
+    <string name="comic_reader_end_back">Back</string>
     <string name="comic_reader_start_first">This is the first chapter</string>
     <string name="comic_reader_mode">Reading mode</string>
     <string name="comic_reader_previous_chapter">Previous chapter</string>
@@ -269,7 +269,7 @@
         <item quantity="other">The %1$d pages read in it will be removed from your timeline. This cannot be undone.</item>
     </plurals>
     <string name="book_about">Synopsis</string>
-    <string name="book_no_details">No details yet. Have Ui look this book up in the catalogue to fill them in.</string>
+    <string name="book_no_details">No details yet. Look it up in the catalogue.</string>
     <string name="book_view_on_source">View on %1$s</string>
     <string name="book_view_in_browser">Open in browser</string>
     <string name="detail_publisher">Publisher</string>
@@ -352,24 +352,24 @@
     <string name="match_choose">Choose match</string>
     <string name="match_search">Search</string>
     <string name="match_pending_title">Details not looked up yet</string>
-    <string name="match_pending_message">Ui will look this book up once you are online and signed in to Hardcover. Until then, the book goes by what the EPUB says about itself.</string>
+    <string name="match_pending_message">Ui will look this book up once you are online and signed in to Hardcover.</string>
     <string name="match_in_progress_title">Looking up details…</string>
-    <string name="match_in_progress_message">Ui is finding this book on Hardcover. Until then, the book goes by what the EPUB says about itself.</string>
+    <string name="match_in_progress_message">Ui is finding this book on Hardcover.</string>
     <string name="match_review_title">Confirm the match</string>
     <string name="match_review_message">Several books could be this one. Pick the right one to fill in its details.</string>
     <string name="match_not_found_title">No match found</string>
-    <string name="match_not_found_message">The catalogue has no book with this title and author. You can search with different words.</string>
+    <string name="match_not_found_message">You can search with different words.</string>
     <string name="search_hint">Title, author or ISBN</string>
     <string name="search_no_results">No books found.</string>
-    <string name="lookup_error_offline">The catalogue cannot be reached while you are offline. What was looked up before is still here.</string>
-    <string name="lookup_error_rate_limited">The catalogue\'s request limit has been reached. Try again later.</string>
+    <string name="lookup_error_offline">You are offline.</string>
+    <string name="lookup_error_rate_limited">Too many lookups. Try again later.</string>
     <string name="lookup_error_signed_out">Sign in to this catalogue in Settings first.</string>
     <string name="lookup_error_unauthorized">The catalogue rejected the request. Sign in again in Settings.</string>
-    <string name="lookup_error_not_configured">Google Books needs an API key, and this build of Kozeki was made without one.</string>
-    <string name="lookup_error_key_rejected">Google Books refused the API key this build of Kozeki was made with.</string>
-    <string name="lookup_error_missing_permission">Kozeki has not been given access to this yet. Sign out of Hardcover in Settings and sign in again to allow it.</string>
-    <string name="lookup_error_no_extensions">No comic source is installed on this device. Install a Mihon extension and its sources show up here.</string>
-    <string name="lookup_error_captcha">The site wants a captcha solved before it answers. Open it in a WebView, solve it, then try again.</string>
+    <string name="lookup_error_not_configured">This build has no Google Books API key.</string>
+    <string name="lookup_error_key_rejected">Google Books rejected this build\'s API key.</string>
+    <string name="lookup_error_missing_permission">Sign in to Hardcover again in Settings to allow this.</string>
+    <string name="lookup_error_no_extensions">No comic source installed. Install a Mihon extension.</string>
+    <string name="lookup_error_captcha">The site wants a captcha solved. Open it in a WebView.</string>
     <string name="captcha_title">Solve the captcha</string>
     <string name="captcha_done">Done</string>
     <string name="captcha_continue">Continue</string>
@@ -439,9 +439,9 @@
     <!-- Search -->
     <string name="search_books_hint">Search your books</string>
     <string name="search_comics_hint">Search your comics</string>
-    <string name="search_books_prompt">Which one are you after? Give me a title or an author and I\'ll look through your library, wishlist and purchases.</string>
+    <string name="search_books_prompt">Which one are you after? Give me a title or an author and I\'ll look through your library.</string>
     <string name="search_books_no_results_title">Not in your library</string>
-    <string name="search_books_no_results">I looked through your library, wishlist and purchases. Nothing matches “%1$s”.</string>
+    <string name="search_books_no_results">Nothing matches “%1$s”.</string>
     <string name="search_clear">Clear search</string>
     <string name="search_group_count">%1$s · %2$d</string>
 
@@ -452,7 +452,7 @@
     <string name="add_book_search_books">Search books</string>
     <string name="add_book_search_comics">Search comics</string>
     <string name="add_book_prompt_title">Ask for a book</string>
-    <string name="add_book_prompt_message">Was there something you needed? Give me a title, an author or an ISBN and I\'ll look it up. I keep what I find on this device, so asking twice costs nothing.</string>
+    <string name="add_book_prompt_message">Was there something you needed? Give me a title, an author or an ISBN and I\'ll look it up.</string>
     <string name="browse_lists">Lists</string>
     <string name="browse_trending_week">Trending this week</string>
     <string name="browse_trending_month">Popular this month</string>
@@ -475,7 +475,7 @@
     <string name="manual_book_title">Add manually</string>
     <string name="book_form_edit_title">Edit details</string>
     <string name="book_form_discard_changes">Discard changes?</string>
-    <string name="book_form_discard_changes_message">The details you changed are not saved. The book stays as it was.</string>
+    <string name="book_form_discard_changes_message">The details you changed are not saved.</string>
     <string name="book_form_discard_book_message">The details you changed are not saved. The book is not added to your library.</string>
     <string name="book_form_discard">Discard</string>
     <string name="book_form_keep_editing">Keep editing</string>
@@ -509,7 +509,7 @@
     <string name="series_error_title">S-Sorry. I can\'t fetch this series right now.</string>
     <string name="series_not_found_title">Series unavailable</string>
     <string name="series_not_found">Huh…? Hardcover has no page for this series.</string>
-    <string name="series_end_bubble">That\'s every book in this series, and each one is already in the library. The set is complete!</string>
+    <string name="series_end_bubble">That\'s every book in this series, and each one is already in the library. The set is complete.</string>
     <string name="action_open_series">Open series</string>
 
     <!-- Calendar -->
@@ -609,8 +609,8 @@
     <string name="settings_hardcover_sign_out">Sign out</string>
     <string name="settings_hardcover_sign_out_title">Sign out of Hardcover?</string>
     <string name="settings_hardcover_sign_out_message">Hardcover lookups stop until you sign in again.</string>
-    <string name="settings_hardcover_denied">Access was declined on Hardcover, so nothing was connected</string>
-    <string name="settings_hardcover_rejected">Hardcover did not accept the sign-in. Contact the developer.</string>
+    <string name="settings_hardcover_denied">Access was declined on Hardcover</string>
+    <string name="settings_hardcover_rejected">Hardcover did not accept the sign-in.</string>
     <string name="settings_appearance_title">Appearance</string>
     <string name="settings_display_mode">Display mode</string>
     <string name="settings_display_mode_description">Change how the application looks</string>
@@ -626,7 +626,7 @@
     <string name="settings_goal_increase">One more</string>
     <string name="settings_backup_title">Backup</string>
     <string name="settings_drive">Google Drive</string>
-    <string name="settings_drive_signed_out">Tap to sign in and keep a copy of your library there</string>
+    <string name="settings_drive_signed_out">Tap to sign in</string>
     <string name="settings_drive_sign_in">Sign in</string>
     <string name="settings_drive_sign_out">Sign out</string>
     <string name="settings_drive_sign_out_title">Sign out of Google Drive?</string>
@@ -659,8 +659,8 @@
         <item quantity="other">%1$d of them are without their EPUBs. Import the files again and each goes back to its book.</item>
     </plurals>
     <string name="settings_backup_error_offline">Google Drive cannot be reached. Check the connection and try again.</string>
-    <string name="settings_backup_error_sign_in">Google did not accept the sign-in (code %1$s). Contact the developer.</string>
-    <string name="settings_backup_error_refused">Google Drive refused the request (%1$s). Contact the developer.</string>
+    <string name="settings_backup_error_sign_in">Google did not accept the sign-in (code %1$s).</string>
+    <string name="settings_backup_error_refused">Google Drive refused the request (%1$s).</string>
     <string name="settings_backup_error_none">There is no backup on this account.</string>
     <string name="settings_backup_error_unreadable">The backup on Google Drive cannot be read.</string>
     <string name="settings_backup_error_too_new">This backup is from a newer version. Update the app.</string>
@@ -674,8 +674,8 @@
     <string name="settings_cache_clear">Clear</string>
     <string name="source_anilist">AniList</string>
     <string name="settings_tracking_title">Tracking</string>
-    <string name="settings_anilist_signed_out">Tap to sign in, and I will keep your comics in step with your list there</string>
-    <string name="settings_anilist_denied">Access was declined on AniList, so nothing was connected</string>
+    <string name="settings_anilist_signed_out">Tap to sign in to enable tracking</string>
+    <string name="settings_anilist_denied">Access was declined on AniList</string>
     <string name="settings_anilist_rejected">AniList rejected the sign-in.</string>
     <string name="settings_anilist_sign_out_title">Sign out of AniList?</string>
     <string name="settings_anilist_sign_out_message">Chapters stop syncing to AniList until you sign in again.</string>
@@ -700,7 +700,7 @@
     <string name="settings_comic_language_other">Other</string>
     <string name="settings_comic_source_settings">Source settings</string>
     <string name="settings_comic_broken_lib">Built for extension library %1$s. Only 1.6 is used.</string>
-    <string name="settings_comic_broken_lib_unknown">Does not say which extension library it was built for. Only 1.6 is used.</string>
+    <string name="settings_comic_broken_lib_unknown">Doesn\'t say its extension library. Only 1.6 is used.</string>
     <string name="settings_comic_broken_malformed">Its package is missing what an extension needs.</string>
     <string name="settings_comic_broken_failed">Could not be loaded: %1$s</string>
     <string name="settings_about_version">Kozeki %1$s</string>

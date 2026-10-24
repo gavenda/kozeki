@@ -126,7 +126,7 @@ Inside the app her portrait is in four kinds of place and nowhere else: wherever
 
 **The update sheet.** When a pull to refresh among the comics finds none due for new chapters, the sheet titled "Already up to date" shows her `HAPPY` face at 96dp where the tick would be, with no line under it and no speech bubble, then Close.
 
-**Ends of content.** Her face at 96dp with a speech bubble beside it, centred, the bubble no wider than 360dp: after the last book in the library (`CONTENT`, a different line for comics), at the foot of the manual book form, and on a series' page when every book in this series is already in the library (`HAPPY`, "The set is complete!"). The bubble is drawn by `SpeechBubble`, its tail pointing back at her.
+**Ends of content.** Her face at 96dp with a speech bubble beside it, centred, the bubble no wider than 360dp: after the last book in the library (`CONTENT`, a different line for comics), at the foot of the manual book form, and on a series' page when every book in this series is already in the library (`HAPPY`, "The set is complete."). The bubble is drawn by `SpeechBubble`, its tail pointing back at her.
 
 Eleven faces are cut, and a new empty state picks from them first. The source number is the `<n>` of `branding/expressions/Ui_Portrait_Expression_<n>.webp`.
 
