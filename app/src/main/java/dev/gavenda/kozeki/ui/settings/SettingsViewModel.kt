@@ -9,6 +9,7 @@ import dev.gavenda.kozeki.data.backup.drive.DriveBackupState
 import dev.gavenda.kozeki.data.backup.local.LocalBackup
 import dev.gavenda.kozeki.data.backup.local.LocalBackupState
 import dev.gavenda.kozeki.data.comic.ComicExtension
+import dev.gavenda.kozeki.data.comic.ComicPages
 import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
@@ -54,6 +55,12 @@ data class SettingsUiState(
     val hiddenComicLanguages: Set<String> = emptySet(),
     /** Hours between the checks of followed comics for new chapters, 0 being never. */
     val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
+    /** A comic's chapter is downloaded when it is opened. */
+    val downloadWhileReading: Boolean = true,
+    /** How much the pages of chapters read without downloading take up, in bytes. */
+    val temporaryPagesBytes: Long = 0,
+    /** How many megabytes they may take up before the oldest go. */
+    val temporaryPagesMegabytes: Int = SettingsRepository.DEFAULT_TEMPORARY_PAGES_MB,
     val versionName: String = "",
     val appUpdate: AppUpdateState = AppUpdateState.Idle,
     /** Today is Ui's birthday. */
@@ -96,6 +103,7 @@ class SettingsViewModel(
     private val driveBackup: DriveBackup,
     private val localBackup: LocalBackup,
     private val comicSources: ComicSources,
+    private val comicPages: ComicPages,
     private val appUpdates: AppUpdates,
     versionName: String,
     clock: Clock,
@@ -147,7 +155,11 @@ class SettingsViewModel(
             versionName = versionName,
             birthday = isUiBirthday(today),
         )
-    }.combine(appUpdates.state) { state, update -> state.copy(appUpdate = update) }.stateIn(
+    }.combine(appUpdates.state) { state, update -> state.copy(appUpdate = update) }
+        .combine(settings.downloadWhileReading) { state, on -> state.copy(downloadWhileReading = on) }
+        .combine(comicPages.temporaryBytes) { state, bytes -> state.copy(temporaryPagesBytes = bytes) }
+        .combine(settings.temporaryPagesMegabytes) { state, megabytes -> state.copy(temporaryPagesMegabytes = megabytes) }
+        .stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         SettingsUiState(
@@ -250,6 +262,10 @@ class SettingsViewModel(
         viewModelScope.launch { settings.setUpdateIntervalHours(hours) }
     }
 
+    fun setDownloadWhileReading(on: Boolean) {
+        viewModelScope.launch { settings.setDownloadWhileReading(on) }
+    }
+
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch { settings.setThemeMode(mode) }
     }
@@ -264,5 +280,13 @@ class SettingsViewModel(
 
     fun clearCache() {
         viewModelScope.launch { metadata.clearCache() }
+    }
+
+    fun clearTemporaryPages() {
+        viewModelScope.launch { comicPages.clearTemporary() }
+    }
+
+    fun setTemporaryPagesLimit(megabytes: Int) {
+        viewModelScope.launch { settings.setTemporaryPagesMegabytes(megabytes) }
     }
 }

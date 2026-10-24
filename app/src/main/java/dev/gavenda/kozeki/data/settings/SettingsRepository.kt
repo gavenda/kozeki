@@ -122,6 +122,14 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
     val updateIntervalHours: Flow<Int> =
         store.data.map { it[Keys.UpdateIntervalHours] ?: DEFAULT_UPDATE_INTERVAL_HOURS }.distinctUntilChanged()
 
+    /** Whether a comic's chapter is downloaded when it is opened, rather than only read from its source. On until switched off. */
+    val downloadWhileReading: Flow<Boolean> =
+        store.data.map { it[Keys.DownloadWhileReading] ?: true }.distinctUntilChanged()
+
+    /** How many megabytes the pages of chapters read without downloading may take up before the oldest go. */
+    val temporaryPagesMegabytes: Flow<Int> =
+        store.data.map { it[Keys.TemporaryPagesMegabytes] ?: DEFAULT_TEMPORARY_PAGES_MB }.distinctUntilChanged()
+
     // Opened here, ahead of its first use, so that reading it later does not wait for the disk.
     private val searchPreferences = context.applicationContext.getSharedPreferences("search", Context.MODE_PRIVATE)
 
@@ -269,6 +277,14 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         store.edit { it[Keys.UpdateIntervalHours] = hours.coerceAtLeast(0) }
     }
 
+    suspend fun setTemporaryPagesMegabytes(megabytes: Int) {
+        store.edit { it[Keys.TemporaryPagesMegabytes] = megabytes.coerceAtLeast(1) }
+    }
+
+    suspend fun setDownloadWhileReading(on: Boolean) {
+        store.edit { it[Keys.DownloadWhileReading] = on }
+    }
+
     /** Shows or leaves out the sources of the extension [packageName] in [language] ("en", "all"). */
     suspend fun setComicLanguageShown(packageName: String, language: String, shown: Boolean) {
         val key = comicLanguageKey(packageName, language)
@@ -293,6 +309,8 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         val LastCurrency = stringPreferencesKey("last_currency")
         val LibrarySort = stringPreferencesKey("library_sort")
         val LibrarySortReversed = booleanPreferencesKey("library_sort_reversed")
+        val DownloadWhileReading = booleanPreferencesKey("comic_download_while_reading")
+        val TemporaryPagesMegabytes = intPreferencesKey("comic_temporary_pages_mb")
         val LibraryDisplay = stringPreferencesKey("library_display")
         val SearchDisplay = stringPreferencesKey("search_display")
         val LibraryKind = stringPreferencesKey("library_kind")
@@ -309,6 +327,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
 
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
         const val DEFAULT_UPDATE_INTERVAL_HOURS = 12
+        const val DEFAULT_TEMPORARY_PAGES_MB = 250
         private const val SEARCH_SOURCE = "source"
         private const val COMIC_SOURCE = "comic_source"
         private const val BOOK_SOURCE = "book_source"

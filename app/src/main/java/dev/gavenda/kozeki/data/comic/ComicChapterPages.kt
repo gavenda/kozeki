@@ -25,6 +25,8 @@ import kotlinx.coroutines.launch
 class ComicChapterPages internal constructor(
     val refs: List<ComicPageRef>,
     private val store: ComicPages,
+    /** Called once the chapter is closed, for what is kept only while it is open. */
+    private val onClose: () -> Unit = {},
 ) {
 
     /** Where a page is on its way to being a file. */
@@ -97,6 +99,7 @@ class ComicChapterPages internal constructor(
     fun close() {
         scope.cancel()
         downloads.clear()
+        onClose()
     }
 
     /** The pages to load for [index], in the order and chunks to load them in. */
@@ -125,7 +128,7 @@ class ComicChapterPages internal constructor(
     private suspend fun load(index: Int) {
         val state = states[index]
         try {
-            // A page already in the cache needs no source at all.
+            // A page already on this device needs no source at all.
             store.cached(refs[index])?.let {
                 state.value = State.Ready(it)
                 return

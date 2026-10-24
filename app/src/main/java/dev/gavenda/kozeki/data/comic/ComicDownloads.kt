@@ -49,13 +49,14 @@ data class QueuedDownload(val bookId: String, val chapter: ComicChapter, val sta
 /**
  * Chapters of comics kept on this device to be read without their source, as Mihon keeps them.
  * They are fetched one chapter at a time and one page at a time, in the order they were asked for,
- * and live under the app's own files, apart from the cache of pages read online, so nothing drops
- * them but the user. They are no part of a backup.
+ * and live under the app's own files, so nothing drops them but the user. They are no part of a
+ * backup. The reader puts the pages it fetches into the same folder, so a chapter read while it is
+ * downloading has none of its pages asked for twice.
  *
  * A chapter is a folder of numbered page files under its book's folder, named after the chapter's
- * URL, with the URL itself written beside the pages. It only takes that name once every page is in.
- * The queue is written down too, so a download the app was closed in the middle of goes on the next
- * time it starts.
+ * URL. The URL itself is written beside the pages once every page is in, which is what marks the
+ * chapter downloaded. The queue is written down too, so a download the app was closed in the middle
+ * of goes on the next time it starts.
  */
 class ComicDownloads(
     context: Context,
@@ -87,6 +88,7 @@ class ComicDownloads(
 
     init {
         scope.launch(Dispatchers.IO) {
+            renamePartials()
             _downloaded.value = scan()
             restoreQueue()
             // A book removed from the library takes its chapters with it.
@@ -112,8 +114,12 @@ class ComicDownloads(
     val counts: Flow<Map<String, Int>> =
         _downloaded.map { map -> map.mapValues { it.value.size }.filterValues { it > 0 } }.distinctUntilChanged()
 
-    /** Puts [chapters] of [bookId] in the queue, in the order given, but for those kept or queued already. */
-    fun enqueue(bookId: String, chapters: List<ComicChapter>) {
+    /**
+     * Puts [chapters] of [bookId] in the queue, in the order given, but for those kept or queued
+     * already. [first] puts them next in line, straight after the chapter coming in now, as for a
+     * chapter being read; one queued already is moved there too.
+     */
+    fun enqueue(bookId: String, chapters: List<ComicChapter>, first: Boolean = false) {
         scope.launch {
             lock.withLock {
                 val kept = _downloaded.value[bookId].orEmpty()
@@ -126,7 +132,13 @@ class ComicDownloads(
                         if (again) task.copy(state = ChapterDownload.Queued) else task
                     }
                     val queued = tasks.filter { it.bookId == bookId }.mapTo(HashSet()) { it.chapter.url }
-                    retried + asked.filter { it.url !in kept && it.url !in queued }.map { Task(bookId, it, ChapterDownload.Queued) }
+                    val added = asked.filter { it.url !in kept && it.url !in queued }.map { Task(bookId, it, ChapterDownload.Queued) }
+                    if (!first) return@update retried + added
+                    val (moved, rest) = retried.partition {
+                        it.bookId == bookId && it.chapter.url in urls && it.state !is ChapterDownload.Downloading
+                    }
+                    val at = rest.indexOfFirst { it.state is ChapterDownload.Downloading } + 1
+                    rest.take(at) + moved + added + rest.drop(at)
                 }
                 saveQueue()
             }
@@ -134,13 +146,19 @@ class ComicDownloads(
         }
     }
 
-    /** Takes [urls] of [bookId] out of the queue, stopping the one being fetched, if it is one of them. */
+    /**
+     * Takes [urls] of [bookId] out of the queue, stopping the one being fetched, if it is one of
+     * them. The pages that had come are deleted.
+     */
     fun cancel(bookId: String, urls: Collection<String>) {
         scope.launch {
-            lock.withLock {
-                queue.update { tasks -> tasks.filterNot { it.bookId == bookId && it.chapter.url in urls } }
+            val dropped = lock.withLock {
+                val dropped = queue.value.filter { it.bookId == bookId && it.chapter.url in urls }
+                queue.update { tasks -> tasks - dropped.toSet() }
                 saveQueue()
+                dropped
             }
+            deleteUnfinished(dropped)
         }
     }
 
@@ -178,10 +196,44 @@ class ComicDownloads(
     /** Empties the queue, stopping the chapter coming in. What is downloaded already stays. */
     fun cancelAll() {
         scope.launch {
-            lock.withLock {
+            val dropped = lock.withLock {
+                val dropped = queue.value
                 queue.value = emptyList()
                 saveQueue()
+                dropped
             }
+            deleteUnfinished(dropped)
+        }
+    }
+
+    /** Whether the chapter [url] of [bookId] is in the queue, waiting, coming in or stopped. */
+    fun isQueued(bookId: String, url: String): Boolean =
+        queue.value.any { it.bookId == bookId && it.chapter.url == url }
+
+    /**
+     * The folder the pages of the chapter [url] of [bookId] go in, for the reader to put the pages
+     * it fetches in while the chapter is downloading. It is made if it is not there.
+     */
+    fun folder(bookId: String, url: String): File = File(bookDir(bookId), hash(url)).apply { mkdirs() }
+
+    /**
+     * The reader is done with the chapter [url] of [bookId], whose pages it put in its [folder]:
+     * they go unless the chapter is downloaded or in the queue.
+     */
+    fun release(bookId: String, url: String) {
+        scope.launch(Dispatchers.IO) {
+            lock.withLock {
+                if (isQueued(bookId, url) || url in _downloaded.value[bookId].orEmpty()) return@withLock
+                File(bookDir(bookId), hash(url)).deleteRecursively()
+            }
+        }
+    }
+
+    /** Deletes what had come of [tasks], which have been taken out of the queue. */
+    private suspend fun deleteUnfinished(tasks: List<Task>) = withContext(Dispatchers.IO) {
+        for (task in tasks) {
+            if (task.chapter.url in _downloaded.value[task.bookId].orEmpty()) continue
+            File(bookDir(task.bookId), hash(task.chapter.url)).deleteRecursively()
         }
     }
 
@@ -224,7 +276,7 @@ class ComicDownloads(
         }
         fun stillQueued() = queue.value.any { it.bookId == bookId && it.chapter.url == chapter.url }
 
-        val partial = File(bookDir(bookId), hash(chapter.url) + PARTIAL_SUFFIX)
+        val partial = File(bookDir(bookId), hash(chapter.url))
         try {
             set(ChapterDownload.Downloading())
             val book = db.bookDao().get(bookId) ?: throw IllegalStateException("The book is gone")
@@ -239,14 +291,12 @@ class ComicDownloads(
                     partial.deleteRecursively()
                     return
                 }
-                val target = File(partial, "%04d%s".format(ref.index, PAGE_SUFFIX))
-                if (!(target.isFile && target.length() > 0)) pages.fetchTo(ref, target)
+                // A page the reader fetched already is there, and not asked for again.
+                pages.fetchTo(ref, File(partial, ComicPages.pageName(ref.index)))
                 set(ChapterDownload.Downloading(ref.index + 1, refs.size))
             }
+            // Written last, as the mark that every page is in.
             File(partial, URL_FILE).writeText(chapter.url)
-            val done = File(bookDir(bookId), hash(chapter.url))
-            done.deleteRecursively()
-            if (!partial.renameTo(done)) throw IllegalStateException("Could not keep the chapter")
             lock.withLock {
                 _downloaded.update { it + (bookId to (it[bookId].orEmpty() + chapter.url)) }
                 queue.update { tasks -> tasks.filterNot { it.bookId == bookId && it.chapter.url == chapter.url } }
@@ -267,9 +317,22 @@ class ComicDownloads(
     private fun scan(): Map<String, Set<String>> {
         val books = root.listFiles { file -> file.isDirectory } ?: return emptyMap()
         return books.associate { book ->
-            book.name to book.listFiles { dir -> dir.isDirectory && !dir.name.endsWith(PARTIAL_SUFFIX) }.orEmpty()
+            book.name to book.listFiles { dir -> dir.isDirectory }.orEmpty()
                 .mapNotNullTo(HashSet()) { dir -> runCatching { File(dir, URL_FILE).readText() }.getOrNull() }
         }.filterValues { it.isNotEmpty() }
+    }
+
+    /**
+     * A chapter on its way down was once in a folder ending in [LEGACY_PARTIAL_SUFFIX], renamed
+     * when it was done. It takes its own name now, so that its download goes on in it.
+     */
+    private fun renamePartials() {
+        root.listFiles { file -> file.isDirectory }.orEmpty().forEach { book ->
+            book.listFiles { dir -> dir.isDirectory && dir.name.endsWith(LEGACY_PARTIAL_SUFFIX) }.orEmpty().forEach { part ->
+                val named = File(book, part.name.removeSuffix(LEGACY_PARTIAL_SUFFIX))
+                if (named.exists() || !part.renameTo(named)) part.deleteRecursively()
+            }
+        }
     }
 
     private suspend fun dropOrphans(alive: Set<String>) {
@@ -329,7 +392,7 @@ class ComicDownloads(
     private companion object {
         const val TAG = "ComicDownloads"
         const val PAGE_SUFFIX = ".page"
-        const val PARTIAL_SUFFIX = ".part"
+        const val LEGACY_PARTIAL_SUFFIX = ".part"
         const val URL_FILE = "url"
     }
 }

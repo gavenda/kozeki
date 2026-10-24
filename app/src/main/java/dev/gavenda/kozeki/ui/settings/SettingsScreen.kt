@@ -67,6 +67,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Switch
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
@@ -205,11 +207,14 @@ fun SettingsScreen(
         onSetDailyGoal = viewModel::setDailyGoal,
         onSetYearlyGoal = viewModel::setYearlyGoal,
         onClearCache = viewModel::clearCache,
+        onClearTemporaryPages = viewModel::clearTemporaryPages,
+        onSetTemporaryPagesLimit = viewModel::setTemporaryPagesLimit,
         backupActions = backupActions,
         localBackupActions = localBackupActions,
         onRefreshExtensions = viewModel::refreshExtensions,
         onSetComicLanguageShown = viewModel::setComicLanguageShown,
         onSetUpdateInterval = viewModel::setUpdateInterval,
+        onSetDownloadWhileReading = viewModel::setDownloadWhileReading,
         onAniListSignIn = viewModel::signInToAniList,
         onAniListSignOut = viewModel::signOutOfAniList,
         onDismissAniListError = viewModel::dismissAniListError,
@@ -228,12 +233,15 @@ fun SettingsContent(
     onSetDailyGoal: (Int) -> Unit,
     onSetYearlyGoal: (Int) -> Unit,
     onClearCache: () -> Unit,
+    onClearTemporaryPages: () -> Unit = {},
+    onSetTemporaryPagesLimit: (Int) -> Unit = {},
     backupActions: BackupActions,
     modifier: Modifier = Modifier,
     localBackupActions: LocalBackupActions = LocalBackupActions(),
     onRefreshExtensions: () -> Unit = {},
     onSetComicLanguageShown: (packageName: String, language: String, shown: Boolean) -> Unit = { _, _, _ -> },
     onSetUpdateInterval: (Int) -> Unit = {},
+    onSetDownloadWhileReading: (Boolean) -> Unit = {},
     onAniListSignIn: () -> Unit = {},
     onAniListSignOut: () -> Unit = {},
     onDismissAniListError: () -> Unit = {},
@@ -272,15 +280,31 @@ fun SettingsContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item(key = "source") {
-                    Section(title = stringResource(R.string.settings_source_title)) {
-                        HardcoverSetting(state, onSignIn, onSignOut, onDismissSignInError)
-                        ComicSourcesSetting(
-                            extensions = state.extensions,
-                            hiddenLanguages = state.hiddenComicLanguages,
-                            onRefresh = onRefreshExtensions,
-                            onSetLanguageShown = onSetComicLanguageShown,
-                        )
-                        UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
+                    SplitSection(title = stringResource(R.string.settings_source_title)) {
+                        SettingSubgroup(SubgroupPosition.FIRST, label = stringResource(R.string.settings_source_books)) {
+                            HardcoverSetting(state, onSignIn, onSignOut, onDismissSignInError)
+                        }
+                        SettingSubgroup(SubgroupPosition.LAST, label = stringResource(R.string.settings_source_comics)) {
+                            ComicSourcesSetting(
+                                extensions = state.extensions,
+                                hiddenLanguages = state.hiddenComicLanguages,
+                                onRefresh = onRefreshExtensions,
+                                onSetLanguageShown = onSetComicLanguageShown,
+                            )
+                            UpdateIntervalSetting(state.updateIntervalHours, onSetUpdateInterval)
+                            SettingRow(
+                                icon = painterResource(R.drawable.download_48px),
+                                title = stringResource(R.string.settings_download_while_reading_title),
+                                subtitle = stringResource(R.string.settings_download_while_reading_description),
+                                modifier = Modifier.toggleable(
+                                    value = state.downloadWhileReading,
+                                    role = Role.Switch,
+                                    onValueChange = onSetDownloadWhileReading,
+                                ),
+                            ) {
+                                Switch(checked = state.downloadWhileReading, onCheckedChange = null)
+                            }
+                        }
                     }
                 }
                 item(key = "tracking") {
@@ -324,6 +348,12 @@ fun SettingsContent(
                                 Text(stringResource(R.string.settings_cache_clear))
                             }
                         }
+                        TemporaryPagesSetting(
+                            bytes = state.temporaryPagesBytes,
+                            megabytes = state.temporaryPagesMegabytes,
+                            onClear = onClearTemporaryPages,
+                            onSetLimit = onSetTemporaryPagesLimit,
+                        )
                     }
                 }
                 item(key = "about") { About(state.versionName, state.birthday, state.appUpdate, onCheckForAppUpdate) }
@@ -773,6 +803,47 @@ internal fun AccountAvatar(url: String?) {
 }
 
 private val UPDATE_INTERVALS = listOf(0, 6, 12, 24)
+
+/** The sizes, in megabytes, the pages of chapters read without downloading can be held to. */
+private val TEMPORARY_PAGE_LIMITS = listOf(100, 250, 500, 1024)
+
+/** [megabytes] as Settings shows a size: in whole megabytes, or in gigabytes from one up. */
+@Composable
+private fun sizeLabel(megabytes: Double): String =
+    if (megabytes >= 1024) {
+        stringResource(R.string.settings_size_gb, "%.1f".format(megabytes / 1024).removeSuffix(".0"))
+    } else {
+        stringResource(R.string.settings_size_mb, kotlin.math.round(megabytes).toInt())
+    }
+
+/** The pages of chapters read without downloading: how much they take up, a button to clear them, and the most they may take up. */
+@Composable
+private fun TemporaryPagesSetting(bytes: Long, megabytes: Int, onClear: () -> Unit, onSetLimit: (Int) -> Unit) {
+    SettingRow(
+        icon = painterResource(R.drawable.photo_library_48px),
+        title = stringResource(R.string.settings_temporary_pages_title, sizeLabel(bytes / (1024.0 * 1024.0))),
+        subtitle = stringResource(R.string.settings_temporary_pages_description),
+    ) {
+        FilledTonalButton(onClick = onClear, enabled = bytes > 0) {
+            Text(stringResource(R.string.settings_cache_clear))
+        }
+    }
+    SettingRow(
+        icon = painterResource(R.drawable.data_usage_48px),
+        title = stringResource(R.string.settings_temporary_pages_limit_title),
+        subtitle = stringResource(R.string.settings_temporary_pages_limit_description),
+    )
+    // A size kept from elsewhere that is none of the choices shows as the nearest one.
+    val selected = TEMPORARY_PAGE_LIMITS.indexOf(megabytes).takeIf { it >= 0 }
+        ?: TEMPORARY_PAGE_LIMITS.indices.minBy { kotlin.math.abs(TEMPORARY_PAGE_LIMITS[it] - megabytes) }
+    ConnectedButtonGroup(
+        options = TEMPORARY_PAGE_LIMITS.map { sizeLabel(it.toDouble()) },
+        selectedIndex = selected,
+        onSelect = { onSetLimit(TEMPORARY_PAGE_LIMITS[it]) },
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
+        optionColors = TEMPORARY_PAGE_LIMITS.map { OptionColor.VIOLET.toggleButtonColors() },
+    )
+}
 
 /** How often the comics being followed are asked for new chapters, which the library then shows. */
 @Composable

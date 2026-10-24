@@ -77,6 +77,8 @@
     <string name="settings_updates_title">Chapter update interval</string>
     <string name="settings_updates_description">How often to check followed comics</string>
     <string name="settings_updates_off">Off</string>
+    <string name="settings_download_while_reading_title">Download while reading</string>
+    <string name="settings_download_while_reading_description">Chapters you open are downloaded</string>
     <string name="settings_updates_hours">%1$d h</string>
     <string name="update_check_title">Checking for new chapters</string>
     <string name="update_check_done">Updated</string>
@@ -645,6 +647,8 @@
     <string name="settings_backup_title">Backup</string>
     <string name="settings_backup_remote">Remote</string>
     <string name="settings_backup_local">Local</string>
+    <string name="settings_source_books">Books</string>
+    <string name="settings_source_comics">Comics</string>
     <string name="settings_drive">Google Drive</string>
     <string name="settings_drive_signed_out">Tap to sign in</string>
     <string name="settings_drive_sign_in">Sign in</string>
@@ -704,13 +708,19 @@
     <string name="settings_local_backup_reading">Reading the backup…</string>
     <string name="settings_local_backup_failed">The last backup failed</string>
     <string name="settings_local_backup_error_unreadable">That file is not a readable backup.</string>
-    <string name="settings_cache_title">Looked up before</string>
+    <string name="settings_cache_title">Cache</string>
     <string name="settings_cache_description">So nothing is looked up twice</string>
     <plurals name="settings_cache_entries">
         <item quantity="one">%1$d stored lookup</item>
         <item quantity="other">%1$d stored lookups</item>
     </plurals>
     <string name="settings_cache_clear">Clear</string>
+    <string name="settings_temporary_pages_title">%1$s of pages</string>
+    <string name="settings_temporary_pages_description">From chapters not downloaded</string>
+    <string name="settings_temporary_pages_limit_title">Maximum size</string>
+    <string name="settings_temporary_pages_limit_description">The pages read longest ago go first</string>
+    <string name="settings_size_mb">%1$d MB</string>
+    <string name="settings_size_gb">%1$s GB</string>
     <string name="source_anilist">AniList</string>
     <string name="settings_tracking_title">Tracking</string>
     <string name="settings_anilist_signed_out">Tap to sign in to enable tracking</string>

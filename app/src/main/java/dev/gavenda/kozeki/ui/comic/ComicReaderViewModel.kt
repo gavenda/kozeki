@@ -15,6 +15,7 @@ import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.SessionDraft
 import dev.gavenda.kozeki.data.model.inReadingOrder
 import dev.gavenda.kozeki.data.repository.LibraryRepository
+import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.reader.SessionTracker
 import kotlin.time.Duration.Companion.milliseconds
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** A chapter laid out in the reader, with its pages. */
@@ -75,6 +77,7 @@ class ComicReaderViewModel(
     private val downloads: ComicDownloads,
     private val preferences: ComicReaderPreferences,
     private val appScope: CoroutineScope,
+    private val settings: SettingsRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ComicReaderUiState>(ComicReaderUiState.Loading)
@@ -168,6 +171,7 @@ class ComicReaderViewModel(
         current = segment.chapter
         chapterUrl = url
         currentPage = 0
+        viewModelScope.launch { downloadIfWanted(segment.chapter) }
         return emit(ready.bookTitle, segment, startPage = 0)
     }
 
@@ -324,6 +328,7 @@ class ComicReaderViewModel(
                 else -> chapter.lastPageRead.coerceIn(0, opened.size - 1)
             }
             currentPage = start
+            downloadIfWanted(chapter)
             val index = ordered.indexOf(chapter)
             emit(book.title, segment, startPage = start)
             opened.request(start)
@@ -334,10 +339,28 @@ class ComicReaderViewModel(
         }
     }
 
-    /** The pages of [chapter]: from this device when it is downloaded, from its source otherwise. */
-    private suspend fun open(chapter: ComicChapter, source: Long = sourceId): ComicChapterPages =
-        downloads.files(bookId, chapter.url)?.let { pages.openLocal(source, chapter.url, it) }
-            ?: pages.open(source, chapter)
+    /**
+     * The pages of [chapter]: from this device when it is downloaded, from its source otherwise.
+     * Pages from its source go into its download's folder when it is downloaded as it is read, or
+     * is in the queue already, so that the download does not fetch them again.
+     */
+    private suspend fun open(chapter: ComicChapter, source: Long = sourceId): ComicChapterPages {
+        downloads.files(bookId, chapter.url)?.let { return pages.openLocal(source, chapter.url, it) }
+        val keep = settings.downloadWhileReading.first() || downloads.isQueued(bookId, chapter.url)
+        if (!keep) return pages.open(source, chapter)
+        return pages.open(
+            source,
+            chapter,
+            into = downloads.folder(bookId, chapter.url),
+            // A chapter laid out beside the one read, but never scrolled into, is not queued, and its pages go.
+            onClose = { downloads.release(bookId, chapter.url) },
+        )
+    }
+
+    /** Puts [chapter], now the one on screen, next in the download queue, if chapters are downloaded as they are read. */
+    private suspend fun downloadIfWanted(chapter: ComicChapter) {
+        if (settings.downloadWhileReading.first()) downloads.enqueue(bookId, listOf(chapter), first = true)
+    }
 
     private fun snapshot(ready: ComicReaderUiState.Ready, page: Int): SessionTracker.Snapshot {
         // Chapters finished before this one, and the part of this one that has been turned through.

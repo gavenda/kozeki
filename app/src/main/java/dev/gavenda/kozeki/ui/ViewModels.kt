@@ -82,6 +82,7 @@ fun comicReaderViewModel(bookId: String, chapterUrl: String) = ComicReaderViewMo
     koin.get(),
     koin.get(),
     koin.get(),
+    koin.get(),
 )
 
 fun settingsViewModel() = SettingsViewModel(
@@ -94,6 +95,7 @@ fun settingsViewModel() = SettingsViewModel(
     driveBackup = koin.get(),
     localBackup = koin.get(),
     comicSources = koin.get(),
+    comicPages = koin.get(),
     appUpdates = koin.get(),
     versionName = BuildConfig.VERSION_NAME,
     clock = koin.get(),

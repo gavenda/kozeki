@@ -199,7 +199,7 @@ fun appModule(app: Application) = module {
 
     single { ComicChapterRepository(get(), get(), get()) }
 
-    single { ComicPages(app, get()) }
+    single { ComicPages(app, get(), get<SettingsRepository>().temporaryPagesMegabytes, get()) }
 
     single { ComicDownloads(app, get(), get(), get(), keepAlive = { DownloadWorker.start(app) }) }
 
