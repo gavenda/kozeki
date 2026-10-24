@@ -15,7 +15,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -92,6 +91,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import dev.gavenda.kozeki.ui.components.ExpandableText
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
@@ -1812,22 +1812,11 @@ private fun MatchNoticeCard(notice: MatchNotice, matching: Boolean, actions: Boo
 @Composable
 private fun AboutSection(book: Book) {
     val uriHandler = LocalUriHandler.current
-    var expanded by rememberSaveable { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.book_about))
         book.description?.let { description ->
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (expanded) Int.MAX_VALUE else 5,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .animateContentSize()
-                    .clickable(
-                        onClickLabel = stringResource(if (expanded) R.string.action_show_less else R.string.action_show_more),
-                    ) { expanded = !expanded },
-            )
+            ExpandableText(description, collapsedLines = 5)
         }
         val details = buildList {
             book.series?.let { series ->
@@ -2035,7 +2024,6 @@ private fun ReviewsStatus(state: ReviewsUiState, onRetry: () -> Unit) {
 private fun ReviewCard(review: BookReview) {
     // A review that gives the story away stays folded until the user asks for it.
     var revealed by rememberSaveable(review.id) { mutableStateOf(!review.hasSpoilers) }
-    var expanded by rememberSaveable(review.id) { mutableStateOf(false) }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -2053,19 +2041,7 @@ private fun ReviewCard(review: BookReview) {
                 review.rating?.let { RatingBar(rating = it, starSize = 16.dp) }
             }
             if (revealed) {
-                Text(
-                    text = review.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = if (expanded) Int.MAX_VALUE else 6,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .animateContentSize()
-                        .clickable(
-                            onClickLabel = stringResource(
-                                if (expanded) R.string.action_show_less else R.string.action_show_more,
-                            ),
-                        ) { expanded = !expanded },
-                )
+                ExpandableText(review.text, collapsedLines = 6, key = review.id)
             } else {
                 MutedText(stringResource(R.string.reviews_spoilers))
                 TextButton(onClick = { revealed = true }, contentPadding = PaddingValues(horizontal = 8.dp)) {

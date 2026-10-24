@@ -1,13 +1,11 @@
 package dev.gavenda.kozeki.ui.author
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,10 +33,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,6 +56,7 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.authorViewModel
+import dev.gavenda.kozeki.ui.components.ExpandableText
 import dev.gavenda.kozeki.ui.components.AddSelectedToolbar
 import dev.gavenda.kozeki.ui.components.BulkAddedSnackbarEffect
 import dev.gavenda.kozeki.ui.components.EmptyState
@@ -298,18 +294,7 @@ private fun AuthorHeader(author: Author, modifier: Modifier = Modifier) {
             }
         }
         author.bio?.let { bio ->
-            var expanded by rememberSaveable { mutableStateOf(false) }
-            Text(
-                text = bio,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = if (expanded) Int.MAX_VALUE else 5,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .animateContentSize()
-                    .clickable(
-                        onClickLabel = stringResource(if (expanded) R.string.action_show_less else R.string.action_show_more),
-                    ) { expanded = !expanded },
-            )
+            ExpandableText(bio, collapsedLines = 5)
         }
     }
 }
