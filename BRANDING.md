@@ -90,6 +90,7 @@ A later version of the library may move these by a shade. The three inputs are w
 - **Leather** is on the goal ring and the week's day rings, on chart bars, and on the physical-copy card of a book's page, where it tells paper progress from EPUB progress. In all-time statistics it is also the summary card itself (`tertiaryContainer`), the one card there with no leather marks on it.
 - **The display mode buttons** in settings take one colour each: System violet, Light gold, Dark leather. Each sits in its colour's container and takes the solid colour when selected.
 - **The range buttons** in statistics do the same by kind of range: Day violet; Week, Month and Year gold; All leather. On the longest-books card, Physical is leather and EPUB violet, as on a book's page, and Comic gold.
+- **A row of choices in more than one colour** is a standard button group (`StandardButtonGroup`): separate buttons that grow when pressed. A connected group (`ConnectedButtonGroup`) keeps to one colour, as Material's button group guidelines ask; the settings intervals are all violet.
 - **A generated cover** takes one of the three containers.
 
 Icon buttons take the three colours by what they do:

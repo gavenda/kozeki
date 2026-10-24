@@ -43,7 +43,7 @@ import dev.gavenda.kozeki.data.model.CompletedBook
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.BookCover
-import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.StandardButtonGroup
 import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.RatingBar
@@ -151,7 +151,7 @@ fun StatisticsContent(
                 item(key = "filters") {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         val ranges = StatsRange.entries
-                        ConnectedButtonGroup(
+                        StandardButtonGroup(
                             options = ranges.map { stringResource(it.label) },
                             selectedIndex = ranges.indexOf(state.range),
                             onSelect = { onSelectRange(ranges[it]) },

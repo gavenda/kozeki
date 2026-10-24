@@ -35,7 +35,7 @@ import dev.gavenda.kozeki.data.model.CompletedBook
 import dev.gavenda.kozeki.data.model.YearStats
 import dev.gavenda.kozeki.ui.components.ChartBar
 import dev.gavenda.kozeki.ui.components.ColumnChart
-import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.StandardButtonGroup
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.GoalRing
 import dev.gavenda.kozeki.ui.components.OptionColor
@@ -323,7 +323,7 @@ private fun LongestBooksCard(longest: Map<LongestKind, List<Pair<Book, Int>>>) {
     val selected = picked ?: LongestKind.entries.first { longest[it].orEmpty().isNotEmpty() }
 
     ChartCard(stringResource(R.string.stats_longest_books)) {
-        ConnectedButtonGroup(
+        StandardButtonGroup(
             options = LongestKind.entries.map { stringResource(it.label) },
             selectedIndex = selected.ordinal,
             onSelect = { picked = LongestKind.entries[it] },

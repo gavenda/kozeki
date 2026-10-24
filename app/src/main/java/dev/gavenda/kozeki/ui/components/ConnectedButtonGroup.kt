@@ -1,12 +1,15 @@
 package dev.gavenda.kozeki.ui.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonColors
@@ -19,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonColors
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,11 +46,15 @@ import dev.gavenda.kozeki.ui.theme.AppTheme
  */
 private val LabelSidePadding = 4.dp
 
+/** How far a neighbour of a pressed button in a [StandardButtonGroup] may shrink. */
+private val PressCompressionLimit = 16.dp
+
 /**
  * A single-choice row of connected toggle buttons, the Material 3 Expressive replacement for
- * segmented buttons. Options share the width equally. [icons], when given, has one drawable per option,
- * and [optionColors] one set of colours per option in place of [colors]. An option in [iconOnly]
- * shows its icon alone, is only as wide as that takes, and has its label read out instead.
+ * segmented buttons. Options share the width equally and all take [colors]; a row whose options
+ * take a colour each is a [StandardButtonGroup], since a connected group keeps to one colour.
+ * [icons], when given, has one drawable per option. An option in [iconOnly] shows its icon alone,
+ * is only as wide as that takes, and has its label read out instead.
  */
 @Composable
 fun ConnectedButtonGroup(
@@ -56,50 +64,121 @@ fun ConnectedButtonGroup(
     modifier: Modifier = Modifier,
     colors: ToggleButtonColors = ToggleButtonDefaults.colors(),
     icons: List<Int>? = null,
-    optionColors: List<ToggleButtonColors>? = null,
     iconOnly: Set<Int> = emptySet(),
 ) {
-    val defaultPadding = ToggleButtonDefaults.contentPaddingFor(ToggleButtonDefaults.size)
-    val contentPadding = PaddingValues(
-        start = LabelSidePadding,
-        top = defaultPadding.calculateTopPadding(),
-        end = LabelSidePadding,
-        bottom = defaultPadding.calculateBottomPadding(),
-    )
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         options.forEachIndexed { index, label ->
-            ToggleButton(
+            OptionButton(
+                label = label,
                 checked = index == selectedIndex,
-                onCheckedChange = { onSelect(index) },
-                modifier = (if (index in iconOnly) Modifier else Modifier.weight(1f))
-                    .semantics { role = Role.RadioButton },
-                colors = optionColors?.get(index) ?: colors,
+                onClick = { onSelect(index) },
+                colors = colors,
                 shapes = when (index) {
                     0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                     options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 },
-                contentPadding = if (index in iconOnly) defaultPadding else contentPadding,
-            ) {
-                if (icons != null && index in iconOnly) {
-                    Icon(painterResource(icons[index]), contentDescription = label, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
-                } else {
-                    if (icons != null) {
-                        Icon(painterResource(icons[index]), contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
-                        Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
-                    }
-                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
+                icon = icons?.get(index),
+                iconOnly = index in iconOnly,
+                modifier = if (index in iconOnly) Modifier else Modifier.weight(1f),
+            )
         }
     }
 }
 
 /**
- * One of the theme's three colours, for a group whose options take a colour each. An unselected
+ * A single-choice Expressive button group of separate toggle buttons, for options that take a
+ * colour each from [optionColors]. Options share the width equally; a pressed one grows and its
+ * neighbours give way, then all settle back. [icons] and [iconOnly] are as in [ConnectedButtonGroup].
+ */
+@Composable
+fun StandardButtonGroup(
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    optionColors: List<ToggleButtonColors>,
+    modifier: Modifier = Modifier,
+    icons: List<Int>? = null,
+    iconOnly: Set<Int> = emptySet(),
+) {
+    val interactionSources = remember(options.size) { List(options.size) { MutableInteractionSource() } }
+    ButtonGroup(
+        // The options share the width, so they never overflow.
+        overflowIndicator = {},
+        modifier = modifier,
+    ) {
+        options.forEachIndexed { index, label ->
+            customItem(
+                buttonGroupContent = {
+                    OptionButton(
+                        label = label,
+                        checked = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        colors = optionColors[index],
+                        shapes = ToggleButtonDefaults.shapesFor(ToggleButtonDefaults.size),
+                        icon = icons?.get(index),
+                        iconOnly = index in iconOnly,
+                        interactionSource = interactionSources[index],
+                        modifier = (if (index in iconOnly) Modifier else Modifier.weight(1f))
+                            .animateWidth(interactionSources[index], compressionLimit = PressCompressionLimit),
+                    )
+                },
+                menuContent = {},
+            )
+        }
+    }
+}
+
+/** One option of either group: an icon and its label, or the icon alone with the label read out. */
+@Composable
+private fun OptionButton(
+    label: String,
+    checked: Boolean,
+    onClick: () -> Unit,
+    colors: ToggleButtonColors,
+    shapes: ToggleButtonShapes,
+    icon: Int?,
+    iconOnly: Boolean,
+    modifier: Modifier,
+    interactionSource: MutableInteractionSource? = null,
+) {
+    val defaultPadding = ToggleButtonDefaults.contentPaddingFor(ToggleButtonDefaults.size)
+    ToggleButton(
+        checked = checked,
+        onCheckedChange = { onClick() },
+        modifier = modifier.semantics { role = Role.RadioButton },
+        colors = colors,
+        shapes = shapes,
+        contentPadding = if (iconOnly) {
+            defaultPadding
+        } else {
+            PaddingValues(
+                start = LabelSidePadding,
+                top = defaultPadding.calculateTopPadding(),
+                end = LabelSidePadding,
+                bottom = defaultPadding.calculateBottomPadding(),
+            )
+        },
+        interactionSource = interactionSource,
+    ) {
+        if (icon != null && iconOnly) {
+            Icon(painterResource(icon), contentDescription = label, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
+        } else {
+            if (icon != null) {
+                Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(ToggleButtonDefaults.IconSize))
+                Spacer(Modifier.size(ToggleButtonDefaults.IconSpacing))
+            }
+            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/**
+ * One of the theme's three colours, for a [StandardButtonGroup] whose options take a colour each, or
+ * a [ConnectedButtonGroup] all in one. An unselected
  * button is in its colour's container and a selected one in the solid colour, so the colours can
  * be told apart in the light theme, where gold and leather are solid browns much alike.
  */
@@ -205,18 +284,28 @@ fun Modifier.wideIconButton(): Modifier = minimumInteractiveComponentSize()
 
 @PreviewLightDark
 @Composable
-private fun ConnectedButtonGroupPreview() {
+private fun ButtonGroupsPreview() {
     AppTheme {
         Surface {
-            var selected by remember { mutableIntStateOf(1) }
-            ConnectedButtonGroup(
-                options = listOf("Day", "Week", "Month", "Year", "All"),
-                selectedIndex = selected,
-                onSelect = { selected = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            )
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                var connected by remember { mutableIntStateOf(1) }
+                ConnectedButtonGroup(
+                    options = listOf("Off", "Daily", "3 days", "Weekly"),
+                    selectedIndex = connected,
+                    onSelect = { connected = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OptionColor.VIOLET.toggleButtonColors(),
+                )
+                var standard by remember { mutableIntStateOf(1) }
+                StandardButtonGroup(
+                    options = listOf("Day", "Week", "Month", "Year", "All"),
+                    selectedIndex = standard,
+                    onSelect = { standard = it },
+                    optionColors = listOf(OptionColor.VIOLET, OptionColor.GOLD, OptionColor.GOLD, OptionColor.GOLD, OptionColor.LEATHER)
+                        .map { it.toggleButtonColors() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

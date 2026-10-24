@@ -99,7 +99,7 @@ internal fun LocalBackupSetting(state: LocalBackupState, actions: LocalBackupAct
         selectedIndex = selected,
         onSelect = { actions.setInterval(BACKUP_INTERVALS[it]) },
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-        optionColors = BACKUP_INTERVALS.map { OptionColor.VIOLET.toggleButtonColors() },
+        colors = OptionColor.VIOLET.toggleButtonColors(),
     )
 
     // Each is a row of its own, tapped like any other setting.

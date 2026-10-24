@@ -102,6 +102,7 @@ import dev.gavenda.kozeki.data.update.AppUpdateState
 import dev.gavenda.kozeki.data.update.UpdateCheck
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.StandardButtonGroup
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
@@ -851,7 +852,7 @@ private fun TemporaryPagesSetting(bytes: Long, megabytes: Int, onClear: () -> Un
         selectedIndex = selected,
         onSelect = { onSetLimit(TEMPORARY_PAGE_LIMITS[it]) },
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-        optionColors = TEMPORARY_PAGE_LIMITS.map { OptionColor.VIOLET.toggleButtonColors() },
+        colors = OptionColor.VIOLET.toggleButtonColors(),
     )
 }
 
@@ -873,7 +874,7 @@ private fun UpdateIntervalSetting(hours: Int, onSet: (Int) -> Unit) {
         selectedIndex = selected,
         onSelect = { onSet(UPDATE_INTERVALS[it]) },
         modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-        optionColors = UPDATE_INTERVALS.map { OptionColor.VIOLET.toggleButtonColors() },
+        colors = OptionColor.VIOLET.toggleButtonColors(),
     )
 }
 
@@ -885,7 +886,7 @@ private fun ThemeModeSetting(mode: ThemeMode, onSet: (ThemeMode) -> Unit) {
         title = stringResource(R.string.settings_display_mode),
         subtitle = stringResource(R.string.settings_display_mode_description),
     )
-    ConnectedButtonGroup(
+    StandardButtonGroup(
         options = modes.map { stringResource(it.labelRes) },
         selectedIndex = modes.indexOf(mode),
         onSelect = { onSet(modes[it]) },
