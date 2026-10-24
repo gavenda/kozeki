@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ShelfEntity::class,
         ShelfBookEntity::class,
     ],
-    version = 14,
+    version = 16,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -57,6 +57,8 @@ abstract class KozekiDatabase : RoomDatabase() {
                     RenameToComics,
                     AddShelves,
                     AddSeries,
+                    AddSessionChapters,
+                    EstimateSessionChapters,
                 )
                 .build()
 
@@ -210,6 +212,48 @@ abstract class KozekiDatabase : RoomDatabase() {
             }
         }
 
+        /** A session counts the chapters of a comic read in it. */
+        private val AddSessionChapters = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reading_sessions ADD COLUMN chapters INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        /** Estimates the chapters of the comic sessions recorded before they were counted. See [estimatedChapters]. */
+        private val EstimateSessionChapters = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val estimates = mutableListOf<Pair<String, Int>>()
+                db.query(
+                    """
+                    SELECT s.id, s.startPosition, s.endPosition, s.pages, s.startChapter = s.endChapter,
+                        (SELECT c.pageCount FROM comic_chapters c
+                            WHERE c.bookId = s.bookId AND c.name = s.startChapter AND c.deletedAt IS NULL LIMIT 1),
+                        (SELECT c.pageCount FROM comic_chapters c
+                            WHERE c.bookId = s.bookId AND c.name = s.endChapter AND c.deletedAt IS NULL LIMIT 1)
+                    FROM reading_sessions s
+                    WHERE s.bookId IN (SELECT id FROM books WHERE source = 'COMICS')
+                    """.trimIndent(),
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        fun int(i: Int) = if (cursor.isNull(i)) null else cursor.getInt(i)
+                        val chapters = estimatedChapters(
+                            startPosition = int(1),
+                            endPosition = int(2),
+                            pagesTurned = cursor.getInt(3),
+                            sameChapter = int(4) == 1,
+                            startPageCount = int(5),
+                            endPageCount = int(6),
+                        )
+                        estimates += cursor.getString(0) to chapters
+                    }
+                }
+                db.execSQL("UPDATE reading_sessions SET chapters = 0 WHERE chapters != 0")
+                for ((id, chapters) in estimates.filter { it.second > 0 }) {
+                    db.execSQL("UPDATE reading_sessions SET chapters = ? WHERE id = ?", arrayOf<Any>(chapters, id))
+                }
+            }
+        }
+
         /** A track keeps whether its comic is still coming out. */
         private val AddTrackPublication = object : Migration(10, 11) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -233,3 +277,35 @@ abstract class KozekiDatabase : RoomDatabase() {
         }
     }
 }
+
+/**
+ * The chapters a comic session recorded before they were counted read, going by what it kept: where
+ * it started and ended, by page and chapter name, and how many pages it turned forward. A chapter
+ * counts only when it was turned through to its last page, as the reader counts them now, so that
+ * jumping ahead is not reading. The chapter it started in counts when it moved on to another, and the
+ * one it ended in when it ended on its last page. At most those two.
+ */
+internal fun estimatedChapters(
+    startPosition: Int?,
+    endPosition: Int?,
+    pagesTurned: Int,
+    sameChapter: Boolean,
+    startPageCount: Int?,
+    endPageCount: Int?,
+): Int {
+    if (startPosition == null || endPosition == null) return 0
+    val endedOnLast = endPageCount != null && endPosition >= endPageCount - 1
+    return if (sameChapter) {
+        val span = endPosition - startPosition
+        if (endedOnLast && span > 0 && pagesTurned >= span * TURNED_THROUGH) 1 else 0
+    } else {
+        // Pages turned in the start chapter, then in the end chapter from its first page.
+        val restOfStart = startPageCount?.let { it - 1 - startPosition } ?: return 0
+        val startRead = restOfStart > 0 && pagesTurned >= (restOfStart + endPosition) * TURNED_THROUGH
+        val endRead = endedOnLast && endPosition > 0 && startRead
+        (if (startRead) 1 else 0) + (if (endRead) 1 else 0)
+    }
+}
+
+/** The share of a chapter's pages that has to have been turned for it to count as read. */
+private const val TURNED_THROUGH = 0.8

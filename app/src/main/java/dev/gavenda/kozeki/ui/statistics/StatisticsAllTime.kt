@@ -137,18 +137,7 @@ private fun AllTimeSummary(stats: AllTimeStats) {
 @Composable
 private fun AllTimeTiles(stats: AllTimeStats) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile(
-                label = stringResource(R.string.stats_time_read),
-                value = formatDuration(stats.durationMs),
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                label = stringResource(R.string.stats_pages),
-                value = stats.pages.toString(),
-                modifier = Modifier.weight(1f),
-            )
-        }
+        TimeAndPages(stats.durationMs, stats.pages, stats.chapters)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatTile(
                 label = stringResource(R.string.stats_days_read),

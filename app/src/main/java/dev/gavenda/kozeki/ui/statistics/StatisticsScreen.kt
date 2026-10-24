@@ -51,6 +51,7 @@ import dev.gavenda.kozeki.ui.components.SettingsButton
 import dev.gavenda.kozeki.ui.components.iconButtonColors
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDate
+import dev.gavenda.kozeki.ui.components.StatTile
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
 import dev.gavenda.kozeki.ui.koinViewModel
@@ -249,7 +250,7 @@ internal fun ChartCard(title: String, modifier: Modifier = Modifier, content: @C
 
 /**
  * What was read of one book: where from and to, for how long, and how fast. A physical copy was not
- * timed, so its card leads with the pages read in place of the time.
+ * timed, so its card leads with the pages read in place of the time. A comic says the chapters read.
  */
 @Composable
 internal fun BookReadingCard(reading: BookReading, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -294,12 +295,42 @@ internal fun BookReadingCard(reading: BookReading, onClick: () -> Unit, modifier
                             )
                         }
                         reading.pagesPerHour?.let { add(stringResource(R.string.stats_pages_per_hour, it)) }
+                        if (reading.chapters > 0) {
+                            add(pluralStringResource(R.plurals.stats_chapters_gained, reading.chapters, reading.chapters))
+                        }
+                        reading.chaptersPerHour?.let { add(stringResource(R.string.stats_chapters_per_hour, it)) }
                     }
                 }
                 details.forEach { line ->
                     Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
+    }
+}
+
+/**
+ * The time read and the pages read, side by side. With comics read as well, their chapters go next
+ * to the pages and the time takes the row above.
+ */
+@Composable
+internal fun TimeAndPages(durationMs: Long, pages: Int, chapters: Int) {
+    val time = @Composable { modifier: Modifier ->
+        StatTile(stringResource(R.string.stats_time_read), formatDuration(durationMs), modifier)
+    }
+    val pagesTile = @Composable { modifier: Modifier ->
+        StatTile(stringResource(R.string.stats_pages), pages.toString(), modifier)
+    }
+    if (chapters > 0) {
+        time(Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            pagesTile(Modifier.weight(1f))
+            StatTile(stringResource(R.string.stats_chapters), chapters.toString(), Modifier.weight(1f))
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            time(Modifier.weight(1f))
+            pagesTile(Modifier.weight(1f))
         }
     }
 }

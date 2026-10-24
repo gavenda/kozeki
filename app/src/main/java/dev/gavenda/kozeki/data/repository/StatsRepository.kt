@@ -42,6 +42,14 @@ class StatsRepository(
     private val physicalReadings = db.physicalReadingDao()
     private val readThroughs = db.readThroughDao()
     private val goals = db.yearlyGoalDao()
+    private val comicChapters = db.comicChapterDao()
+
+    /** The library, with each comic's [Book.chapterCount] set to the chapters it has, which is how long it is. */
+    private fun booksWithLengths(): Flow<List<Book>> =
+        combine(library.observeAll(), comicChapters.observeCounts()) { books, counts ->
+            val byBook = counts.associate { it.bookId to it.count }
+            books.map { if (it.isComic) it.copy(chapterCount = byBook[it.id]) else it }
+        }
 
     fun observeDay(date: LocalDate, firstDayOfWeek: DayOfWeek): Flow<DailyStats> {
         val weekStart = date.with(TemporalAdjusters.previousOrSame(firstDayOfWeek))
@@ -52,8 +60,9 @@ class StatsRepository(
             readThroughs.observeCompletedBetween(date.toEpochDay(), date.toEpochDay() + 1),
             library.observeAll(),
             settings.dailyGoalMinutes,
-        ) { weekSessions, weekPhysical, finished, books, goal ->
+        ) { recorded, weekPhysical, finished, books, goal ->
             val byId = books.associateBy { it.id }
+            val weekSessions = withoutComicPages(recorded, byId)
             val today = weekSessions.filter { it.day == date.toEpochDay() }
             val physical = weekPhysical.filter { it.day == date.toEpochDay() }
             val paper = paperOnly(physical, byId)
@@ -66,6 +75,7 @@ class StatsRepository(
                 timeline = timeline(today, physical, byId),
                 completed = completed(finished, byId),
                 week = perDay(weekSessions, paperOnly(weekPhysical, byId), weekStart, weekEnd),
+                chapters = today.sumOf { it.chapters },
             )
         }.flowOn(Dispatchers.Default)
     }
@@ -81,7 +91,7 @@ class StatsRepository(
             settings.dailyGoalMinutes,
         ) { periodSessions, physical, finished, books, goal ->
             val byId = books.associateBy { it.id }
-            val known = periodSessions.filter { it.bookId in byId }
+            val known = withoutComicPages(periodSessions.filter { it.bookId in byId }, byId)
             val paper = paperOnly(physical, byId)
             PeriodStats(
                 start = start,
@@ -93,6 +103,7 @@ class StatsRepository(
                 sessionCount = known.size,
                 books = perBook(known, paper, byId),
                 completed = completed(finished, byId),
+                chapters = known.sumOf { it.chapters },
             )
         }.flowOn(Dispatchers.Default)
     }
@@ -104,11 +115,11 @@ class StatsRepository(
             sessions.observeBetween(start.toEpochDay(), end.toEpochDay()),
             physicalReadings.observeBetween(start.toEpochDay(), end.toEpochDay()),
             readThroughs.observeCompletedBetween(start.toEpochDay(), end.toEpochDay()),
-            library.observeAll(),
+            booksWithLengths(),
             goals.observe(year),
         ) { yearSessions, physical, finished, books, goal ->
             val byId = books.associateBy { it.id }
-            val known = yearSessions.filter { it.bookId in byId }
+            val known = withoutComicPages(yearSessions.filter { it.bookId in byId }, byId)
             val paper = paperOnly(physical, byId)
             val done = completed(finished, byId)
             val rated = ratings(done)
@@ -139,6 +150,7 @@ class StatsRepository(
                         .sumOf { it.purchasePriceMinor ?: 0L }
                 },
                 spendingCurrency = mainCurrency,
+                chapters = known.sumOf { it.chapters },
             )
         }.flowOn(Dispatchers.Default)
     }
@@ -148,11 +160,11 @@ class StatsRepository(
         sessions.observeAll(),
         physicalReadings.observeAll(),
         readThroughs.observeCompleted(),
-        library.observeAll(),
+        booksWithLengths(),
     ) { allSessions, physical, finished, books ->
         val byId = books.associateBy { it.id }
         allTimeStats(
-            sessions = allSessions.filter { it.bookId in byId },
+            sessions = withoutComicPages(allSessions.filter { it.bookId in byId }, byId),
             completed = completed(finished, byId),
             books = books,
             today = today,
@@ -236,10 +248,12 @@ class StatsRepository(
                     book = book,
                     durationMs = ordered.sumOf { it.durationMs },
                     pages = pages,
-                    startPosition = ordered.firstNotNullOfOrNull { it.startPosition },
-                    endPosition = ordered.mapNotNull { it.endPosition }.maxOrNull(),
+                    // A comic's positions are pages of whichever chapter was open, which say nothing across chapters.
+                    startPosition = ordered.firstNotNullOfOrNull { it.startPosition }.takeUnless { book.isComic },
+                    endPosition = ordered.mapNotNull { it.endPosition }.maxOrNull().takeUnless { book.isComic },
                     // From the pages turned, so that jumping around the book does not count as progress.
                     progressGained = book.positionCount?.takeIf { it > 0 }?.let { pages.toDouble() / it } ?: 0.0,
+                    chapters = ordered.sumOf { it.chapters },
                 )
             }
             .sortedByDescending { it.durationMs } + paperBooks(paper, books)
@@ -274,6 +288,13 @@ internal fun timeline(
     }
     return (read + entered).sortedBy { it.at }
 }
+
+/**
+ * [sessions] with the pages of comics left out. A comic's pages start over with every chapter, so
+ * it is counted in chapters; sessions recorded before that still carry the pages it turned.
+ */
+internal fun withoutComicPages(sessions: List<ReadingSessionEntity>, books: Map<String, Book>): List<ReadingSessionEntity> =
+    sessions.map { if (it.pages != 0 && books[it.bookId]?.isComic == true) it.copy(pages = 0) else it }
 
 /**
  * The [physical] readings that the statistics tell a book by: those of books that have no EPUB.
@@ -349,6 +370,7 @@ internal fun allTimeStats(
             charted.filter { it.purchasedOn?.year == year }.sumOf { it.purchasePriceMinor ?: 0L }
         },
         spendingCurrency = mainCurrency,
+        chapters = sessions.sumOf { it.chapters },
     )
 }
 

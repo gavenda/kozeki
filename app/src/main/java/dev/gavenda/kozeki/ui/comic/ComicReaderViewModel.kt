@@ -107,6 +107,12 @@ class ComicReaderViewModel(
     private val tracker = SessionTracker(System::currentTimeMillis)
     private var resumed = false
     private var lastSnapshot: SessionTracker.Snapshot? = null
+
+    /** Chapters read to their last page since the session began, which is what the statistics count for a comic. */
+    private val finishedInSession = mutableSetOf<String>()
+
+    /** The pages of each chapter on screen this session, so that a chapter skipped through is not counted as read. */
+    private val seenInSession = mutableMapOf<String, MutableSet<Int>>()
     private val unsaved = MutableStateFlow<Unsaved?>(null)
 
     init {
@@ -155,6 +161,8 @@ class ComicReaderViewModel(
         unsaved.value = record
         if (read) markReadHere(ready.chapter.url)
         val snapshot = snapshot(ready, page)
+        val seen = seenInSession.getOrPut(ready.chapter.url) { mutableSetOf() }.apply { add(page) }
+        if (read && turnedThrough(seen, page)) finishedInSession += ready.chapter.url
         lastSnapshot = snapshot
         if (resumed && !tracker.isRunning) tracker.begin(snapshot) else tracker.activity(snapshot)
         ready.pages.request(page)
@@ -379,6 +387,9 @@ class ComicReaderViewModel(
         val progress = unsaved.value
         unsaved.value = null
         val session = tracker.end()
+        val chaptersRead = finishedInSession.size
+        finishedInSession.clear()
+        seenInSession.clear()
         val readThrough = readThroughId
         if (progress == null && session == null) return
         appScope.launch {
@@ -395,9 +406,11 @@ class ComicReaderViewModel(
                         endProgression = it.end.progression,
                         startPosition = it.start.position,
                         endPosition = it.end.position,
-                        pages = it.pages,
+                        // Its pages start over with every chapter, so it is counted in chapters.
+                        pages = 0,
                         startChapter = it.start.chapterTitle,
                         endChapter = it.end.chapterTitle,
+                        chapters = chaptersRead,
                     ),
                 )
             }
@@ -409,7 +422,19 @@ class ComicReaderViewModel(
         segments.forEach { it.pages.close() }
     }
 
+    /**
+     * Whether a chapter whose [last] page was reached was read to it, not skipped: most of its pages,
+     * from the first one on screen this session, were on screen too.
+     */
+    private fun turnedThrough(seen: Set<Int>, last: Int): Boolean {
+        val from = seen.min()
+        return from < last && seen.size >= (last - from + 1) * TURNED_THROUGH
+    }
+
     private companion object {
+        /** The share of a chapter's pages that has to be on screen for it to count as read. */
+        const val TURNED_THROUGH = 0.8
+
         const val SAVE_DEBOUNCE_MS = 1_500L
 
         /** How close to the end of a chapter, in pages, the next one starts being laid out. */

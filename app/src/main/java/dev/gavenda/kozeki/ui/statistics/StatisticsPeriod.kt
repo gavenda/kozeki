@@ -49,18 +49,7 @@ internal fun LazyListScope.periodItems(
 @Composable
 private fun PeriodTiles(period: PeriodStats) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatTile(
-                label = stringResource(R.string.stats_time_read),
-                value = formatDuration(period.durationMs),
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                label = stringResource(R.string.stats_pages),
-                value = period.pages.toString(),
-                modifier = Modifier.weight(1f),
-            )
-        }
+        TimeAndPages(period.durationMs, period.pages, period.chapters)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatTile(
                 label = stringResource(R.string.stats_days_read),

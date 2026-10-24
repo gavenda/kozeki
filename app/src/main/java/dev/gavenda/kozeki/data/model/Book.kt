@@ -183,6 +183,8 @@ data class SessionDraft(
     val pages: Int,
     val startChapter: String?,
     val endChapter: String?,
+    /** Chapters of a comic read to their last page. */
+    val chapters: Int = 0,
 )
 
 sealed interface ImportResult {

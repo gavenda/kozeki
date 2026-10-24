@@ -2,6 +2,7 @@ package dev.gavenda.kozeki.ui
 
 import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.CompletedBook
+import dev.gavenda.kozeki.ui.statistics.LongestKind
 import dev.gavenda.kozeki.ui.statistics.longestFinished
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
@@ -20,7 +21,7 @@ class LongestBooksTest {
         Book(id = id, title = id, pageCount = pages, positionCount = positions, inLibrary = true)
 
     private fun ranked(completed: List<CompletedBook>, physical: Boolean, limit: Int = 8) =
-        longestFinished(completed, physical, limit).map { (book, pages) -> book.id to pages }
+        longestFinished(completed, if (physical) LongestKind.PHYSICAL else LongestKind.EPUB, limit).map { (book, pages) -> book.id to pages }
 
     @Test
     fun `physical books and EPUBs are ranked apart, longest first`() {
@@ -63,5 +64,20 @@ class LongestBooksTest {
         val completed = (1..5).map { finished(paper("book-$it", it * 100)) }
 
         assertEquals(listOf("book-5" to 500, "book-4" to 400), ranked(completed, physical = true, limit = 2))
+    }
+
+    @Test
+    fun `comics are ranked by their chapters, apart from books`() {
+        val completed = listOf(
+            finished(Book(id = "short", title = "short", isComic = true, inLibrary = true, chapterCount = 40)),
+            finished(Book(id = "long", title = "long", isComic = true, inLibrary = true, chapterCount = 222, pageCount = 10)),
+            finished(epub("novella", 120)),
+        )
+
+        assertEquals(
+            listOf("long" to 222, "short" to 40),
+            longestFinished(completed, LongestKind.COMIC).map { (book, length) -> book.id to length },
+        )
+        assertEquals(listOf("novella" to 120), ranked(completed, physical = false))
     }
 }

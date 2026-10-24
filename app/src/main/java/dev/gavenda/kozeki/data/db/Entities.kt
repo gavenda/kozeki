@@ -193,8 +193,10 @@ data class ReadingSessionEntity(
     val endProgression: Double,
     val startPosition: Int? = null,
     val endPosition: Int? = null,
-    /** Pages turned forward during the session, in Readium positions. */
+    /** Pages turned forward during the session, in Readium positions. A comic's are not counted. */
     val pages: Int = 0,
+    /** Chapters of a comic read to their last page during the session. A book's are not counted. */
+    val chapters: Int = 0,
     val startChapter: String? = null,
     val endChapter: String? = null,
     @Embedded val sync: SyncStamp,

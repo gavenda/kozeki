@@ -565,6 +565,7 @@
     <string name="stats_goal_minutes">Goal: %1$s</string>
     <string name="stats_time_read">Time read</string>
     <string name="stats_pages">Pages</string>
+    <string name="stats_chapters">Chapters</string>
     <string name="stats_days_read">Days read</string>
     <string name="stats_goal_reached">Goal reached</string>
     <string name="stats_time_per_day">Reading time per day</string>
@@ -579,6 +580,15 @@
         <item quantity="other">+%1$d pages (%2$d%%)</item>
     </plurals>
     <string name="stats_pages_per_hour">%1$.1f pages per hour</string>
+    <string name="stats_chapters_per_hour">%1$.1f chapters per hour</string>
+    <plurals name="stats_chapters_gained">
+        <item quantity="one">+%1$d chapter</item>
+        <item quantity="other">+%1$d chapters</item>
+    </plurals>
+    <plurals name="stats_chapters_read">
+        <item quantity="one">%1$d chapter</item>
+        <item quantity="other">%1$d chapters</item>
+    </plurals>
     <plurals name="stats_pages_read">
         <item quantity="one">%1$d page</item>
         <item quantity="other">%1$d pages</item>
@@ -607,11 +617,15 @@
         <item quantity="one">%1$d star</item>
         <item quantity="other">%1$d stars</item>
     </plurals>
-    <string name="stats_longest_books">Longest books finished, in pages</string>
+    <string name="stats_longest_books">Longest books finished</string>
     <string name="stats_longest_physical">Physical</string>
     <string name="stats_longest_epub">EPUB</string>
-    <string name="stats_longest_physical_empty">No physical book with a page count was finished.</string>
-    <string name="stats_longest_epub_empty">No EPUB with a page count was finished.</string>
+    <string name="stats_longest_comic">Comic</string>
+    <string name="stats_longest_physical_empty">No physical book with a page count finished yet. I\'ll wait at the last page.</string>
+    <string name="stats_longest_epub_empty">No EPUB with a page count finished yet. I\'ll wait at the last page.</string>
+    <string name="stats_longest_comic_empty">No comic finished yet. I\'ll wait at the last chapter.</string>
+    <string name="stats_length_pages">%1$d p.</string>
+    <string name="stats_length_chapters">%1$d ch.</string>
     <string name="stats_spending">Spent on books</string>
     <string name="stats_since">Since %1$s</string>
     <string name="stats_books_per_year">Books finished per year</string>

@@ -1,10 +1,14 @@
 package dev.gavenda.kozeki.ui.statistics
 
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -32,10 +36,13 @@ import dev.gavenda.kozeki.data.model.YearStats
 import dev.gavenda.kozeki.ui.components.ChartBar
 import dev.gavenda.kozeki.ui.components.ColumnChart
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.GoalRing
 import dev.gavenda.kozeki.ui.components.OptionColor
+import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.RankedBar
 import dev.gavenda.kozeki.ui.components.RankedBars
+import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.StatTile
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDuration
@@ -159,11 +166,19 @@ private fun YearTiles(year: YearStats, today: LocalDate) {
                 modifier = Modifier.weight(1f),
             )
         }
-        StatTile(
-            label = stringResource(R.string.stats_time_read),
-            value = formatDuration(year.durationMs),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        val time = stringResource(R.string.stats_time_read)
+        if (year.chapters > 0) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StatTile(label = time, value = formatDuration(year.durationMs), modifier = Modifier.weight(1f))
+                StatTile(
+                    label = stringResource(R.string.stats_chapters),
+                    value = year.chapters.toString(),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        } else {
+            StatTile(label = time, value = formatDuration(year.durationMs), modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
@@ -247,66 +262,91 @@ internal fun RatingsCard(average: Float, counts: List<Int>) {
 
 /** The longest of the [completed] books, in a card that is left out when no book's length is known. */
 internal fun LazyListScope.longestBooks(completed: List<CompletedBook>) {
-    val physical = longestFinished(completed, physical = true)
-    val epubs = longestFinished(completed, physical = false)
-    if (physical.isNotEmpty() || epubs.isNotEmpty()) {
-        item(key = "longest-books") { LongestBooksCard(physical, epubs) }
+    val longest = LongestKind.entries.associateWith { longestFinished(completed, it) }
+    if (longest.values.any { it.isNotEmpty() }) {
+        item(key = "longest-books") { LongestBooksCard(longest) }
     }
 }
 
+/** The kinds the longest books are ranked by, each behind its own tab. */
+internal enum class LongestKind(
+    @param:StringRes val label: Int,
+    @param:StringRes val empty: Int,
+    @param:DrawableRes val icon: Int,
+    val color: OptionColor,
+) {
+    // Leather for paper and violet for EPUB, as on a book's own page. The EPUB's is the icon of the library's imported badge.
+    PHYSICAL(R.string.stats_longest_physical, R.string.stats_longest_physical_empty, R.drawable.auto_stories_48px, OptionColor.LEATHER),
+    EPUB(R.string.stats_longest_epub, R.string.stats_longest_epub_empty, R.drawable.library_books_fill_48px, OptionColor.VIOLET),
+    COMIC(R.string.stats_longest_comic, R.string.stats_longest_comic_empty, R.drawable.photo_library_48px, OptionColor.GOLD),
+}
+
 /**
- * The longest of the [completed] books with their pages, longest first, of one kind: the [physical]
- * ones, which are the books without an EPUB, or the ones with an EPUB. A physical copy is as long
- * as the user says it is; an EPUB without a page count goes by its positions. A book finished more
- * than once is listed once, and one whose length is not known not at all.
+ * The longest of the [completed] books with their length, longest first, of one [kind]: the
+ * physical ones, which are the books without an EPUB, the ones with an EPUB, or the comics. A
+ * physical copy is as long as the user says it is; an EPUB without a page count goes by its
+ * positions; a comic is as long as its chapters. A book finished more than once is listed once, and
+ * one whose length is not known not at all.
  */
 internal fun longestFinished(
     completed: List<CompletedBook>,
-    physical: Boolean,
+    kind: LongestKind,
     limit: Int = LONGEST_BOOKS_SHOWN,
 ): List<Pair<Book, Int>> = completed
     .asSequence()
     .map { it.book }
     .distinctBy { it.id }
-    .filter { it.inLibrary != physical }
+    .filter {
+        when (kind) {
+            LongestKind.PHYSICAL -> !it.inLibrary && !it.isComic
+            LongestKind.EPUB -> it.inLibrary && !it.isComic
+            LongestKind.COMIC -> it.isComic
+        }
+    }
     .mapNotNull { book ->
-        val pages = if (physical) book.physicalPageCount ?: book.pageCount else book.pageCount ?: book.positionCount
-        pages?.takeIf { it > 0 }?.let { book to it }
+        val length = when (kind) {
+            LongestKind.PHYSICAL -> book.physicalPageCount ?: book.pageCount
+            LongestKind.EPUB -> book.pageCount ?: book.positionCount
+            LongestKind.COMIC -> book.chapterCount
+        }
+        length?.takeIf { it > 0 }?.let { book to it }
     }
     .sortedByDescending { it.second }
     .take(limit)
     .toList()
 
-/** The two kinds of [longestFinished] behind a tab each, the physical books on the left and shown first. */
+/** The kinds of [longestFinished] behind a tab each, the physical books on the left and shown first. */
 @Composable
-private fun LongestBooksCard(physical: List<Pair<Book, Int>>, epubs: List<Pair<Book, Int>>) {
-    // Until a tab is picked, the card opens on the physical books, or on the EPUBs when it has only those.
-    var picked by rememberSaveable { mutableStateOf<Int?>(null) }
-    val selected = picked ?: if (physical.isEmpty()) 1 else 0
-    val tabs = listOf(R.string.stats_longest_physical, R.string.stats_longest_epub)
+private fun LongestBooksCard(longest: Map<LongestKind, List<Pair<Book, Int>>>) {
+    // Until a tab is picked, the card opens on the first kind that has any.
+    var picked by rememberSaveable { mutableStateOf<LongestKind?>(null) }
+    val selected = picked ?: LongestKind.entries.first { longest[it].orEmpty().isNotEmpty() }
 
     ChartCard(stringResource(R.string.stats_longest_books)) {
         ConnectedButtonGroup(
-            options = tabs.map { stringResource(it) },
-            selectedIndex = selected,
-            onSelect = { picked = it },
+            options = LongestKind.entries.map { stringResource(it.label) },
+            selectedIndex = selected.ordinal,
+            onSelect = { picked = LongestKind.entries[it] },
             modifier = Modifier.fillMaxWidth(),
-            // The EPUB's is the icon of the library's imported badge.
-            icons = listOf(R.drawable.auto_stories_48px, R.drawable.library_books_fill_48px),
-            // Leather for paper and violet for EPUB, as on a book's own page.
-            optionColors = listOf(OptionColor.LEATHER, OptionColor.VIOLET).map { it.toggleButtonColors() },
+            icons = LongestKind.entries.map { it.icon },
+            optionColors = LongestKind.entries.map { it.color.toggleButtonColors() },
         )
-        val longest = if (selected == 0) physical else epubs
-        if (longest.isEmpty()) {
-            Text(
-                text = stringResource(
-                    if (selected == 0) R.string.stats_longest_physical_empty else R.string.stats_longest_epub_empty,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        val books = longest[selected].orEmpty()
+        if (books.isEmpty()) {
+            // As the library ends: her face, and the bubble kept to the width of an empty state's text.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Portrait(Expression.NEUTRAL, Modifier.width(96.dp))
+                SpeechBubble(stringResource(selected.empty), Modifier.weight(1f, fill = false).widthIn(max = 360.dp))
+            }
         } else {
-            RankedBars(longest.map { (book, pages) -> RankedBar(book.title, pages.toFloat(), pages.toString()) })
+            val unit = if (selected == LongestKind.COMIC) R.string.stats_length_chapters else R.string.stats_length_pages
+            RankedBars(
+                books.map { (book, length) -> RankedBar(book.title, length.toFloat(), stringResource(unit, length)) },
+            )
         }
     }
 }

@@ -892,6 +892,7 @@ class LibraryRepository(
                 startPosition = draft.startPosition,
                 endPosition = draft.endPosition,
                 pages = draft.pages,
+                chapters = draft.chapters,
                 startChapter = draft.startChapter,
                 endChapter = draft.endChapter,
                 sync = SyncStamp.created(now),

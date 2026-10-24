@@ -164,8 +164,14 @@ interface BookDao {
     )
 }
 
+/** How many chapters a comic has. */
+data class ChapterCount(val bookId: String, val count: Int)
+
 @Dao
 interface ComicChapterDao {
+
+    @Query("SELECT bookId, COUNT(*) AS count FROM comic_chapters WHERE deletedAt IS NULL GROUP BY bookId")
+    fun observeCounts(): Flow<List<ChapterCount>>
 
     @Query("SELECT * FROM comic_chapters WHERE bookId = :bookId AND deletedAt IS NULL ORDER BY sourceOrder")
     fun observeForBook(bookId: String): Flow<List<ComicChapterEntity>>

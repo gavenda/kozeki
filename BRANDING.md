@@ -89,7 +89,7 @@ A later version of the library may move these by a shade. The three inputs are w
 - **Gold** fills whatever Material draws in the secondary container, such as the selected navigation item, selected chips and tonal buttons. The app also asks for it by name for a book's reading-state label, the badge on a search result that is already owned, the tint behind a selected book or day, and the badge on an empty state's portrait.
 - **Leather** is on the goal ring and the week's day rings, on chart bars, and on the physical-copy card of a book's page, where it tells paper progress from EPUB progress. In all-time statistics it is also the summary card itself (`tertiaryContainer`), the one card there with no leather marks on it.
 - **The display mode buttons** in settings take one colour each: System violet, Light gold, Dark leather. Each sits in its colour's container and takes the solid colour when selected.
-- **The range buttons** in statistics do the same by kind of range: Day violet; Week, Month and Year gold; All leather. On the year's longest-books card, Physical is leather and EPUB violet, as on a book's page.
+- **The range buttons** in statistics do the same by kind of range: Day violet; Week, Month and Year gold; All leather. On the longest-books card, Physical is leather and EPUB violet, as on a book's page, and Comic gold.
 - **A generated cover** takes one of the three containers.
 
 Icon buttons take the three colours by what they do:
@@ -129,7 +129,7 @@ It stays the portrait, themed layer included. The halo does not go here.
 
 Inside the app her portrait is in four kinds of place and nowhere else: wherever a screen has nothing to show or has failed, at the end of some content, About, and the update sheet when nothing was due.
 
-**Empty and error screens.** `EmptyState` requires an `expression` and an `icon`. The icon sits on a 40dp gold badge (`secondaryContainer`) at the plate's lower end corner, over the book she holds. Smaller messages inside a sheet or a card, such as a book with no notes yet, are plain text with no face.
+**Empty and error screens.** `EmptyState` requires an `expression` and an `icon`. The icon sits on a 40dp gold badge (`secondaryContainer`) at the plate's lower end corner, over the book she holds. Smaller messages inside a sheet or a card, such as a book with no notes yet, are plain text with no face. One card is the exception: a tab of the longest-books card in statistics with nothing in it has her face and a bubble as at the ends of content (`NEUTRAL`). Physical and EPUB say "No physical book with a page count finished yet. I'll wait at the last page." and the same of an EPUB; Comic says "No comic finished yet. I'll wait at the last chapter."
 
 **About.** The last thing in Settings, with no card and no heading: her `CONTENT` face at 96dp, a speech bubble beside it with her line, and "Kozeki" with the version underneath. Under the version are two plain lines in the third person: "Kept by Ui, Magician of the Old Library" and "Character design and illustration by CHILD, from Blue Archive". On 23 April the bubble says "It's my birthday today. A book read would be present enough." instead.
 
@@ -157,7 +157,7 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 |---|---|---|---|
 | `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due; About while she says you are on the latest version |
 | `CONTENT` | Slight smile | 3 | All-time statistics with nothing on record; the download queue with nothing in it; About |
-| `NEUTRAL` | Her usual flat look | 1 | A library filter with nothing under it |
+| `NEUTRAL` | Her usual flat look | 1 | A library filter with nothing under it; an empty tab of the longest-books card |
 | `CURIOUS` | A small "o" | 8 | Library search, before typing; About when a newer version is out |
 | `STUDIOUS` | Monocle | 23 | Add book, before searching; About while checking for a newer version |
 | `ASLEEP` | Eyes closed | 7 | A day with nothing read |

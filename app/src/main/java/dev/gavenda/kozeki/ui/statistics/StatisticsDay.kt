@@ -165,6 +165,7 @@ private fun DaySummary(day: DailyStats) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val pages = pluralStringResource(R.plurals.stats_pages_read, day.pages, day.pages)
+                val chapters = pluralStringResource(R.plurals.stats_chapters_read, day.chapters, day.chapters)
                 // The one figure this view leads with. A day read only on paper has no time, so its pages lead.
                 val untimed = day.durationMs == 0L && day.pages > 0
                 Text(
@@ -172,8 +173,13 @@ private fun DaySummary(day: DailyStats) {
                     style = MaterialTheme.typography.displaySmallEmphasized,
                 )
                 if (!untimed) {
+                    // Comics are counted in chapters, so a day of only comics says nothing of pages.
+                    val read = listOfNotNull(
+                        pages.takeIf { day.pages > 0 || day.chapters == 0 },
+                        chapters.takeIf { day.chapters > 0 },
+                    )
                     Text(
-                        text = pages,
+                        text = read.joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

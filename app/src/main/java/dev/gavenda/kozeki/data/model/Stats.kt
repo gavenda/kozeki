@@ -23,10 +23,16 @@ data class BookReading(
      * there is no duration, and the pages and positions are pages of that copy.
      */
     val physical: Boolean = false,
+    /** Chapters of a comic read to their end. A comic counts these in place of pages. */
+    val chapters: Int = 0,
 ) {
     /** Pages per hour, or null when too little was read to say. */
     val pagesPerHour: Double?
         get() = if (durationMs >= 60_000 && pages > 0) pages / (durationMs / 3_600_000.0) else null
+
+    /** Chapters per hour, or null when too little was read to say. */
+    val chaptersPerHour: Double?
+        get() = if (durationMs >= 60_000 && chapters > 0) chapters / (durationMs / 3_600_000.0) else null
 }
 
 /** One line of a day's timeline. */
@@ -71,6 +77,8 @@ data class DailyStats(
     val completed: List<CompletedBook>,
     /** The week around [date], for the day strip. */
     val week: List<DayReading>,
+    /** Chapters of comics read. Comics are not counted in [pages]. */
+    val chapters: Int = 0,
 ) {
     val goalProgress: Float
         get() = if (goalMinutes <= 0) 0f else (durationMs / 60_000f) / goalMinutes
@@ -87,6 +95,8 @@ data class PeriodStats(
     val sessionCount: Int,
     val books: List<BookReading>,
     val completed: List<CompletedBook>,
+    /** Chapters of comics read. Comics are not counted in [pages]. */
+    val chapters: Int = 0,
 ) {
     /** A day read on paper took no time on record, so its pages are what tell it was read on. */
     val daysRead: Int get() = days.count { it.durationMs > 0 || it.pages > 0 }
@@ -111,6 +121,8 @@ data class YearStats(
     /** Monthly spending in [spendingCurrency], the currency most purchases used. */
     val spendingPerMonth: List<Long>,
     val spendingCurrency: String?,
+    /** Chapters of comics read. Comics are not counted in [pages]. */
+    val chapters: Int = 0,
 ) {
     val goalProgress: Float?
         get() = goalBooks?.takeIf { it > 0 }?.let { completed.size.toFloat() / it }
@@ -144,6 +156,8 @@ data class AllTimeStats(
     /** Yearly spending in [spendingCurrency], from the year of its first purchase to the current one. */
     val spendingPerYear: Map<Int, Long>,
     val spendingCurrency: String?,
+    /** Chapters of comics read. Comics are not counted in [pages]. */
+    val chapters: Int = 0,
 ) {
     /** Nothing was read, finished or bought yet. */
     val isEmpty: Boolean get() = since == null && spending.isEmpty()
