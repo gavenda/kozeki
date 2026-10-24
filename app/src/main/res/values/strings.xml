@@ -116,7 +116,6 @@
     </plurals>
     <string name="selection_clear">Clear selection</string>
     <string name="selection_select_all">Select all</string>
-    <string name="selection_change_state">Change reading state</string>
     <!-- Adding the results picked in a search, an author's books or a series. -->
     <string name="bulk_add_wishlist">Add to wishlist</string>
     <string name="bulk_add_purchased">Add as owned</string>
