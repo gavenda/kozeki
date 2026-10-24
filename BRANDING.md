@@ -92,6 +92,15 @@ A later version of the library may move these by a shade. The three inputs are w
 - **The range buttons** in statistics do the same by kind of range: Day violet; Week, Month and Year gold; All leather. On the year's longest-books card, Physical is leather and EPUB violet, as on a book's page.
 - **A generated cover** takes one of the three containers.
 
+Icon buttons take the three colours by what they do:
+
+- **In a top app bar** each action sits on a narrow pill in `surfaceContainer`, with its icon in the action's colour. Violet is for the one thing to do on the screen, such as retrying failed downloads. Gold is for actions on what the screen shows: the download queue, a comic's download menu, and the lists when adding a book. Leather is for Settings, which leaves the screen. Overflow menus and the list or covers toggle keep the plain icon colour. The favourite heart fills violet while it is on. Back and close stay plain. Once the captcha is passed, its Continue is a filled violet button.
+- **The bars** take `surfaceContainer` once the page scrolls under them, as the library's does. The pills then merge into the bar and only their icons show.
+- **Chevrons and steppers** are narrow tonal buttons, each in its colour's container. The arrows in statistics take the colour of the range they step through, and the calendar's are gold, like Month. The comic reader's chapter arrows are gold, set apart from the violet slider between them. The arrows that fold a shelf or an extension's languages are leather, the colour of a shelf's title. An open extension stands on `surfaceContainerHighest`.
+- **The shelf button** on a book's page is a narrow button in solid leather.
+
+In the light theme, gold and leather icons in a bar are the two browns described below.
+
 In the light theme `secondary` and `tertiary` are two dark browns that cannot be told apart, so anything that has to separate gold from leather there should use their containers.
 
 Every colour drawn in Compose comes from `MaterialTheme.colorScheme`, the halo's excepted. Three colours are written out as resources:
@@ -106,7 +115,7 @@ The window background still has its values from 1.0, when the app followed the w
 
 The page of a book is a separate matter. The reader's Light, Sepia and Dark are the EPUB renderer's own, and only its App setting takes the theme's surface.
 
-Type, shapes and motion are Material 3 Expressive's defaults, with `MotionScheme.expressive()`. The app has no typeface and no wordmark of its own.
+Type, shapes and motion are Material 3 Expressive's defaults, with `MotionScheme.expressive()`. Icon buttons are round and square off while pressed. Those that sit on a container are narrow: 32dp wide, inside the usual 48dp touch target. The app has no typeface and no wordmark of its own.
 
 ## The launcher icon
 
