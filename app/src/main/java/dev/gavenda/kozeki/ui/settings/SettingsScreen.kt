@@ -40,17 +40,28 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.material3.SliderState
+import androidx.compose.material3.Slider
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -97,15 +108,14 @@ import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
+import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.settingsViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
-import kotlin.math.roundToInt
 
-private const val MIN_DAILY_GOAL = 5
-private const val MAX_DAILY_GOAL = 180
-private const val DAILY_GOAL_STEP = 5
-private const val DEFAULT_YEARLY_GOAL = 12
+// The daily goal's stops: 5 minutes apart under an hour, 10 under three hours, then an hour apart up to a full day.
+private val DAILY_GOAL_STOPS = (5..55 step 5) + (60..170 step 10) + (180..24 * 60 step 60)
+private const val MAX_YEARLY_GOAL_DIGITS = 4
 private val AVATAR_SIZE = 36.dp
 private val ABOUT_PORTRAIT_WIDTH = 96.dp
 
@@ -911,43 +921,105 @@ private val ThemeMode.icon: Int
 
 @Composable
 private fun DailyGoalSetting(minutes: Int, onSet: (Int) -> Unit) {
-    // The slider moves freely; the setting is only written when the finger lifts.
-    var dragged by remember(minutes) { mutableFloatStateOf(minutes.toFloat()) }
-    val sliderState = remember { SliderState(dragged, trackRange = MIN_DAILY_GOAL.toFloat()..MAX_DAILY_GOAL.toFloat()) }
+    // The slider runs over the stops, not the minutes, so the short goals get most of its length.
+    // It moves freely and the setting is only written when the finger lifts.
+    val last = DAILY_GOAL_STOPS.lastIndex
+    var dragged by remember(minutes) {
+        mutableFloatStateOf(DAILY_GOAL_STOPS.indices.minBy { abs(DAILY_GOAL_STOPS[it] - minutes) }.toFloat())
+    }
+    val sliderState = remember { SliderState(dragged, trackRange = 0f..last.toFloat()) }
     sliderState.value = dragged
+    // Shown when the slider is let go at its end, a full day.
+    var pastDay by remember { mutableStateOf(false) }
     SettingRow(
         icon = painterResource(R.drawable.timer_fill_48px),
         title = stringResource(R.string.settings_daily_goal),
-        subtitle = stringResource(R.string.settings_daily_goal_value, dragged.roundToInt()),
+        subtitle = formatDuration(DAILY_GOAL_STOPS[dragged.roundToInt()] * 60_000L),
     )
     Slider(
         state = sliderState,
-        onValueChange = { dragged = (it / DAILY_GOAL_STEP).roundToInt() * DAILY_GOAL_STEP.toFloat() },
-        onValueChangeFinished = { onSet(dragged.roundToInt()) },
+        onValueChange = { dragged = it.roundToInt().toFloat() },
+        onValueChangeFinished = {
+            val index = dragged.roundToInt()
+            onSet(DAILY_GOAL_STOPS[index])
+            if (index == last) pastDay = true
+        },
         modifier = Modifier.padding(horizontal = 20.dp),
     )
+    if (pastDay) {
+        AlertDialog(
+            onDismissRequest = { pastDay = false },
+            icon = { Portrait(Expression.DUMBFOUNDED, Modifier.width(96.dp)) },
+            title = { Text(stringResource(R.string.settings_daily_goal_past_day_title), textAlign = TextAlign.Center) },
+            text = {
+                Text(
+                    stringResource(R.string.settings_daily_goal_past_day_message),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { pastDay = false }) {
+                    Text(stringResource(R.string.action_close))
+                }
+            },
+        )
+    }
 }
 
 @Composable
 private fun YearlyGoalSetting(year: Int, books: Int?, onSet: (Int) -> Unit) {
+    var editing by remember { mutableStateOf(false) }
     SettingRow(
         icon = painterResource(R.drawable.flag_fill_48px),
         title = stringResource(R.string.settings_yearly_goal, year),
         subtitle = books?.toString() ?: stringResource(R.string.settings_goal_not_set),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilledTonalIconButton(
-                onClick = { onSet((books ?: DEFAULT_YEARLY_GOAL) - 1) },
-                enabled = (books ?: 0) > 1,
-                modifier = Modifier.narrowIconButton(),
-            ) {
-                Icon(painterResource(R.drawable.remove_48px), contentDescription = stringResource(R.string.settings_goal_decrease), modifier = Modifier.size(24.dp))
-            }
-            FilledTonalIconButton(onClick = { onSet(books?.plus(1) ?: DEFAULT_YEARLY_GOAL) }, modifier = Modifier.narrowIconButton()) {
-                Icon(painterResource(R.drawable.add_48px), contentDescription = stringResource(R.string.settings_goal_increase), modifier = Modifier.size(24.dp))
-            }
-        }
+        modifier = Modifier.clickable { editing = true },
+    )
+    if (editing) {
+        YearlyGoalDialog(
+            year = year,
+            books = books,
+            onConfirm = {
+                editing = false
+                onSet(it)
+            },
+            onDismiss = { editing = false },
+        )
     }
+}
+
+/** Asks for the number of books to finish in [year], a whole number of at least one. */
+@Composable
+private fun YearlyGoalDialog(year: Int, books: Int?, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
+    var field by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        val initial = books?.toString().orEmpty()
+        mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
+    }
+    val value = field.text.toIntOrNull()?.takeIf { it >= 1 }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_yearly_goal, year)) },
+        text = {
+            OutlinedTextField(
+                value = field,
+                onValueChange = { new -> field = new.copy(text = new.text.filter(Char::isDigit).take(MAX_YEARLY_GOAL_DIGITS)) },
+                label = { Text(stringResource(R.string.settings_yearly_goal_books)) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { value?.let(onConfirm) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { value?.let(onConfirm) }, enabled = value != null) {
+                Text(stringResource(R.string.action_save))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @ScreenPreviews

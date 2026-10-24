@@ -160,7 +160,7 @@ private fun DaySummary(day: DailyStats) {
             GoalRing(progress = day.goalProgress, label = "${(day.goalProgress * 100).roundToInt()}%")
             Column {
                 Text(
-                    text = stringResource(R.string.stats_goal_minutes, day.goalMinutes),
+                    text = stringResource(R.string.stats_goal_minutes, formatDuration(day.goalMinutes * 60_000L)),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

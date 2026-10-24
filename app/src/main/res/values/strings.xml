@@ -562,7 +562,7 @@
     <string name="stats_finished">Finished</string>
     <string name="stats_timeline">Timeline</string>
     <string name="stats_goal">Goal</string>
-    <string name="stats_goal_minutes">Goal: %1$dm</string>
+    <string name="stats_goal_minutes">Goal: %1$s</string>
     <string name="stats_time_read">Time read</string>
     <string name="stats_pages">Pages</string>
     <string name="stats_days_read">Days read</string>
@@ -639,11 +639,11 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_goals_title">Goals</string>
     <string name="settings_daily_goal">Daily reading goal</string>
-    <string name="settings_daily_goal_value">%1$d min</string>
+    <string name="settings_daily_goal_past_day_title">A day has only 24 hours</string>
+    <string name="settings_daily_goal_past_day_message">I need to sleep sometime too.</string>
     <string name="settings_yearly_goal">Books to finish in %1$d</string>
     <string name="settings_goal_not_set">Not set</string>
-    <string name="settings_goal_decrease">One fewer</string>
-    <string name="settings_goal_increase">One more</string>
+    <string name="settings_yearly_goal_books">Books</string>
     <string name="settings_backup_title">Backup</string>
     <string name="settings_backup_remote">Remote</string>
     <string name="settings_backup_local">Local</string>

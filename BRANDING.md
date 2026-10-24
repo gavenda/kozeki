@@ -217,7 +217,7 @@ So the Settings heading is "Catalogue", a book offers "Look up in the catalogue"
 - **The visitor she lets in.** The empty library opens with "W-Welcome.", and the add-book screen asks "Was there something you needed?"
 - **Flustered apologies.** She stutters on a first letter in four strings and no others: "W-Welcome.", the two "S-Sorry." titles of a failed lookup, and "Wh-What happened to this one?" for a damaged EPUB. Lighter hesitations, "Huh…?" and "I couldn't find it…", are as rare.
 - **The condition of books.** "Tell Ui the page you are on, so no corner needs folding.", and her alarm at a damaged EPUB.
-- **Sleep.** Her `ASLEEP` face on a day with nothing read.
+- **Sleep.** Her `ASLEEP` face on a day with nothing read, and her `DUMBFOUNDED` face when the daily goal slider in Settings is let go at its end, 24 hours: "A day has only 24 hours" over "I need to sleep sometime too."
 - **Her birthday.** 23 April, also World Book Day. A day with nothing read becomes "World Book Day" over "It's also my birthday… Will you read something today?" with her `HAPPY` face, and About has "It's my birthday today. A book read would be present enough."
 - **The guest book.** All-time statistics with nothing on record yet: "The guest book is empty", then "I'll write an entry every time you read".
 
