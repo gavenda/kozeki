@@ -92,6 +92,7 @@ fun settingsViewModel() = SettingsViewModel(
     hardcoverSignIn = koin.get(),
     aniListAuth = koin.get(),
     driveBackup = koin.get(),
+    localBackup = koin.get(),
     comicSources = koin.get(),
     versionName = BuildConfig.VERSION_NAME,
     clock = koin.get(),

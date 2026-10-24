@@ -7,6 +7,8 @@ import android.os.Build
 import dev.gavenda.kozeki.data.backup.BackupRepository
 import dev.gavenda.kozeki.data.backup.drive.DriveApi
 import dev.gavenda.kozeki.data.backup.drive.DriveBackup
+import dev.gavenda.kozeki.data.backup.local.DocumentBackupFolder
+import dev.gavenda.kozeki.data.backup.local.LocalBackup
 import dev.gavenda.kozeki.data.backup.drive.PlayServicesDriveAuthorizer
 import dev.gavenda.kozeki.data.db.KozekiDatabase
 import dev.gavenda.kozeki.data.epub.Readium
@@ -142,6 +144,23 @@ fun appModule(app: Application) = module {
             links = get<SettingsRepository>(),
             scope = scope,
             // The books come back without their cover pictures, and some still waiting for a lookup.
+            onRestored = {
+                matchPending()
+                scope.launch { library.downloadMissingCovers() }
+            },
+        )
+    }
+
+    single {
+        val library = get<LibraryRepository>()
+        val scope = get<CoroutineScope>()
+        val matchPending = scheduleMatching()
+        LocalBackup(
+            folders = DocumentBackupFolder(app.contentResolver),
+            library = get<BackupRepository>(),
+            store = get<SettingsRepository>(),
+            scope = scope,
+            // As after a restore from Drive.
             onRestored = {
                 matchPending()
                 scope.launch { library.downloadMissingCovers() }

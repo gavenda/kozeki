@@ -12,6 +12,8 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.gavenda.kozeki.data.backup.DriveLink
 import dev.gavenda.kozeki.data.backup.drive.DriveLinkStore
+import dev.gavenda.kozeki.data.backup.local.LocalBackupConfig
+import dev.gavenda.kozeki.data.backup.local.LocalBackupStore
 import dev.gavenda.kozeki.data.metadata.BrowseOrder
 import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
@@ -60,7 +62,7 @@ data class SettingsSnapshot(
     val searchSource: MetadataSource? = null,
 )
 
-class SettingsRepository(context: Context) : DriveLinkStore {
+class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
 
     private val store = context.applicationContext.dataStore
     private val json = Json { ignoreUnknownKeys = true }
@@ -178,6 +180,25 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         }
     }
 
+    /**
+     * The folder local backups go to, how often, and how the last one went. The folder is this
+     * device's, so this is no part of a [SettingsSnapshot] either.
+     */
+    override val localBackup: Flow<LocalBackupConfig> = store.data
+        .map { prefs ->
+            prefs[Keys.LocalBackup]?.let { runCatching { json.decodeFromString<LocalBackupConfig>(it) }.getOrNull() }
+                ?: LocalBackupConfig()
+        }
+        .distinctUntilChanged()
+
+    override suspend fun updateLocalBackup(transform: (LocalBackupConfig) -> LocalBackupConfig) {
+        store.edit { prefs ->
+            val now = prefs[Keys.LocalBackup]?.let { runCatching { json.decodeFromString<LocalBackupConfig>(it) }.getOrNull() }
+                ?: LocalBackupConfig()
+            prefs[Keys.LocalBackup] = json.encodeToString(transform(now))
+        }
+    }
+
     suspend fun snapshot(): SettingsSnapshot {
         val prefs = store.data.first()
         return SettingsSnapshot(
@@ -277,6 +298,7 @@ class SettingsRepository(context: Context) : DriveLinkStore {
         val LibraryKind = stringPreferencesKey("library_kind")
         val CollapsedLibraryGroups = stringSetPreferencesKey("library_collapsed_groups")
         val DriveLink = stringPreferencesKey("drive_link")
+        val LocalBackup = stringPreferencesKey("local_backup")
         val UpdateIntervalHours = intPreferencesKey("update_interval_hours")
         val HiddenComicLanguages = stringSetPreferencesKey("comic_hidden_languages")
     }

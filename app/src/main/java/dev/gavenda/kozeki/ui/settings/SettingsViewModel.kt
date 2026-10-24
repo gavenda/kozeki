@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.gavenda.kozeki.data.backup.drive.DriveBackup
 import dev.gavenda.kozeki.data.backup.drive.DriveBackupState
+import dev.gavenda.kozeki.data.backup.local.LocalBackup
+import dev.gavenda.kozeki.data.backup.local.LocalBackupState
 import dev.gavenda.kozeki.data.comic.ComicExtension
 import dev.gavenda.kozeki.data.comic.ComicSources
 import dev.gavenda.kozeki.data.metadata.MetadataRepository
@@ -37,6 +39,7 @@ data class SettingsUiState(
     val aniList: AniListAccount = AniListAccount.SignedOut,
     val aniListSignIn: AniListAuth.Status = AniListAuth.Status.IDLE,
     val backup: DriveBackupState = DriveBackupState(),
+    val localBackup: LocalBackupState = LocalBackupState(),
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val dailyGoalMinutes: Int = SettingsRepository.DEFAULT_DAILY_GOAL_MINUTES,
     val year: Int = 0,
@@ -67,6 +70,14 @@ private data class LibrarySettings(
     val hiddenComicLanguages: Set<String>,
 )
 
+/** The accounts and backups, held together to be combined. */
+private data class AccountsState(
+    val hardcover: HardcoverAccount,
+    val signIn: HardcoverSignIn.Status,
+    val backup: DriveBackupState,
+    val localBackup: LocalBackupState,
+)
+
 class SettingsViewModel(
     private val settings: SettingsRepository,
     private val metadata: MetadataRepository,
@@ -75,6 +86,7 @@ class SettingsViewModel(
     private val hardcoverSignIn: HardcoverSignIn,
     private val aniListAuth: AniListAuth,
     private val driveBackup: DriveBackup,
+    private val localBackup: LocalBackup,
     private val comicSources: ComicSources,
     versionName: String,
     clock: Clock,
@@ -85,7 +97,7 @@ class SettingsViewModel(
     private val eventChannel = Channel<SettingsEvent>(Channel.BUFFERED)
     val events: Flow<SettingsEvent> = eventChannel.receiveAsFlow()
 
-    private val accounts = combine(hardcoverAuth.account, hardcoverSignIn.status, driveBackup.state, ::Triple)
+    private val accounts = combine(hardcoverAuth.account, hardcoverSignIn.status, driveBackup.state, localBackup.state, ::AccountsState)
 
     val uiState: StateFlow<SettingsUiState> = combine(
         combine(
@@ -105,7 +117,7 @@ class SettingsViewModel(
         stats.observeYearlyGoal(today.year),
         metadata.observeCacheSize(),
     ) { (accountsState, comicState), themeMode, dailyGoal, yearlyGoal, cached ->
-        val (hardcover, signIn, backup) = accountsState
+        val (hardcover, signIn, backup, local) = accountsState
         val (extensions, updateIntervalHours, aniList, aniListSignIn, hiddenComicLanguages) = comicState
         SettingsUiState(
             hardcover = hardcover,
@@ -114,6 +126,7 @@ class SettingsViewModel(
             aniList = aniList,
             aniListSignIn = aniListSignIn,
             backup = backup,
+            localBackup = local,
             themeMode = themeMode,
             dailyGoalMinutes = dailyGoal,
             year = today.year,
@@ -131,6 +144,7 @@ class SettingsViewModel(
         SettingsUiState(
             hardcoverRedirectUri = hardcoverAuth.redirectUri,
             backup = driveBackup.state.value,
+            localBackup = localBackup.state.value,
             year = today.year,
             versionName = versionName,
             birthday = isUiBirthday(today),
@@ -197,6 +211,20 @@ class SettingsViewModel(
     fun restoreBackup() = driveBackup.restore()
 
     fun dismissBackupNotice() = driveBackup.dismiss()
+
+    /** The folder picker gave the app [folder] to back up to. */
+    fun pickBackupFolder(folder: Uri) = localBackup.pickFolder(folder.toString())
+
+    fun setLocalBackupInterval(hours: Int) = localBackup.setInterval(hours)
+
+    fun backUpLocally() = localBackup.backUpNow()
+
+    /** The user picked a backup file, after which they are asked whether to put it back. */
+    fun pickBackupFile(file: Uri) = localBackup.pickBackup(file.toString())
+
+    fun restoreLocalBackup() = localBackup.restore()
+
+    fun dismissLocalBackupNotice() = localBackup.dismiss()
 
     fun setUpdateInterval(hours: Int) {
         viewModelScope.launch { settings.setUpdateIntervalHours(hours) }

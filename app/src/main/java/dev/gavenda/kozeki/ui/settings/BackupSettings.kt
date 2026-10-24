@@ -4,17 +4,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -89,39 +85,39 @@ internal fun BackupSetting(state: DriveBackupState, actions: BackupActions) {
     )
 
     if (link != null) {
+        // Rows of their own, as for the folder on the device.
         SettingRow(
             icon = painterResource(R.drawable.cloud_upload_fill_48px),
-            title = when (working) {
-                Work.BACKING_UP -> stringResource(R.string.settings_backup_working)
-                Work.FETCHING -> stringResource(R.string.settings_backup_fetching)
-                Work.RESTORING -> stringResource(R.string.settings_backup_restoring)
-                Work.SIGNING_IN, null -> link.latest
-                    ?.let { stringResource(R.string.settings_backup_latest, formatDateTime(it.createdAt)) }
-                    ?: stringResource(R.string.settings_backup_none)
-            },
-            subtitle = stringResource(R.string.settings_backup_contents),
-            trailing = if (working != null && working != Work.SIGNING_IN) {
+            title = stringResource(
+                if (working == Work.BACKING_UP) R.string.settings_backup_working else R.string.settings_backup_now,
+            ),
+            subtitle = link.latest
+                ?.let { stringResource(R.string.settings_backup_latest, formatDateTime(it.createdAt)) }
+                ?: stringResource(R.string.settings_backup_none),
+            modifier = Modifier.clickable(enabled = working == null, role = Role.Button) { actions.backUp(false) },
+            trailing = if (working == Work.BACKING_UP) {
                 { HaloLoadingIndicator(Modifier.size(24.dp)) }
             } else {
                 null
             },
         )
-        // Indented to sit under the row's text rather than its icon.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 60.dp, end = 20.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilledTonalButton(
-                onClick = { actions.backUp(false) },
-                enabled = working == null,
-                shapes = ButtonDefaults.shapes(),
-            ) {
-                Text(stringResource(R.string.settings_backup_now))
-            }
-            OutlinedButton(onClick = actions.fetch, enabled = working == null, shapes = ButtonDefaults.shapes()) {
-                Text(stringResource(R.string.settings_backup_restore))
-            }
-        }
+        SettingRow(
+            icon = painterResource(R.drawable.cloud_download_fill_48px),
+            title = stringResource(
+                when (working) {
+                    Work.FETCHING -> R.string.settings_backup_fetching
+                    Work.RESTORING -> R.string.settings_backup_restoring
+                    else -> R.string.settings_backup_restore
+                },
+            ),
+            subtitle = stringResource(R.string.settings_drive_restore_description),
+            modifier = Modifier.clickable(enabled = working == null, role = Role.Button, onClick = actions.fetch),
+            trailing = if (working == Work.FETCHING || working == Work.RESTORING) {
+                { HaloLoadingIndicator(Modifier.size(24.dp)) }
+            } else {
+                null
+            },
+        )
     }
 
     state.notice?.let { BackupNotice(it, actions.dismiss) }
@@ -201,12 +197,18 @@ private fun BackupNotice(notice: Notice, onDismiss: () -> Unit) {
             Failure.OTHER -> stringResource(R.string.settings_backup_error_other)
         }
     }
+    NoticeText(text, error = notice is Notice.Failed, onDismiss = onDismiss)
+}
+
+/** A notice under the rows, with OK to put it away. */
+@Composable
+internal fun NoticeText(text: String, error: Boolean, onDismiss: () -> Unit) {
     // Indented to sit under the row's text rather than its icon.
     Column(Modifier.padding(start = 60.dp, end = 20.dp, bottom = 8.dp)) {
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (notice is Notice.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
         )
         TextButton(onClick = onDismiss, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Text(stringResource(R.string.action_ok))
@@ -216,7 +218,7 @@ private fun BackupNotice(notice: Notice, onDismiss: () -> Unit) {
 
 /** Asks before something that takes the place of something else. */
 @Composable
-private fun ConfirmDialog(
+internal fun ConfirmDialog(
     icon: Painter,
     title: String,
     paragraphs: List<String>,
@@ -245,10 +247,10 @@ private fun ConfirmDialog(
 }
 
 @Composable
-private fun bookCount(books: Int): String = pluralStringResource(R.plurals.book_count, books, books)
+internal fun bookCount(books: Int): String = pluralStringResource(R.plurals.book_count, books, books)
 
 @Composable
-private fun deviceName(info: BackupInfo): String =
+internal fun deviceName(info: BackupInfo): String =
     info.device.ifEmpty { stringResource(R.string.settings_backup_unknown_device) }
 
 private val previewLink = DriveLink(
@@ -262,29 +264,31 @@ private fun BackupSettingPreview() {
     AppTheme {
         Surface {
             Column {
-                Section(title = stringResource(R.string.settings_backup_title)) {
-                    BackupSetting(DriveBackupState(), BackupActions())
-                }
-                Section(title = stringResource(R.string.settings_backup_title)) {
-                    BackupSetting(
-                        DriveBackupState(
-                            link = previewLink,
-                            notice = Notice.Restored(RestorePlan(previewLink.latest!!, booksRemoved = 0, booksWithoutFile = 12)),
-                        ),
-                        BackupActions(),
-                    )
-                }
-                Section(title = stringResource(R.string.settings_backup_title)) {
-                    BackupSetting(
-                        DriveBackupState(
-                            link = previewLink.copy(latest = null),
-                            working = Work.BACKING_UP,
-                            notice = Notice.Failed(Failure.DRIVE_REFUSED, "403 accessNotConfigured"),
-                        ),
-                        BackupActions(),
-                    )
-                }
+                DrivePreviewSection(DriveBackupState())
+                DrivePreviewSection(
+                    DriveBackupState(
+                        link = previewLink,
+                        notice = Notice.Restored(RestorePlan(previewLink.latest!!, booksRemoved = 0, booksWithoutFile = 12)),
+                    ),
+                )
+                DrivePreviewSection(
+                    DriveBackupState(
+                        link = previewLink.copy(latest = null),
+                        working = Work.BACKING_UP,
+                        notice = Notice.Failed(Failure.DRIVE_REFUSED, "403 accessNotConfigured"),
+                    ),
+                )
             }
+        }
+    }
+}
+
+/** The Drive rows as Settings shows them, in their card of the backup section. */
+@Composable
+private fun DrivePreviewSection(state: DriveBackupState) {
+    SplitSection(title = stringResource(R.string.settings_backup_title)) {
+        SettingSubgroup {
+            BackupSetting(state, BackupActions())
         }
     }
 }

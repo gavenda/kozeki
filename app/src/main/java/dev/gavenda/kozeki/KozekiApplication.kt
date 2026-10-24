@@ -9,10 +9,13 @@ import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.work.LocalBackupWorker
 import dev.gavenda.kozeki.data.work.MatchWorker
 import dev.gavenda.kozeki.data.work.UpdateWorker
 import eu.kanade.tachiyomi.AppInfo
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.koin.core.context.startKoin
 
@@ -45,6 +48,13 @@ class KozekiApplication : Application() {
         // New chapters of the comics being followed, found while the app is not open.
         koin.get<CoroutineScope>().launch {
             koin.get<SettingsRepository>().updateIntervalHours.collect { UpdateWorker.schedule(this@KozekiApplication, it) }
+        }
+        // Automatic backups to the folder the user picked, while there is one.
+        koin.get<CoroutineScope>().launch {
+            koin.get<SettingsRepository>().localBackup
+                .map { if (it.folder == null) 0 else it.intervalHours }
+                .distinctUntilChanged()
+                .collect { LocalBackupWorker.schedule(this@KozekiApplication, it) }
         }
     }
 }

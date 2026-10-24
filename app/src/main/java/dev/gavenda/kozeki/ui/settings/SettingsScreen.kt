@@ -2,6 +2,7 @@ package dev.gavenda.kozeki.ui.settings
 
 import android.app.Activity
 import android.content.ActivityNotFoundException
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -150,6 +152,37 @@ fun SettingsScreen(
         )
     }
 
+    // The system's pickers stand in for a path: the folder backups go to, and a backup to restore.
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        uri?.let(viewModel::pickBackupFolder)
+    }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::pickBackupFile)
+    }
+    val localBackupActions = remember(viewModel, folderPicker, filePicker) {
+        LocalBackupActions(
+            pickFolder = {
+                val current = viewModel.uiState.value.localBackup.folder?.let(Uri::parse)
+                try {
+                    folderPicker.launch(current)
+                } catch (_: ActivityNotFoundException) {
+                    // A device without a documents UI has no way to pick one.
+                }
+            },
+            setInterval = viewModel::setLocalBackupInterval,
+            backUp = viewModel::backUpLocally,
+            // The provider says what type a backup is, so any file can be picked.
+            pickFile = {
+                try {
+                    filePicker.launch(arrayOf("*/*"))
+                } catch (_: ActivityNotFoundException) {
+                }
+            },
+            restore = viewModel::restoreLocalBackup,
+            dismiss = viewModel::dismissLocalBackupNotice,
+        )
+    }
+
     SettingsContent(
         state = state,
         onBack = onBack,
@@ -161,6 +194,7 @@ fun SettingsScreen(
         onSetYearlyGoal = viewModel::setYearlyGoal,
         onClearCache = viewModel::clearCache,
         backupActions = backupActions,
+        localBackupActions = localBackupActions,
         onRefreshExtensions = viewModel::refreshExtensions,
         onSetComicLanguageShown = viewModel::setComicLanguageShown,
         onSetUpdateInterval = viewModel::setUpdateInterval,
@@ -183,6 +217,7 @@ fun SettingsContent(
     onClearCache: () -> Unit,
     backupActions: BackupActions,
     modifier: Modifier = Modifier,
+    localBackupActions: LocalBackupActions = LocalBackupActions(),
     onRefreshExtensions: () -> Unit = {},
     onSetComicLanguageShown: (packageName: String, language: String, shown: Boolean) -> Unit = { _, _, _ -> },
     onSetUpdateInterval: (Int) -> Unit = {},
@@ -247,8 +282,13 @@ fun SettingsContent(
                     }
                 }
                 item(key = "backup") {
-                    Section(title = stringResource(R.string.settings_backup_title)) {
-                        BackupSetting(state.backup, backupActions)
+                    SplitSection(title = stringResource(R.string.settings_backup_title)) {
+                        SettingSubgroup(SubgroupPosition.FIRST) {
+                            BackupSetting(state.backup, backupActions)
+                        }
+                        SettingSubgroup(SubgroupPosition.LAST) {
+                            LocalBackupSetting(state.localBackup, localBackupActions)
+                        }
                     }
                 }
                 item(key = "cache") {
@@ -274,16 +314,29 @@ fun SettingsContent(
     }
 }
 
+/** Settings of a [SplitSection] that belong together, as a card of their own. */
+@Composable
+internal fun SettingSubgroup(
+    position: SubgroupPosition = SubgroupPosition.ALONE,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    // Round where the section's edge is, nearly square where it meets the next card, as the
+    // buttons of a connected group meet.
+    val top = if (position == SubgroupPosition.FIRST || position == SubgroupPosition.ALONE) OuterCorner else InnerCorner
+    val bottom = if (position == SubgroupPosition.LAST || position == SubgroupPosition.ALONE) OuterCorner else InnerCorner
+    Card(
+        shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        Column(Modifier.padding(vertical = 8.dp), content = content)
+    }
+}
+
 /** A titled group of settings, drawn as one card. */
 @Composable
 internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        )
+        SectionTitle(title)
         Card(
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -293,6 +346,31 @@ internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit)
     }
 }
 
+/** Where a [SettingSubgroup] stands among the cards of its [SplitSection]. */
+internal enum class SubgroupPosition { ALONE, FIRST, MIDDLE, LAST }
+
+private val OuterCorner = 28.dp
+private val InnerCorner = 4.dp
+
+/** A titled group of settings split into [SettingSubgroup] cards, joined like a connected button group. */
+@Composable
+internal fun SplitSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle(title)
+        Column(verticalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween), content = content)
+    }
+}
+
+@Composable
+private fun SectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 8.dp),
+    )
+}
+
 /** One setting inside a [Section]: an icon, what it is, its current value, and an optional control. */
 @Composable
 internal fun SettingRow(
@@ -300,6 +378,7 @@ internal fun SettingRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     SettingRow(
@@ -307,6 +386,7 @@ internal fun SettingRow(
         title = title,
         modifier = modifier,
         subtitle = subtitle,
+        subtitleColor = subtitleColor,
         trailing = trailing,
     )
 }

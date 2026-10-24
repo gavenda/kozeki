@@ -74,7 +74,7 @@
     <string name="library_add_manual">Add manually</string>
     <string name="library_imported_epub">Imported EPUB</string>
     <string name="selection_select">Select</string>
-    <string name="settings_updates_title">Check for new chapters</string>
+    <string name="settings_updates_title">Chapter update interval</string>
     <string name="settings_updates_description">How often to check followed comics</string>
     <string name="settings_updates_off">Off</string>
     <string name="settings_updates_hours">%1$d h</string>
@@ -602,7 +602,7 @@
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_source_title">Catalogue</string>
-    <string name="settings_hardcover_signed_out">Tap to sign in with your Hardcover account</string>
+    <string name="settings_hardcover_signed_out">Tap to sign in</string>
     <string name="settings_hardcover_signed_in">Signed in</string>
     <string name="settings_hardcover_signed_in_as">Signed in as %1$s</string>
     <string name="settings_hardcover_sign_in">Sign in</string>
@@ -634,12 +634,12 @@
     <string name="settings_backup_none">No backup yet</string>
     <string name="settings_backup_latest">Backed up %1$s</string>
     <string name="settings_backup_unknown_device">another device</string>
-    <string name="settings_backup_contents">Library, history, notes and goals. EPUBs stay on this device</string>
     <string name="settings_backup_working">Backing up…</string>
     <string name="settings_backup_fetching">Getting the backup…</string>
     <string name="settings_backup_restoring">Restoring…</string>
-    <string name="settings_backup_now">Back up now</string>
+    <string name="settings_backup_now">Backup now</string>
     <string name="settings_backup_restore">Restore</string>
+    <string name="settings_drive_restore_description">Get the backup</string>
     <string name="settings_backup_replace_title">Replace the backup?</string>
     <string name="settings_backup_replace_message">Drive has another backup from %2$s on %3$s. Backing up replaces it.</string>
     <string name="settings_backup_replace_confirm">Replace</string>
@@ -665,6 +665,25 @@
     <string name="settings_backup_error_unreadable">The backup on Google Drive cannot be read.</string>
     <string name="settings_backup_error_too_new">This backup is from a newer version. Update the app.</string>
     <string name="settings_backup_error_other">That did not work. Try again later.</string>
+    <string name="settings_local_backup">Backup folder</string>
+    <string name="settings_local_backup_no_folder">Tap to choose a folder</string>
+    <string name="settings_local_backup_folder_lost">Can\'t reach this folder. Tap to choose it again</string>
+    <string name="settings_local_backup_choose">Choose folder</string>
+    <string name="settings_local_backup_auto">Backup automatically</string>
+    <plurals name="settings_local_backup_kept">
+        <item quantity="one">Keeps the newest backup</item>
+        <item quantity="other">Keeps the newest %1$d backups</item>
+    </plurals>
+    <string name="settings_local_backup_daily">Daily</string>
+    <string name="settings_local_backup_weekly">Weekly</string>
+    <plurals name="settings_local_backup_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
+    <string name="settings_local_backup_restore_description">Select a previous backup</string>
+    <string name="settings_local_backup_reading">Reading the backup…</string>
+    <string name="settings_local_backup_failed">The last backup failed</string>
+    <string name="settings_local_backup_error_unreadable">That file is not a readable backup.</string>
     <string name="settings_cache_title">Looked up before</string>
     <string name="settings_cache_description">So nothing is looked up twice</string>
     <plurals name="settings_cache_entries">
