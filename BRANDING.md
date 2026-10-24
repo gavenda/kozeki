@@ -124,6 +124,20 @@ Inside the app her portrait is in four kinds of place and nowhere else: wherever
 
 **About.** The last thing in Settings, with no card and no heading: her `CONTENT` face at 96dp, a speech bubble beside it with her line, and "Kozeki" with the version underneath. Under the version are two plain lines in the third person: "Kept by Ui, Magician of the Old Library" and "Character design and illustration by CHILD, from Blue Archive". On 23 April the bubble says "It's my birthday today. A book read would be present enough." instead.
 
+Tapping her checks GitHub for a newer version of the app, and the app also checks once by itself each time it is freshly opened. The bubble keeps her line and adds a second sentence for the check, and her face changes with it:
+
+| Check | Second sentence | Face |
+|---|---|---|
+| Not checked yet, or the launch check failed | None | `CONTENT` |
+| Checking (a tapped check lasts at least a second, so the face is seen) | "Let me see if there's a newer version…" | `STUDIOUS` |
+| Up to date | None, until "Kozeki 2.6.0" under her is tapped: then "You are on the latest version." Tapping it again takes the sentence away. | `CONTENT`, then `HAPPY` while she says it |
+| A newer version | "Version 2.7.0 is out. Tap me to fetch it." Tapping her again opens its APK. | `CURIOUS` |
+| Offline | "I can't reach GitHub right now." | `WORRIED` |
+| Too many checks | "GitHub won't take more checks for now. Try again later." | `WORRIED` |
+| Refused or unreadable | "GitHub turned me away (404)." / "I couldn't read GitHub's answer." | `DISMAYED` |
+
+The faces cross-fade. Tapping her has no ripple, since a box of it over her and her halo looks pasted on.
+
 **The update sheet.** When a pull to refresh among the comics finds none due for new chapters, the sheet titled "Already up to date" shows her `HAPPY` face at 96dp where the tick would be, with no line under it and no speech bubble, then Close.
 
 **Ends of content.** Her face at 96dp with a speech bubble beside it, centred, the bubble no wider than 360dp: after the last book in the library (`CONTENT`, a different line for comics), at the foot of the manual book form, and on a series' page when every book in this series is already in the library (`HAPPY`, "The set is complete."). The bubble is drawn by `SpeechBubble`, its tail pointing back at her.
@@ -132,15 +146,15 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 
 | Face | Shows | Source | Used for |
 |---|---|---|---|
-| `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due |
+| `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due; About while she says you are on the latest version |
 | `CONTENT` | Slight smile | 3 | All-time statistics with nothing on record; the download queue with nothing in it; About |
 | `NEUTRAL` | Her usual flat look | 1 | A library filter with nothing under it |
-| `CURIOUS` | A small "o" | 8 | Library search, before typing |
-| `STUDIOUS` | Monocle | 23 | Add book, before searching |
+| `CURIOUS` | A small "o" | 8 | Library search, before typing; About when a newer version is out |
+| `STUDIOUS` | Monocle | 23 | Add book, before searching; About while checking for a newer version |
 | `ASLEEP` | Eyes closed | 7 | A day with nothing read |
 | `DOWNCAST` | Half-lidded eyes | 15 | Library search with nothing found; an author with no books listed; Add book on Comics with no source installed |
-| `WORRIED` | Mouth open, a bead of sweat | 13 | Add book, nothing found |
-| `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page |
+| `WORRIED` | Mouth open, a bead of sweat | 13 | Add book, nothing found; About when GitHub cannot be reached or wants no more checks |
+| `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page; About when GitHub refuses the check or its answer cannot be read |
 | `DUMBFOUNDED` | Black dots for eyes | 21 | An author whose page is gone |
 | `SHOCKED` | Comic yell | 14 | A book the reader cannot open |
 

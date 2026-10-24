@@ -36,6 +36,8 @@ import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListApi
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
+import dev.gavenda.kozeki.data.update.AppUpdates
+import dev.gavenda.kozeki.data.update.UpdateChecker
 import dev.gavenda.kozeki.data.work.MatchWorker
 import dev.gavenda.kozeki.data.work.TrackWorker
 import java.security.MessageDigest
@@ -227,6 +229,8 @@ fun appModule(app: Application) = module {
     }
 
     single { ComicReaderPreferences(app) }
+
+    single { AppUpdates(UpdateChecker(get(), BuildConfig.VERSION_NAME), get()) }
 }
 
 /**

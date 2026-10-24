@@ -19,6 +19,9 @@ import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
+import dev.gavenda.kozeki.data.update.AppUpdateState
+import dev.gavenda.kozeki.data.update.AppUpdates
+import dev.gavenda.kozeki.data.update.UpdateCheck
 import dev.gavenda.kozeki.ui.isUiBirthday
 import java.time.Clock
 import java.time.LocalDate
@@ -52,6 +55,7 @@ data class SettingsUiState(
     /** Hours between the checks of followed comics for new chapters, 0 being never. */
     val updateIntervalHours: Int = SettingsRepository.DEFAULT_UPDATE_INTERVAL_HOURS,
     val versionName: String = "",
+    val appUpdate: AppUpdateState = AppUpdateState.Idle,
     /** Today is Ui's birthday. */
     val birthday: Boolean = false,
 )
@@ -59,7 +63,11 @@ data class SettingsUiState(
 sealed interface SettingsEvent {
     /** Send the user to Hardcover to approve the sign-in. */
     data class OpenBrowser(val uri: Uri) : SettingsEvent
+
+    /** Hand a newer version's APK, or its release page, to whatever opens links. */
+    data class Download(val uri: Uri) : SettingsEvent
 }
+
 
 /** What the screen reads from the sources of comics and the tracker, held together to be combined. */
 private data class LibrarySettings(
@@ -88,6 +96,7 @@ class SettingsViewModel(
     private val driveBackup: DriveBackup,
     private val localBackup: LocalBackup,
     private val comicSources: ComicSources,
+    private val appUpdates: AppUpdates,
     versionName: String,
     clock: Clock,
 ) : ViewModel() {
@@ -138,7 +147,7 @@ class SettingsViewModel(
             versionName = versionName,
             birthday = isUiBirthday(today),
         )
-    }.stateIn(
+    }.combine(appUpdates.state) { state, update -> state.copy(appUpdate = update) }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         SettingsUiState(
@@ -147,6 +156,7 @@ class SettingsViewModel(
             localBackup = localBackup.state.value,
             year = today.year,
             versionName = versionName,
+            appUpdate = appUpdates.state.value,
             birthday = isUiBirthday(today),
         ),
     )
@@ -225,6 +235,16 @@ class SettingsViewModel(
     fun restoreLocalBackup() = localBackup.restore()
 
     fun dismissLocalBackupNotice() = localBackup.dismiss()
+
+    /** Asks for the newest version, or downloads it once a check has found one. */
+    fun checkForAppUpdate() {
+        val current = appUpdates.state.value
+        if (current is AppUpdateState.Checked && current.result is UpdateCheck.Available) {
+            eventChannel.trySend(SettingsEvent.Download(Uri.parse(current.result.url)))
+        } else {
+            appUpdates.check()
+        }
+    }
 
     fun setUpdateInterval(hours: Int) {
         viewModelScope.launch { settings.setUpdateIntervalHours(hours) }

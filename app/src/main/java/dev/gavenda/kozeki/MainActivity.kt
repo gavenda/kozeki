@@ -18,6 +18,7 @@ import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
+import dev.gavenda.kozeki.data.update.AppUpdates
 import dev.gavenda.kozeki.ui.KozekiApp
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import org.koin.core.component.KoinComponent
@@ -30,12 +31,16 @@ class MainActivity : ComponentActivity(), KoinComponent {
     private val aniListAuth: AniListAuth by inject()
     private val incomingEpubs: IncomingEpubs by inject()
     private val settings: SettingsRepository by inject()
+    private val appUpdates: AppUpdates by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         // Only a fresh launch brings something new; a recreated activity would replay the old intent.
-        if (savedInstanceState == null) handleIntent(intent)
+        if (savedInstanceState == null) {
+            handleIntent(intent)
+            appUpdates.checkOnLaunch()
+        }
         setContent {
             val themeMode by settings.themeMode.collectAsStateWithLifecycle(initialValue = null)
             LaunchedEffect(themeMode) { applyThemeMode(themeMode ?: return@LaunchedEffect) }
