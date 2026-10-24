@@ -227,7 +227,7 @@ private fun LocalBackupSettingPreview() {
 @Composable
 private fun LocalPreviewSection(state: LocalBackupState) {
     SplitSection(title = stringResource(R.string.settings_backup_title)) {
-        SettingSubgroup {
+        SettingSubgroup(label = stringResource(R.string.settings_backup_local)) {
             LocalBackupSetting(state, LocalBackupActions())
         }
     }

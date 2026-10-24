@@ -68,12 +68,14 @@ import dev.gavenda.kozeki.ui.settings.SettingsScreen
 import dev.gavenda.kozeki.ui.statistics.StatisticsScreen
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 /** The whole app: the navigation frame around the back stack of screens. */
 @Composable
-fun KozekiApp(incomingEpubs: IncomingEpubs) {
+fun KozekiApp(incomingEpubs: IncomingEpubs, openDownloads: Flow<Unit> = emptyFlow()) {
     // Kept across process death, like the rest of the saved state.
     val backStack = rememberNavBackStack(LibraryRoute)
     val topLevel = TopLevelDestination.entries.firstOrNull { it.route == backStack.last() }
@@ -81,6 +83,13 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
     // EPUBs another app hands over are taken in by the library, so it is brought back whatever
     // was showing. One that was opened rather than shared is then read, over its own page as if
     // it had been picked there.
+    // A tap on the download notification opens the queue over whatever was showing.
+    LaunchedEffect(backStack, openDownloads) {
+        openDownloads.collect {
+            if (backStack.lastOrNull() != DownloadQueueRoute) backStack.add(DownloadQueueRoute)
+        }
+    }
+
     LaunchedEffect(backStack, incomingEpubs) {
         launch {
             incomingEpubs.waiting.collect { if (it.isNotEmpty()) backStack.backToLibrary() }

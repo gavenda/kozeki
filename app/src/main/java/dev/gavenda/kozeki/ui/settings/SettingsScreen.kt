@@ -301,10 +301,10 @@ fun SettingsContent(
                 }
                 item(key = "backup") {
                     SplitSection(title = stringResource(R.string.settings_backup_title)) {
-                        SettingSubgroup(SubgroupPosition.FIRST) {
+                        SettingSubgroup(SubgroupPosition.FIRST, label = stringResource(R.string.settings_backup_remote)) {
                             BackupSetting(state.backup, backupActions)
                         }
-                        SettingSubgroup(SubgroupPosition.LAST) {
+                        SettingSubgroup(SubgroupPosition.LAST, label = stringResource(R.string.settings_backup_local)) {
                             LocalBackupSetting(state.localBackup, localBackupActions)
                         }
                     }
@@ -332,18 +332,37 @@ fun SettingsContent(
     }
 }
 
-/** Settings of a [SplitSection] that belong together, as a card of their own. */
+/**
+ * Settings of a [SplitSection] that belong together, as a card of their own. A [label] goes in a
+ * strip of its own above the card, joined to it like the cards are to each other.
+ */
 @Composable
 internal fun SettingSubgroup(
     position: SubgroupPosition = SubgroupPosition.ALONE,
+    label: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     // Round where the section's edge is, nearly square where it meets the next card, as the
     // buttons of a connected group meet.
     val top = if (position == SubgroupPosition.FIRST || position == SubgroupPosition.ALONE) OuterCorner else InnerCorner
     val bottom = if (position == SubgroupPosition.LAST || position == SubgroupPosition.ALONE) OuterCorner else InnerCorner
+    if (label != null) {
+        Surface(
+            shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = InnerCorner, bottomEnd = InnerCorner),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            )
+        }
+    }
+    val cardTop = if (label != null) InnerCorner else top
     Card(
-        shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
+        shape = RoundedCornerShape(topStart = cardTop, topEnd = cardTop, bottomStart = bottom, bottomEnd = bottom),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(Modifier.padding(vertical = 8.dp), content = content)

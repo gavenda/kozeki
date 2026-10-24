@@ -62,6 +62,8 @@ class ComicDownloads(
     private val db: KozekiDatabase,
     private val pages: ComicPages,
     private val scope: CoroutineScope,
+    /** Called as the queue starts being worked through, to keep the app running until it is done. */
+    private val keepAlive: () -> Unit = {},
 ) {
 
     private val root = File(context.filesDir, "comic_downloads")
@@ -206,6 +208,7 @@ class ComicDownloads(
 
     private fun start() {
         if (runner?.isActive == true) return
+        keepAlive()
         runner = scope.launch(Dispatchers.IO) {
             while (true) {
                 val task = lock.withLock { queue.value.firstOrNull { it.state is ChapterDownload.Queued } } ?: break

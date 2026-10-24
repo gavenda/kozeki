@@ -107,6 +107,45 @@ fun DeleteBooksDialog(books: List<Book>, onConfirm: () -> Unit, onDismiss: () ->
     )
 }
 
+/** Asks before [count] downloaded chapters are deleted from the device. */
+@Composable
+fun DeleteDownloadsDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(painterResource(R.drawable.delete_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+        iconContentColor = MaterialTheme.colorScheme.error,
+        title = { Text(pluralStringResource(R.plurals.delete_downloads_title, count, count)) },
+        text = { Text(pluralStringResource(R.plurals.delete_downloads_message, count)) },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                shapes = ButtonDefaults.shapes(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Text(pluralStringResource(R.plurals.delete_downloads_confirm, count))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(pluralStringResource(R.plurals.delete_books_keep, count)) }
+        },
+    )
+}
+
+@DialogPreviews
+@Composable
+private fun DeleteDownloadDialogPreview() {
+    AppTheme { DeleteDownloadsDialog(count = 1, onConfirm = {}, onDismiss = {}) }
+}
+
+@DialogPreviews
+@Composable
+private fun DeleteDownloadsDialogPreview() {
+    AppTheme { DeleteDownloadsDialog(count = 12, onConfirm = {}, onDismiss = {}) }
+}
+
 @DialogPreviews
 @Composable
 private fun DeleteBookDialogPreview() {

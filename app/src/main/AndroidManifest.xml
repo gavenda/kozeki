@@ -13,6 +13,11 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!-- The notifications of chapter downloads and update checks, which keep long runs going. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
     <application
         android:name=".KozekiApplication"
         android:allowBackup="true"
@@ -111,6 +116,12 @@
         <activity
             android:name=".ui.settings.SourcePreferencesActivity"
             android:exported="false" />
+
+        <!-- WorkManager's foreground service, run by chapter downloads and update checks. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
 
     </application>
 

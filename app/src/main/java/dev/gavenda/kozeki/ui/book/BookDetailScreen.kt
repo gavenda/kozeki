@@ -1,5 +1,9 @@
 package dev.gavenda.kozeki.ui.book
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.scaleIn
@@ -231,6 +235,14 @@ fun BookDetailScreen(
     val coverPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.setCover(uri)
     }
+    // The notification that keeps a long download queue going. Downloads go ahead either way.
+    val context = LocalContext.current
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val askForNotifications = {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
 
     LaunchedEffect(viewModel, resources) {
         viewModel.events.collect { event ->
@@ -277,9 +289,9 @@ fun BookDetailScreen(
             onReadChapter = { onReadChapter(bookId, it) },
             onSetChaptersRead = viewModel::setChaptersRead,
             onRetryChapters = viewModel::retryChapters,
-            onDownloadChapters = viewModel::downloadChapters,
-            onDownloadUnread = viewModel::downloadUnread,
-            onDownloadAll = viewModel::downloadAll,
+            onDownloadChapters = { askForNotifications(); viewModel.downloadChapters(it) },
+            onDownloadUnread = { askForNotifications(); viewModel.downloadUnread() },
+            onDownloadAll = { askForNotifications(); viewModel.downloadAll() },
             onDeleteDownloads = viewModel::deleteDownloads,
             onDeleteAllDownloads = viewModel::deleteAllDownloads,
             onOpenDownloads = onOpenDownloads,
@@ -382,6 +394,25 @@ fun BookDetailContent(
     // URLs of the chapters picked with a long press; none means no selection is going on.
     var selectedChapters by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     BackHandler(enabled = selectedChapters.isNotEmpty()) { selectedChapters = emptyList() }
+    // Downloaded chapters waiting for a yes before they are deleted; null when nothing is asked.
+    var deletingDownloads by rememberSaveable { mutableStateOf<List<String>?>(null) }
+    var deletingAllDownloads by rememberSaveable { mutableStateOf(false) }
+    val downloadStates = state.chapters?.downloads.orEmpty()
+    // Only chapters already on the device are asked about; one still on its way is just cancelled.
+    val deleteDownloads = { urls: List<String> ->
+        if (urls.any { downloadStates[it] == ChapterDownload.Downloaded }) {
+            deletingDownloads = urls
+        } else {
+            actions.onDeleteDownloads(urls)
+        }
+    }
+    val deleteAllDownloads = {
+        if (downloadStates.values.any { it == ChapterDownload.Downloaded }) {
+            deletingAllDownloads = true
+        } else {
+            actions.onDeleteAllDownloads()
+        }
+    }
     val listState = rememberLazyListState()
     // The header carries the title, so the bar only takes it over once the header's copy, which
     // sits at the very top of the list, has scrolled under it.
@@ -439,7 +470,7 @@ fun BookDetailContent(
                         }
                         val chapters = state.chapters
                         if (book.isComic && chapters != null && chapters.chapters.isNotEmpty()) {
-                            DownloadMenu(chapters, actions)
+                            DownloadMenu(chapters, actions, onDeleteAll = deleteAllDownloads)
                         }
                         Box {
                             FilledTonalIconButton(
@@ -533,7 +564,7 @@ fun BookDetailContent(
                             selectedChapters = emptyList()
                         },
                         onDeleteDownloads = { urls ->
-                            actions.onDeleteDownloads(urls)
+                            deleteDownloads(urls)
                             selectedChapters = emptyList()
                         },
                         onSelectAll = { selectedChapters = state.chapters?.chapters.orEmpty().map(ComicChapter::url) },
@@ -623,6 +654,7 @@ fun BookDetailContent(
                         state = chapters,
                         owned = owned,
                         actions = actions,
+                        onDeleteDownloads = deleteDownloads,
                         showingAll = showingAllChapters,
                         selected = selectedChapters,
                         onSelectedChange = { selectedChapters = it },
@@ -687,6 +719,27 @@ fun BookDetailContent(
             }
             }
         }
+    }
+
+    deletingDownloads?.let { urls ->
+        DeleteDownloadsDialog(
+            count = urls.count { downloadStates[it] == ChapterDownload.Downloaded },
+            onConfirm = {
+                deletingDownloads = null
+                actions.onDeleteDownloads(urls)
+            },
+            onDismiss = { deletingDownloads = null },
+        )
+    }
+    if (deletingAllDownloads) {
+        DeleteDownloadsDialog(
+            count = downloadStates.values.count { it == ChapterDownload.Downloaded },
+            onConfirm = {
+                deletingAllDownloads = false
+                actions.onDeleteAllDownloads()
+            },
+            onDismiss = { deletingAllDownloads = false },
+        )
     }
 
     if (book != null) {
@@ -956,6 +1009,7 @@ private fun LazyListScope.chaptersSection(
     state: ComicChaptersUiState,
     owned: Boolean,
     actions: BookDetailActions,
+    onDeleteDownloads: (List<String>) -> Unit,
     showingAll: Boolean,
     selected: List<String>,
     onSelectedChange: (List<String>) -> Unit,
@@ -1013,7 +1067,7 @@ private fun LazyListScope.chaptersSection(
                     } else {
                         null
                     },
-                    onDeleteDownload = { actions.onDeleteDownloads(listOf(chapter.url)) },
+                    onDeleteDownload = { onDeleteDownloads(listOf(chapter.url)) },
                     downloadable = owned,
                     // Once picking has begun a tap picks too, as it does in a gallery.
                     onClick = {
@@ -1141,7 +1195,7 @@ private fun ChapterSelectionToolbar(
  * read yet or all of them, to delete the ones downloaded, and to see the queue.
  */
 @Composable
-private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActions) {
+private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActions, onDeleteAll: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         FilledTonalIconButton(
@@ -1179,7 +1233,7 @@ private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActi
                 enabled = chapters.downloads.isNotEmpty(),
                 onClick = {
                     expanded = false
-                    actions.onDeleteAllDownloads()
+                    onDeleteAll()
                 },
             )
             HorizontalDivider()

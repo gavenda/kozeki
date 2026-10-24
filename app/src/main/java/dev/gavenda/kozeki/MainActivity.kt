@@ -19,8 +19,11 @@ import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.data.update.AppUpdates
+import dev.gavenda.kozeki.data.work.DownloadWorker
 import dev.gavenda.kozeki.ui.KozekiApp
 import dev.gavenda.kozeki.ui.theme.AppTheme
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -32,6 +35,9 @@ class MainActivity : ComponentActivity(), KoinComponent {
     private val incomingEpubs: IncomingEpubs by inject()
     private val settings: SettingsRepository by inject()
     private val appUpdates: AppUpdates by inject()
+
+    /** Taps on the download notification, each asking for the download queue. */
+    private val openDownloads = Channel<Unit>(Channel.CONFLATED)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,7 +58,7 @@ class MainActivity : ComponentActivity(), KoinComponent {
                 enableEdgeToEdge()
             }
             AppTheme {
-                KozekiApp(incomingEpubs)
+                KozekiApp(incomingEpubs, openDownloads.receiveAsFlow())
             }
         }
     }
@@ -79,6 +85,7 @@ class MainActivity : ComponentActivity(), KoinComponent {
     private fun handleIntent(intent: Intent?) {
         handleRedirect(intent)
         receiveEpubs(intent)
+        if (intent?.action == DownloadWorker.ACTION_OPEN_QUEUE) openDownloads.trySend(Unit)
     }
 
     /** Hardcover sends the browser back here once the user has approved or denied the sign-in. */

@@ -220,11 +220,29 @@
     <string name="comic_download_retry">Try again</string>
     <string name="comic_download_delete">Delete download</string>
     <string name="comic_download_delete_picked">Delete downloads</string>
+    <plurals name="delete_downloads_title">
+        <item quantity="one">Delete this download?</item>
+        <item quantity="other">Delete %1$d downloads?</item>
+    </plurals>
+    <plurals name="delete_downloads_message">
+        <item quantity="one">The chapter is removed from this device. Its reading progress stays.</item>
+        <item quantity="other">The chapters are removed from this device. Their reading progress stays.</item>
+    </plurals>
+    <plurals name="delete_downloads_confirm">
+        <item quantity="one">Yes, delete it</item>
+        <item quantity="other">Yes, delete them</item>
+    </plurals>
     <string name="downloads_title">Download queue</string>
     <plurals name="downloads_chapter_count">
         <item quantity="one">%1$d chapter</item>
         <item quantity="other">%1$d chapters</item>
     </plurals>
+    <plurals name="downloads_notification_left">
+        <item quantity="one">%1$d chapter left</item>
+        <item quantity="other">%1$d chapters left</item>
+    </plurals>
+    <string name="notification_channel_downloads">Chapter downloads</string>
+    <string name="notification_channel_updates">Chapter updates</string>
     <string name="downloads_listing_pages">Finding the pages</string>
     <string name="downloads_pages_progress">%1$d of %2$d pages</string>
     <string name="downloads_move_to_front">Download next</string>
@@ -625,6 +643,8 @@
     <string name="settings_goal_decrease">One fewer</string>
     <string name="settings_goal_increase">One more</string>
     <string name="settings_backup_title">Backup</string>
+    <string name="settings_backup_remote">Remote</string>
+    <string name="settings_backup_local">Local</string>
     <string name="settings_drive">Google Drive</string>
     <string name="settings_drive_signed_out">Tap to sign in</string>
     <string name="settings_drive_sign_in">Sign in</string>

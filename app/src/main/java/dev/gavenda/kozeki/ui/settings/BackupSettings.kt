@@ -287,7 +287,7 @@ private fun BackupSettingPreview() {
 @Composable
 private fun DrivePreviewSection(state: DriveBackupState) {
     SplitSection(title = stringResource(R.string.settings_backup_title)) {
-        SettingSubgroup {
+        SettingSubgroup(label = stringResource(R.string.settings_backup_remote)) {
             BackupSetting(state, BackupActions())
         }
     }

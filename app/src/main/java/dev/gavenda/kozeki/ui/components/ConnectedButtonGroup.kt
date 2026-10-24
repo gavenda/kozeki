@@ -196,6 +196,13 @@ fun appBarIconToggleButtonColors(): IconToggleButtonColors {
 fun Modifier.narrowIconButton(): Modifier = minimumInteractiveComponentSize()
     .size(IconButtonDefaults.smallContainerSize(IconButtonDefaults.IconButtonWidthOption.Narrow))
 
+/**
+ * A wide icon button: 52dp wide inside the usual 48dp touch target, for the one action a screen
+ * wants noticed beside narrow ones.
+ */
+fun Modifier.wideIconButton(): Modifier = minimumInteractiveComponentSize()
+    .size(IconButtonDefaults.smallContainerSize(IconButtonDefaults.IconButtonWidthOption.Wide))
+
 @PreviewLightDark
 @Composable
 private fun ConnectedButtonGroupPreview() {

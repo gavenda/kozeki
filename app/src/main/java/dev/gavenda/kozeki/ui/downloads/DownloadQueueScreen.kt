@@ -65,6 +65,7 @@ import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.wideIconButton
 import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
 import dev.gavenda.kozeki.ui.downloadQueueViewModel
@@ -150,7 +151,7 @@ fun DownloadQueueContent(
                             onClick = actions.onRetryFailed,
                             shapes = IconButtonDefaults.shapes(),
                             colors = OptionColor.VIOLET.appBarIconButtonColors(),
-                            modifier = Modifier.narrowIconButton(),
+                            modifier = Modifier.wideIconButton(),
                         ) {
                             Icon(
                                 painterResource(R.drawable.refresh_48px),
