@@ -28,6 +28,8 @@ data class Book(
     val coverUrl: String? = null,
     /** The cover is a picture the user chose themselves. */
     val hasCustomCover: Boolean = false,
+    /** The user changed its details since it last took its source's. */
+    val hasEditedDetails: Boolean = false,
     val state: ReadingState = ReadingState.PLANNED,
     val acquisition: Acquisition = Acquisition.WISHLIST,
     val isFavorite: Boolean = false,

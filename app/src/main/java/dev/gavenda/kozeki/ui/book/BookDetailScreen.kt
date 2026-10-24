@@ -210,7 +210,7 @@ class BookDetailActions(
     val onDeleteDownloads: (List<String>) -> Unit = {},
     val onDeleteAllDownloads: () -> Unit = {},
     val onOpenDownloads: () -> Unit = {},
-    val onRefresh: () -> Unit = {},
+    val onRefresh: (replaceDetails: Boolean) -> Unit = {},
     val onOpenTrack: () -> Unit = {},
     val onOpenShelves: () -> Unit = {},
     val track: TrackSheetActions = TrackSheetActions(),
@@ -391,10 +391,12 @@ fun BookDetailContent(
     // show or change, only what the source says about it.
     val owned = onAdd == null
     var menuOpen by remember { mutableStateOf(false) }
+    val uriHandler = LocalUriHandler.current
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var editingPhysicalProgress by rememberSaveable { mutableStateOf(false) }
     var confirmingStopPhysical by rememberSaveable { mutableStateOf(false) }
+    var confirmingRefresh by rememberSaveable { mutableStateOf(false) }
     // "" means a new note is being written; null means no note dialog.
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
     var showingAllReviews by rememberSaveable { mutableStateOf(false) }
@@ -433,10 +435,11 @@ fun BookDetailContent(
     }
 
     // The bar stays put and takes the surface container once the page scrolls under it, as the library's does.
+    // It listens on the list, not the page, so a refresh pull at the top is not taken for a scroll.
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 scrollBehavior = scrollBehavior,
@@ -459,6 +462,7 @@ fun BookDetailContent(
                     }
                 },
                 actions = {
+                    val sourceUrl = book?.sourceUrl?.takeIf { book.source != null }
                     if (book != null && owned) {
                         if (book.canFavorite) {
                             FilledTonalIconToggleButton(
@@ -480,6 +484,8 @@ fun BookDetailContent(
                         if (book.isComic && chapters != null && chapters.chapters.isNotEmpty()) {
                             DownloadMenu(chapters, actions, onDeleteAll = deleteAllDownloads)
                         }
+                    }
+                    if (book != null && (owned || sourceUrl != null)) {
                         Box {
                             FilledTonalIconButton(
                                 onClick = { menuOpen = true },
@@ -494,8 +500,17 @@ fun BookDetailContent(
                                 )
                             }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                if (sourceUrl != null) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.book_view_in_browser)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            uriHandler.openUri(sourceUrl)
+                                        },
+                                    )
+                                }
                                 // A comic's details come from the source it is read from, with no EPUB to match.
-                                if (!book.isComic) {
+                                if (owned && !book.isComic) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.match_find)) },
                                         onClick = {
@@ -504,7 +519,7 @@ fun BookDetailContent(
                                         },
                                     )
                                 }
-                                if (book.source != null && !book.isComic) {
+                                if (owned && book.source != null && !book.isComic) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.match_unlink)) },
                                         onClick = {
@@ -513,14 +528,16 @@ fun BookDetailContent(
                                         },
                                     )
                                 }
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.cover_choose)) },
-                                    onClick = {
-                                        menuOpen = false
-                                        actions.onChooseCover()
-                                    },
-                                )
-                                if (book.hasCustomCover) {
+                                if (owned) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.cover_choose)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            actions.onChooseCover()
+                                        },
+                                    )
+                                }
+                                if (owned && book.hasCustomCover) {
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.cover_remove)) },
                                         onClick = {
@@ -529,13 +546,15 @@ fun BookDetailContent(
                                         },
                                     )
                                 }
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.action_remove)) },
-                                    onClick = {
-                                        menuOpen = false
-                                        confirmingDelete = true
-                                    },
-                                )
+                                if (owned) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.action_remove)) },
+                                        onClick = {
+                                            menuOpen = false
+                                            confirmingDelete = true
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -586,7 +605,8 @@ fun BookDetailContent(
             val pullState = rememberPullToRefreshState()
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
-                onRefresh = actions.onRefresh,
+                // Details the user changed are only replaced once they say so.
+                onRefresh = { if (book.hasEditedDetails) confirmingRefresh = true else actions.onRefresh(true) },
                 enabled = owned && book.sourceId != null && (book.isComic || book.source in MetadataSource.matchable),
                 state = pullState,
                 indicator = {
@@ -613,7 +633,10 @@ fun BookDetailContent(
             ) {
             LazyColumn(
                 state = listState,
-                modifier = Modifier.widthIn(max = 720.dp).align(Alignment.TopCenter),
+                modifier = Modifier
+                    .widthIn(max = 720.dp)
+                    .align(Alignment.TopCenter)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
@@ -793,6 +816,19 @@ fun BookDetailContent(
                     actions.onSetPhysicalProgress(page, pageCount)
                 },
                 onDismiss = { editingPhysicalProgress = false },
+            )
+        }
+        if (confirmingRefresh) {
+            ReplaceEditsDialog(
+                onReplace = {
+                    confirmingRefresh = false
+                    actions.onRefresh(true)
+                },
+                onKeep = {
+                    confirmingRefresh = false
+                    actions.onRefresh(false)
+                },
+                onDismiss = { confirmingRefresh = false },
             )
         }
         if (confirmingStopPhysical) {
@@ -1857,8 +1893,6 @@ private fun MatchNoticeCard(notice: MatchNotice, matching: Boolean, actions: Boo
 
 @Composable
 private fun AboutSection(book: Book) {
-    val uriHandler = LocalUriHandler.current
-
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SectionTitle(stringResource(R.string.book_about))
         book.description?.let { description ->
@@ -1893,22 +1927,6 @@ private fun AboutSection(book: Book) {
                     modifier = Modifier.width(112.dp),
                 )
                 Text(value, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        val source = book.source
-        val url = book.sourceUrl
-        if (source != null && url != null) {
-            TextButton(onClick = { uriHandler.openUri(url) }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-                Text(
-                    if (source == MetadataSource.COMICS) {
-                        // The catalogue is every installed source, so it names none of them.
-                        stringResource(R.string.book_view_in_browser)
-                    } else {
-                        stringResource(R.string.book_view_on_source, stringResource(source.nameRes))
-                    },
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(painterResource(R.drawable.open_in_new_48px), contentDescription = null, modifier = Modifier.size(16.dp))
             }
         }
     }

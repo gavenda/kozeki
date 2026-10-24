@@ -386,7 +386,7 @@ class LibraryRepository(
     suspend fun updateDetails(bookId: String, draft: BookDraft) = edit(bookId) { book ->
         val authors = draft.authors.singleLines()
         val isbn13 = draft.isbn?.let(Isbn::toIsbn13)
-        book.copy(
+        val edited = book.copy(
             title = draft.title.singleLine().ifEmpty { book.title },
             subtitle = draft.subtitle.tidied(),
             authors = authors,
@@ -400,6 +400,8 @@ class LibraryRepository(
             isbn10 = isbn13?.let(Isbn::toIsbn10),
             isbn13 = isbn13,
         )
+        // Saving the form only to change the cover leaves the details as the source gave them.
+        if (edited == book) book else edited.copy(detailsEdited = true)
     }
 
     /**
@@ -467,6 +469,7 @@ class LibraryRepository(
                     sourceId = metadata.sourceId,
                     sourceUrl = metadata.infoUrl,
                     matchStatus = MatchStatus.MATCHED,
+                    detailsEdited = false,
                     sync = book.sync.touched(clock.millis()),
                 ),
             )
@@ -941,6 +944,7 @@ class LibraryRepository(
         coverPath = coverFile?.let(storage::coverFile)?.takeIf { it.isFile }?.absolutePath,
         coverUrl = coverUrl,
         hasCustomCover = customCover,
+        hasEditedDetails = detailsEdited,
         state = state,
         acquisition = acquisition,
         isFavorite = isFavorite,

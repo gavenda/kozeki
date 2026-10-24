@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.gavenda.kozeki.R
@@ -107,6 +108,27 @@ fun DeleteBooksDialog(books: List<Book>, onConfirm: () -> Unit, onDismiss: () ->
     )
 }
 
+/**
+ * Asks, on a pull to refresh, whether the details the user changed give way to the source's.
+ * Keeping them still refreshes the rest.
+ */
+@Composable
+fun ReplaceEditsDialog(onReplace: () -> Unit, onKeep: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.refresh_edited_title)) },
+        text = { Text(stringResource(R.string.refresh_edited_message)) },
+        confirmButton = {
+            Button(onClick = onReplace, shapes = ButtonDefaults.shapes()) {
+                Text(stringResource(R.string.refresh_edited_replace))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onKeep) { Text(stringResource(R.string.refresh_edited_keep)) }
+        },
+    )
+}
+
 /** Asks before [count] downloaded chapters are deleted from the device. */
 @Composable
 fun DeleteDownloadsDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
@@ -156,4 +178,10 @@ private fun DeleteBookDialogPreview() {
 @Composable
 private fun DeleteBooksDialogPreview() {
     AppTheme { DeleteBooksDialog(books = PreviewData.books, onConfirm = {}, onDismiss = {}) }
+}
+
+@DialogPreviews
+@Composable
+private fun ReplaceEditsDialogPreview() {
+    AppTheme { ReplaceEditsDialog(onReplace = {}, onKeep = {}, onDismiss = {}) }
 }

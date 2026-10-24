@@ -350,7 +350,7 @@ fun LibraryContent(
     }
 
     Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = modifier,
         topBar = {
             SearchTopBar(
                 title = stringResource(R.string.nav_library),
@@ -412,7 +412,12 @@ fun LibraryContent(
 
             // Scrolls, because on a short window it does not all fit, and a column that cannot
             // scroll squashes its last buttons into whatever height is left.
-            state.isLibraryEmpty -> Box(Modifier.padding(innerPadding).verticalScroll(rememberScrollState())) {
+            state.isLibraryEmpty -> Box(
+                Modifier
+                    .padding(innerPadding)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .verticalScroll(rememberScrollState()),
+            ) {
                 EmptyState(
                     expression = Expression.HAPPY,
                     icon = painterResource(R.drawable.shelves_fill_48px),
@@ -436,7 +441,7 @@ fun LibraryContent(
             else -> Column(Modifier.padding(top = innerPadding.calculateTopPadding())) {
                 FilterRow(state, onFilterSelected, onSortSelected, onDisplaySelected, onKindSelected)
                 if (state.isShelvesEmpty) {
-                    Box(Modifier.verticalScroll(rememberScrollState())) {
+                    Box(Modifier.nestedScroll(scrollBehavior.nestedScrollConnection).verticalScroll(rememberScrollState())) {
                         EmptyState(
                             expression = Expression.NEUTRAL,
                             icon = painterResource(R.drawable.shelves_fill_48px),
@@ -518,7 +523,12 @@ fun LibraryContent(
                             horizontalArrangement = Arrangement.spacedBy(if (list) 8.dp else 12.dp),
                             // The gap between rows of covers is under each cover rather than between every item,
                             // so folded headers sit one on the next as they do in the list.
-                            modifier = Modifier.fillMaxSize().nestedScroll(scrollTurn),
+                            // The bar listens on the grid, inside the pull, so a drag back up to the top
+                            // brings the title down before any of it goes to a refresh.
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(scrollBehavior.nestedScrollConnection)
+                                .nestedScroll(scrollTurn),
                         ) {
                             // A book on several shelves is in the grid once for each, so its key says which.
                             fun LazyGridScope.sectionItems(prefix: String, sections: List<LibrarySection>) {

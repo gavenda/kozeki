@@ -356,24 +356,25 @@ class BookDetailViewModel(
      * Asks the source again, for a pull to refresh. A comic's details and chapters come together, and
      * a failure shows as the chapters' error. A book linked to a catalogue has its details asked for
      * past the cache, as the update check in Settings does, and its reviews too; a failure is an event.
-     * What the source says replaces what is kept.
+     * What the source says replaces what is kept, unless [replaceDetails] is false: then the details
+     * stay as they are and only the chapters, or the reviews, are asked for.
      */
-    fun refresh() {
+    fun refresh(replaceDetails: Boolean = true) {
         if (refreshing.value) return
         viewModelScope.launch {
             val book = library.observeBook(bookId).first() ?: return@launch
-            if (book.isComic) refreshComic(book) else refreshDetails(book)
+            if (book.isComic) refreshComic(book, replaceDetails) else refreshDetails(book, replaceDetails)
         }
     }
 
-    private fun refreshComic(book: Book) {
+    private fun refreshComic(book: Book, replaceDetails: Boolean) {
         val sourceId = book.sourceId ?: return
         chaptersJob?.cancel()
         refreshing.value = true
         chaptersJob = viewModelScope.launch {
             try {
-                val update = comicChapters.fetch(sourceId, book.title, book.sourceMemo, details = true)
-                update.details?.let { library.applyMetadata(bookId, it) }
+                val update = comicChapters.fetch(sourceId, book.title, book.sourceMemo, details = replaceDetails)
+                if (replaceDetails) update.details?.let { library.applyMetadata(bookId, it) }
                 comicChapters.sync(bookId, update.chapters.orEmpty())
                 chaptersStatus.value = ComicChaptersUiState()
                 try {
@@ -391,13 +392,13 @@ class BookDetailViewModel(
         }
     }
 
-    private suspend fun refreshDetails(book: Book) {
+    private suspend fun refreshDetails(book: Book, replaceDetails: Boolean) {
         val source = book.source?.takeIf { it in MetadataSource.matchable } ?: return
         val sourceId = book.sourceId ?: return
         refreshing.value = true
         try {
             // A book the source no longer has keeps what it was given before.
-            metadata.book(source, sourceId, fresh = true)?.let { library.applyMetadata(bookId, it) }
+            if (replaceDetails) metadata.book(source, sourceId, fresh = true)?.let { library.applyMetadata(bookId, it) }
             if (reviewed != null) loadReviews(fresh = true)
         } catch (e: MetadataException) {
             eventChannel.send(BookDetailEvent.RefreshFailed(LookupError.from(e)))

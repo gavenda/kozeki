@@ -58,6 +58,8 @@ data class BookEntity(
     val coverUrl: String? = null,
     /** [coverFile] is a picture the user chose, which no cover from an EPUB or a source replaces. */
     @ColumnInfo(defaultValue = "0") val customCover: Boolean = false,
+    /** The user changed what describes the book since it last took its source's details. */
+    @ColumnInfo(defaultValue = "0") val detailsEdited: Boolean = false,
 
     val state: ReadingState = ReadingState.PLANNED,
     val acquisition: Acquisition = Acquisition.WISHLIST,

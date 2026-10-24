@@ -22,7 +22,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ShelfEntity::class,
         ShelfBookEntity::class,
     ],
-    version = 16,
+    version = 17,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -59,6 +59,7 @@ abstract class KozekiDatabase : RoomDatabase() {
                     AddSeries,
                     AddSessionChapters,
                     EstimateSessionChapters,
+                    AddDetailsEdited,
                 )
                 .build()
 
@@ -209,6 +210,13 @@ abstract class KozekiDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE books ADD COLUMN series TEXT")
                 db.execSQL("ALTER TABLE books ADD COLUMN seriesNumber REAL")
+            }
+        }
+
+        /** A book remembers that its details were edited. Which of the ones already there were is not known. */
+        private val AddDetailsEdited = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE books ADD COLUMN detailsEdited INTEGER NOT NULL DEFAULT 0")
             }
         }
 

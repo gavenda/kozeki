@@ -106,6 +106,10 @@
     <string name="metadata_refresh_confirm_title">Refresh every book’s details?</string>
     <string name="metadata_refresh_confirm_message">Books linked to sources will be updated. Edits will be replaced.</string>
     <string name="metadata_refresh_confirm">Refresh</string>
+    <string name="refresh_edited_title">Replace your edits?</string>
+    <string name="refresh_edited_message">The source’s details will replace the ones you changed.</string>
+    <string name="refresh_edited_replace">Replace</string>
+    <string name="refresh_edited_keep">Keep mine</string>
     <plurals name="new_chapters">
         <item quantity="one">%1$d new chapter</item>
         <item quantity="other">%1$d new chapters</item>
@@ -289,7 +293,6 @@
     </plurals>
     <string name="book_about">Synopsis</string>
     <string name="book_no_details">No details yet. Look it up in the catalogue.</string>
-    <string name="book_view_on_source">View on %1$s</string>
     <string name="book_view_in_browser">Open in browser</string>
     <string name="detail_publisher">Publisher</string>
     <string name="detail_series">Series</string>
