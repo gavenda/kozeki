@@ -2,12 +2,15 @@ package dev.gavenda.kozeki.ui.search
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +42,8 @@ private val SettingsButtonInset = 4.dp
 
 /**
  * The top of a list of books: a large title with the search bar under it. Scrolling takes the
- * title away and leaves the search bar pinned at the top of the screen, with settings beside it.
+ * title away and leaves the search bar pinned at the top of the screen, with settings and the
+ * download queue beside it.
  */
 @Composable
 fun SearchTopBar(
@@ -52,8 +56,14 @@ fun SearchTopBar(
     scrollBehavior: TopAppBarScrollBehavior,
     modifier: Modifier = Modifier,
     @StringRes searchHint: Int = R.string.search_books_hint,
+    /** Chapters of comics in the download queue, counted on the button to it while there are any. */
+    queuedDownloads: Int = 0,
+    /** Opens the download queue; with none, there is no button for it. */
+    onDownloadsClick: (() -> Unit)? = null,
 ) {
     val barState = scrollBehavior.state
+    // How much of the bar's end the buttons take once it has slid up beside them.
+    val buttonsWidth = SettingsButtonSize * (if (onDownloadsClick != null) 2 else 1)
     val containerColor = MaterialTheme.colorScheme.surface
     val scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
 
@@ -103,15 +113,14 @@ fun SearchTopBar(
                     .layout { measurable, constraints ->
                         val making = ((barState.collapsedFraction - 0.4f) / 0.25f).coerceIn(0f, 1f)
                         val start = SearchBarInset.roundToPx()
-                        val end = lerp(SearchBarInset, SettingsButtonInset + SettingsButtonSize, making).roundToPx()
+                        val end = lerp(SearchBarInset, SettingsButtonInset + buttonsWidth, making).roundToPx()
                         val placeable = measurable.measure(constraints.offset(horizontal = -(start + end)))
                         layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(start, 0) }
                     }
                     .padding(vertical = 8.dp),
             )
         }
-        IconButton(
-            onClick = onSettingsClick,
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 // From the title's corner down to the middle of the search bar, a few pixels lower.
@@ -122,7 +131,22 @@ fun SearchTopBar(
                     )
                 },
         ) {
-            Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
+            if (onDownloadsClick != null) {
+                IconButton(onClick = onDownloadsClick) {
+                    BadgedBox(
+                        badge = { if (queuedDownloads > 0) Badge { Text(queuedDownloads.toString()) } },
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.download_48px),
+                            contentDescription = stringResource(R.string.downloads_title),
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = onSettingsClick) {
+                Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
+            }
         }
     }
 }

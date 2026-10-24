@@ -428,6 +428,10 @@ class LibraryViewModel(
 
     private val extras = combine(purchaseDefaults, shelfData, ::Pair)
 
+    /** How many chapters of comics are in the download queue, for the top bar's way to it. */
+    val queuedDownloads: StateFlow<Int> = downloads.queued.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     val uiState: StateFlow<LibraryUiState> =
         combine(books, view, busy, selectedIds, extras) { allBooks, (view, collapsed), busy, selected, extras ->
             val (filter, display) = view.filter to view.display

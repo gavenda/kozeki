@@ -41,6 +41,10 @@ data class AuthorRoute(val authorId: String, val name: String) : NavKey
 @Serializable
 data class SeriesRoute(val name: String) : NavKey
 
+/** The chapters of comics waiting to be downloaded or coming in. */
+@Serializable
+data object DownloadQueueRoute : NavKey
+
 @Serializable
 data object SettingsRoute : NavKey
 

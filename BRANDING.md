@@ -49,7 +49,7 @@ The halo is used where it means something: starting up, waiting, a goal reached,
 |---|---|
 | Launch screen | Draws itself in over half a second. The rings run round from the top, then the second hand swings from twelve to three. |
 | Anything loading | `HaloLoadingIndicator`, 48dp unless given another size, down to 24dp in rows and the icon size inside buttons. The rings drift one way while the hands go round the other at an even pace, like clockwork, the second five times as fast as the first. With a `progress`, the first hand goes round once as the work is done and the dial fills faintly behind it from twelve, while the second hand keeps lapping it, so a stall still looks at work. |
-| A chapter of a comic being downloaded | A 24dp halo at the end of the chapter's row. Its first hand and the fill behind it follow the pages as they come in (`progress`); a chapter still waiting in the queue has the plain wait at half strength. |
+| A chapter of a comic being downloaded | A 24dp halo at the end of the chapter's row. Its first hand and the fill behind it follow the pages as they come in (`progress`); a chapter still waiting in the queue has the plain wait at half strength. The download queue's own screen leads each chapter's row with the same halo. |
 | Checking followed comics for new chapters | A 96dp loading halo in the middle of the sheet a pull to refresh opens in the library. Its first hand goes round once over the whole check, the dial filling behind it (`progress`), and it is the plain wait until the comics are counted. |
 | A cover whose details are being looked up | The loading halo over the dimmed cover, with `glow = true`. Nothing else glows, since the glow only shows against something dark. |
 | A goal that is met | The day's and the year's goal ring (`GoalRing`) become the halo. The full ring takes the halo's colour and gains the inner ring and the ties, and the percentage stays where the dial would be. |
@@ -133,7 +133,7 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 | Face | Shows | Source | Used for |
 |---|---|---|---|
 | `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due |
-| `CONTENT` | Slight smile | 3 | All-time statistics with nothing on record; About |
+| `CONTENT` | Slight smile | 3 | All-time statistics with nothing on record; the download queue with nothing in it; About |
 | `NEUTRAL` | Her usual flat look | 1 | A library filter with nothing under it |
 | `CURIOUS` | A small "o" | 8 | Library search, before typing |
 | `STUDIOUS` | Monocle | 23 | Add book, before searching |

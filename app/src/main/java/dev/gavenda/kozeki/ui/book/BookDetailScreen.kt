@@ -51,6 +51,7 @@ import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
@@ -188,6 +189,7 @@ class BookDetailActions(
     /** Deletes the downloads of these chapters, or stops them on their way. */
     val onDeleteDownloads: (List<String>) -> Unit = {},
     val onDeleteAllDownloads: () -> Unit = {},
+    val onOpenDownloads: () -> Unit = {},
     val onRefresh: () -> Unit = {},
     val onOpenTrack: () -> Unit = {},
     val onOpenShelves: () -> Unit = {},
@@ -203,6 +205,7 @@ fun BookDetailScreen(
     onEdit: (String) -> Unit,
     onOpenAuthor: (AuthorRef) -> Unit,
     onOpenSeries: (String) -> Unit,
+    onOpenDownloads: () -> Unit = {},
     /** Shown until the stored book has loaded, for a page that was already showing this book. */
     placeholder: Book? = null,
     viewModel: BookDetailViewModel = koinViewModel(key = bookId) { bookDetailViewModel(bookId) },
@@ -270,6 +273,7 @@ fun BookDetailScreen(
             onDownloadAll = viewModel::downloadAll,
             onDeleteDownloads = viewModel::deleteDownloads,
             onDeleteAllDownloads = viewModel::deleteAllDownloads,
+            onOpenDownloads = onOpenDownloads,
             onRefresh = viewModel::refresh,
             onOpenTrack = viewModel::openTrackSheet,
             onOpenShelves = { choosingShelves = true },
@@ -1108,7 +1112,7 @@ private fun ChapterSelectionToolbar(
 
 /**
  * The download button of a comic's top bar, as Mihon has it: a menu to download the chapters not
- * read yet or all of them, and to delete the ones downloaded.
+ * read yet or all of them, to delete the ones downloaded, and to see the queue.
  */
 @Composable
 private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActions) {
@@ -1145,6 +1149,14 @@ private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActi
                 onClick = {
                     expanded = false
                     actions.onDeleteAllDownloads()
+                },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.downloads_title)) },
+                onClick = {
+                    expanded = false
+                    actions.onOpenDownloads()
                 },
             )
         }

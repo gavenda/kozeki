@@ -45,6 +45,7 @@ import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.ui.book.BookDetailScreen
 import dev.gavenda.kozeki.ui.book.FoundBookScreen
 import dev.gavenda.kozeki.ui.calendar.CalendarScreen
+import dev.gavenda.kozeki.ui.downloads.DownloadQueueScreen
 import dev.gavenda.kozeki.ui.library.LibraryScreen
 import dev.gavenda.kozeki.ui.comic.ComicReaderScreen
 import dev.gavenda.kozeki.ui.navigation.AddBookRoute
@@ -53,6 +54,7 @@ import dev.gavenda.kozeki.ui.navigation.SeriesRoute
 import dev.gavenda.kozeki.ui.navigation.BookRoute
 import dev.gavenda.kozeki.ui.navigation.CalendarRoute
 import dev.gavenda.kozeki.ui.navigation.DayRoute
+import dev.gavenda.kozeki.ui.navigation.DownloadQueueRoute
 import dev.gavenda.kozeki.ui.navigation.FoundBookRoute
 import dev.gavenda.kozeki.ui.navigation.LibraryRoute
 import dev.gavenda.kozeki.ui.navigation.BookFormRoute
@@ -114,6 +116,7 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
                         onAddBook = { nav.open(AddBookRoute) },
                         onAddManually = { nav.open(BookFormRoute()) },
                         onOpenSettings = { nav.open(SettingsRoute) },
+                        onOpenDownloads = { nav.open(DownloadQueueRoute) },
                     )
                 }
                 entry<CalendarRoute>(metadata = topLevelMetadata(TopLevelDestination.CALENDAR)) {
@@ -190,6 +193,10 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
                         onOpenResult = { nav.open(FoundBookRoute(Json.encodeToString(it))) },
                     )
                 }
+                entry<DownloadQueueRoute> {
+                    val nav = rememberEntryNavigator(backStack)
+                    DownloadQueueScreen(onBack = nav::back, onOpenComic = { nav.open(BookRoute(it)) })
+                }
                 entry<SettingsRoute> {
                     val nav = rememberEntryNavigator(backStack)
                     SettingsScreen(onBack = nav::back)
@@ -204,6 +211,7 @@ fun KozekiApp(incomingEpubs: IncomingEpubs) {
                         onEdit = { nav.open(BookFormRoute(it)) },
                         onOpenAuthor = { nav.open(AuthorRoute(it.id, it.name)) },
                         onOpenSeries = { nav.open(SeriesRoute(it)) },
+                        onOpenDownloads = { nav.open(DownloadQueueRoute) },
                     )
                 }
                 entry<ComicReaderRoute> { route ->

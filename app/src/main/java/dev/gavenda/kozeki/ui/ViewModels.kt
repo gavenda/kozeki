@@ -15,6 +15,7 @@ import dev.gavenda.kozeki.ui.series.SeriesViewModel
 import dev.gavenda.kozeki.ui.book.BookDetailViewModel
 import dev.gavenda.kozeki.ui.book.FoundBookViewModel
 import dev.gavenda.kozeki.ui.calendar.CalendarViewModel
+import dev.gavenda.kozeki.ui.downloads.DownloadQueueViewModel
 import dev.gavenda.kozeki.ui.library.LibraryViewModel
 import dev.gavenda.kozeki.ui.comic.ComicReaderViewModel
 import dev.gavenda.kozeki.ui.reader.ReaderViewModel
@@ -44,6 +45,8 @@ fun bookFormViewModel(bookId: String?) = BookFormViewModel(bookId, koin.get())
 fun authorViewModel(authorId: String, name: String) = AuthorViewModel(authorId, name, koin.get(), koin.get())
 
 fun seriesViewModel(name: String) = SeriesViewModel(name, koin.get(), koin.get())
+
+fun downloadQueueViewModel() = DownloadQueueViewModel(koin.get(), koin.get())
 
 fun searchViewModel() = SearchViewModel(koin.get())
 

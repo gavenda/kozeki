@@ -220,6 +220,21 @@
     <string name="comic_download_retry">Try again</string>
     <string name="comic_download_delete">Delete download</string>
     <string name="comic_download_delete_picked">Delete downloads</string>
+    <string name="downloads_title">Download queue</string>
+    <plurals name="downloads_chapter_count">
+        <item quantity="one">%1$d chapter</item>
+        <item quantity="other">%1$d chapters</item>
+    </plurals>
+    <string name="downloads_listing_pages">Finding the pages</string>
+    <string name="downloads_pages_progress">%1$d of %2$d pages</string>
+    <string name="downloads_move_to_front">Download next</string>
+    <string name="downloads_retry_failed">Try the stopped ones again</string>
+    <string name="downloads_cancel_all">Cancel all downloads</string>
+    <string name="downloads_cancel_comic">Cancel this comic\'s downloads</string>
+    <string name="downloads_more_actions">More options</string>
+    <string name="downloads_chapter_actions">Chapter options</string>
+    <string name="downloads_empty_title">Nothing to fetch</string>
+    <string name="downloads_empty_message">I\'m not fetching any chapters. Ask for some from a comic\'s page and I\'ll keep them here for reading without the source.</string>
     <string name="comic_reader_chapter_missing">This chapter is no longer listed by its source.</string>
     <string name="comic_reader_page_description">Page %1$d</string>
     <string name="comic_reader_page_failed">This page could not be loaded.</string>

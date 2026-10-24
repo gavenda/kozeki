@@ -43,6 +43,9 @@ sealed interface ChapterDownload {
     data object Downloaded : ChapterDownload
 }
 
+/** A chapter in the download queue, waiting, coming in or stopped. */
+data class QueuedDownload(val bookId: String, val chapter: ComicChapter, val state: ChapterDownload)
+
 /**
  * Chapters of comics kept on this device to be read without their source, as Mihon keeps them.
  * They are fetched one chapter at a time and one page at a time, in the order they were asked for,
@@ -99,6 +102,10 @@ class ComicDownloads(
             }
         }.distinctUntilChanged()
 
+    /** Every chapter in the queue, in the order it will be fetched. */
+    val queued: Flow<List<QueuedDownload>> =
+        queue.map { tasks -> tasks.map { QueuedDownload(it.bookId, it.chapter, it.state) } }.distinctUntilChanged()
+
     /** How many chapters of each book are downloaded, for the books with any. */
     val counts: Flow<Map<String, Int>> =
         _downloaded.map { map -> map.mapValues { it.value.size }.filterValues { it > 0 } }.distinctUntilChanged()
@@ -130,6 +137,47 @@ class ComicDownloads(
         scope.launch {
             lock.withLock {
                 queue.update { tasks -> tasks.filterNot { it.bookId == bookId && it.chapter.url in urls } }
+                saveQueue()
+            }
+        }
+    }
+
+    /**
+     * Moves the chapter [url] of [bookId] to the front of the queue, to be fetched next. The one
+     * coming in now is not stopped for it.
+     */
+    fun moveToFront(bookId: String, url: String) {
+        scope.launch {
+            lock.withLock {
+                queue.update { tasks ->
+                    val task = tasks.firstOrNull { it.bookId == bookId && it.chapter.url == url } ?: return@update tasks
+                    val rest = tasks - task
+                    // Straight after the one coming in, which the queue shows first.
+                    val at = rest.indexOfFirst { it.state is ChapterDownload.Downloading } + 1
+                    rest.take(at) + task + rest.drop(at)
+                }
+                saveQueue()
+            }
+        }
+    }
+
+    /** Puts every chapter that stopped back to waiting. */
+    fun retryFailed() {
+        scope.launch {
+            lock.withLock {
+                queue.update { tasks ->
+                    tasks.map { if (it.state is ChapterDownload.Failed) it.copy(state = ChapterDownload.Queued) else it }
+                }
+            }
+            start()
+        }
+    }
+
+    /** Empties the queue, stopping the chapter coming in. What is downloaded already stays. */
+    fun cancelAll() {
+        scope.launch {
+            lock.withLock {
+                queue.value = emptyList()
                 saveQueue()
             }
         }

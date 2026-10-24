@@ -158,11 +158,13 @@ fun LibraryScreen(
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     viewModel: LibraryViewModel = koinViewModel { libraryViewModel() },
     searchViewModel: SearchViewModel = koinViewModel { searchViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val search by searchViewModel.uiState.collectAsStateWithLifecycle()
+    val queuedDownloads by viewModel.queuedDownloads.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalResources.current
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -217,6 +219,8 @@ fun LibraryScreen(
             )
         },
         onSettingsClick = onOpenSettings,
+        queuedDownloads = queuedDownloads,
+        onDownloadsClick = onOpenDownloads,
         onRefresh = viewModel::checkForUpdates,
         onRefreshMetadata = viewModel::refreshMetadata,
         onCancelRefresh = viewModel::cancelUpdateCheck,
@@ -270,6 +274,8 @@ fun LibraryContent(
     onCancelRefresh: () -> Unit = {},
     onUpToDateShown: () -> Unit = {},
     onToggleGroup: (String) -> Unit = {},
+    queuedDownloads: Int = 0,
+    onDownloadsClick: () -> Unit = {},
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val gridState = rememberLazyGridState()
@@ -351,6 +357,8 @@ fun LibraryContent(
                 onSearchQueryChange = onSearchQueryChange,
                 onBookClick = onBookClick,
                 onSettingsClick = onSettingsClick,
+                queuedDownloads = queuedDownloads,
+                onDownloadsClick = onDownloadsClick,
                 scrollBehavior = scrollBehavior,
                 searchHint = if (state.kind == LibraryKind.COMICS) {
                     R.string.search_comics_hint
