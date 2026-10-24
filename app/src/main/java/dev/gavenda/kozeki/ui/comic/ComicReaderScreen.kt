@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -177,6 +178,18 @@ private fun ComicReaderReady(state: ComicReaderUiState.Ready, viewModel: ComicRe
         if (vertical) {
             val urls = state.segments.map { it.chapter.url }
             LaunchedEffect(urls) { strip.track(state.segments) }
+            // The list finds the item it showed by its key only within a hundred or so places of where
+            // it was. A downloaded chapter is all slices at once, well over that, so when one above is
+            // let go the list would stay at the same place and land a chapter on. The item is found
+            // here instead, after the change and before the list is laid out again.
+            val itemsForPosition = items
+            SideEffect {
+                val index = listState.firstVisibleItemIndex
+                val first = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } ?: return@SideEffect
+                if (itemsForPosition.getOrNull(index)?.key == first.key) return@SideEffect
+                val moved = itemsForPosition.indexOfFirst { it.key == first.key }
+                if (moved >= 0) listState.requestScrollToItem(moved, listState.firstVisibleItemScrollOffset)
+            }
         }
         val rtl = mode == ComicReadingMode.RIGHT_TO_LEFT
         // The strip outlives the chapter on screen, which changes as the next one is scrolled into.
