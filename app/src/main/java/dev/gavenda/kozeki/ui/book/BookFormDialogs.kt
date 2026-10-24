@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.ui.book
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -32,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -54,6 +57,7 @@ import dev.gavenda.kozeki.data.model.pagesUnread
 import dev.gavenda.kozeki.ui.DialogPreviews
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.components.HistoryTextField
+import dev.gavenda.kozeki.ui.components.TooltipIconButton
 import dev.gavenda.kozeki.ui.defaultCurrency
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.parsePrice
@@ -81,6 +85,7 @@ fun NoteDialog(
         onSave = { onSave(text) },
         onDismiss = onDismiss,
         removeLabel = stringResource(R.string.note_remove),
+        removeIcon = R.drawable.delete_48px,
         onRemove = onDelete,
     ) {
         OutlinedTextField(
@@ -116,9 +121,8 @@ fun PhysicalProgressDialog(
         mutableStateOf(TextFieldValue(text, TextRange(0, text.length)))
     }
     var pageCount by rememberSaveable { mutableStateOf(book.physicalPageCount?.toString().orEmpty()) }
-    // Going back and stopping both unread pages that are on record, so each asks first.
+    // Going back unreads pages that are on record, so it asks first.
     var confirmingRewind by rememberSaveable { mutableStateOf(false) }
-    var confirmingStop by rememberSaveable { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -129,7 +133,6 @@ fun PhysicalProgressDialog(
     // The page as it will be kept: a copy with no count of its own ends where the source says the book does.
     val target = pageNumber?.coerceAtMost(total ?: book.pageCount?.takeIf { it > 0 } ?: Int.MAX_VALUE)
     val unreadByPage = if (target != null) pagesUnread(readings, book.physicalPage, target) else 0
-    val unreadByStopping = pagesUnread(readings, book.physicalPage, null)
 
     FormDialog(
         title = stringResource(R.string.physical_dialog_title),
@@ -137,12 +140,6 @@ fun PhysicalProgressDialog(
         saveEnabled = pageValid && pageCountValid,
         onSave = { if (unreadByPage > 0) confirmingRewind = true else onSave(pageNumber, total) },
         onDismiss = onDismiss,
-        removeLabel = stringResource(R.string.physical_stop),
-        onRemove = if (book.physicalPage != null) {
-            { if (unreadByStopping > 0) confirmingStop = true else onSave(null, total) }
-        } else {
-            null
-        },
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
@@ -178,17 +175,12 @@ fun PhysicalProgressDialog(
             onDismiss = { confirmingRewind = false },
         )
     }
-    if (confirmingStop) {
-        RewindDialog(
-            page = null,
-            pagesLost = unreadByStopping,
-            onConfirm = {
-                confirmingStop = false
-                onSave(null, total)
-            },
-            onDismiss = { confirmingStop = false },
-        )
-    }
+}
+
+/** Asks before tracking a physical copy stops, since the [pagesLost] on record leave the timeline with it. */
+@Composable
+fun StopPhysicalDialog(pagesLost: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    RewindDialog(page = null, pagesLost = pagesLost, onConfirm = onConfirm, onDismiss = onDismiss)
 }
 
 /**
@@ -364,8 +356,9 @@ fun PurchaseDialog(
 }
 
 /**
- * The dialog the editing forms share: a title, the fields, then the actions, with the destructive
- * one first when there is one. A tap outside does not close it, so what was typed is only
+ * The dialog the editing forms share: a title, the fields, then the actions. A destructive one, when
+ * there is one, is an icon alone at the start, named by [removeLabel] for TalkBack and a long press,
+ * so the row does not wrap. A tap outside does not close it, so what was typed is only
  * discarded on purpose, with Cancel or Back.
  */
 @Composable
@@ -376,21 +369,22 @@ private fun FormDialog(
     onSave: () -> Unit,
     onDismiss: () -> Unit,
     removeLabel: String? = null,
+    @DrawableRes removeIcon: Int? = null,
     onRemove: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        // One row of its own, so the remove icon can sit apart at the start.
         confirmButton = {
-            Button(onClick = onSave, enabled = saveEnabled, shapes = ButtonDefaults.shapes()) { Text(saveLabel) }
-        },
-        dismissButton = {
-            // The dialog lays these out from the end, so the one written last comes first.
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
-            if (removeLabel != null && onRemove != null) {
-                TextButton(onClick = onRemove) {
-                    Text(removeLabel, color = MaterialTheme.colorScheme.error)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (removeLabel != null && removeIcon != null && onRemove != null) {
+                    TooltipIconButton(removeIcon, removeLabel, onRemove, tint = MaterialTheme.colorScheme.error)
                 }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = onSave, enabled = saveEnabled, shapes = ButtonDefaults.shapes()) { Text(saveLabel) }
             }
         },
         title = { Text(title) },

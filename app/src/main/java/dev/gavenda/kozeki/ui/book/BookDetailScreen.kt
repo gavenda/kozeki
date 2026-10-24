@@ -2,28 +2,24 @@ package dev.gavenda.kozeki.ui.book
 
 import android.Manifest
 import android.content.pm.PackageManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.AnimatedContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +27,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,42 +42,41 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilledTonalIconToggleButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
-import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,46 +88,42 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import dev.gavenda.kozeki.ui.components.ExpandableText
-import dev.gavenda.kozeki.ui.components.CoverAspectRatio
-import coil3.compose.AsyncImage
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil3.compose.AsyncImage
 import dev.gavenda.kozeki.R
+import dev.gavenda.kozeki.data.comic.ChapterDownload
 import dev.gavenda.kozeki.data.metadata.AuthorRef
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
-import dev.gavenda.kozeki.ui.components.appBarIconToggleButtonColors
-import dev.gavenda.kozeki.ui.components.narrowIconButton
-import dev.gavenda.kozeki.ui.components.OptionColor
-import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
-import dev.gavenda.kozeki.ui.library.ShelfChecklistSheet
-import dev.gavenda.kozeki.data.comic.ChapterDownload
 import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.data.model.MatchStatus
 import dev.gavenda.kozeki.data.model.MetadataSource
@@ -140,6 +133,7 @@ import dev.gavenda.kozeki.data.model.ReadOutcome
 import dev.gavenda.kozeki.data.model.ReadThrough
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.TrackStatus
+import dev.gavenda.kozeki.data.model.pagesUnread
 import dev.gavenda.kozeki.ui.CaptchaActivity
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.PreviewData
@@ -149,12 +143,19 @@ import dev.gavenda.kozeki.ui.bookDetailViewModel
 import dev.gavenda.kozeki.ui.components.AuthorLinks
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.CoverAspectRatio
+import dev.gavenda.kozeki.ui.components.ExpandableText
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.LabelTooltip
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
+import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
+import dev.gavenda.kozeki.ui.components.appBarIconToggleButtonColors
 import dev.gavenda.kozeki.ui.components.icon
 import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.components.nameRes
+import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatPercent
@@ -162,6 +163,7 @@ import dev.gavenda.kozeki.ui.formatPrice
 import dev.gavenda.kozeki.ui.foundBookViewModel
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.library.EpubMimeTypes
+import dev.gavenda.kozeki.ui.library.ShelfChecklistSheet
 import dev.gavenda.kozeki.ui.library.importMessage
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.text.NumberFormat
@@ -392,6 +394,7 @@ fun BookDetailContent(
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var editingPhysicalProgress by rememberSaveable { mutableStateOf(false) }
+    var confirmingStopPhysical by rememberSaveable { mutableStateOf(false) }
     // "" means a new note is being written; null means no note dialog.
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
     var showingAllReviews by rememberSaveable { mutableStateOf(false) }
@@ -644,7 +647,18 @@ fun BookDetailContent(
                 }
                 if (book.canTrackPhysical && !book.isComic) {
                     item(key = "physical-progress") {
-                        PhysicalProgressCard(book, onEdit = { editingPhysicalProgress = true })
+                        PhysicalProgressCard(
+                            book = book,
+                            onEdit = { editingPhysicalProgress = true },
+                            onStop = {
+                                // Asks first only when stopping unreads pages that are on record.
+                                if (pagesUnread(state.physicalReadings, book.physicalPage, null) > 0) {
+                                    confirmingStopPhysical = true
+                                } else {
+                                    actions.onSetPhysicalProgress(null, book.physicalPageCount)
+                                }
+                            },
+                        )
                     }
                 }
                 matchNotice(book)?.let { notice ->
@@ -779,6 +793,16 @@ fun BookDetailContent(
                     actions.onSetPhysicalProgress(page, pageCount)
                 },
                 onDismiss = { editingPhysicalProgress = false },
+            )
+        }
+        if (confirmingStopPhysical) {
+            StopPhysicalDialog(
+                pagesLost = pagesUnread(state.physicalReadings, book.physicalPage, null),
+                onConfirm = {
+                    confirmingStopPhysical = false
+                    actions.onSetPhysicalProgress(null, book.physicalPageCount)
+                },
+                onDismiss = { confirmingStopPhysical = false },
             )
         }
         editingNoteId?.let { noteId ->
@@ -1693,7 +1717,7 @@ private fun ProgressCard(book: Book, readingTimeMs: Long, readThroughs: List<Rea
  * invitation rather than an empty meter.
  */
 @Composable
-private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit) {
+private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit, onStop: () -> Unit) {
     // The paper copy is told from the EPUB by its colour as well: the theme's leather.
     val leather = MaterialTheme.colorScheme.tertiary
     val page = book.physicalPage
@@ -1732,6 +1756,28 @@ private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit) {
                     value = if (pageCount != null) stringResource(R.string.x_of_y, page, pageCount) else page.toString(),
                     modifier = Modifier.weight(1f),
                 )
+                // Narrow, and in the error colours, beside the button it must not be mistaken for.
+                val stopLabel = stringResource(R.string.physical_stop)
+                LabelTooltip(stopLabel) {
+                    FilledTonalIconButton(
+                        onClick = onStop,
+                        shapes = IconButtonDefaults.shapes(),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                        modifier = Modifier.size(
+                            IconButtonDefaults.smallContainerSize(IconButtonDefaults.IconButtonWidthOption.Narrow),
+                        ),
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.do_not_disturb_on_48px),
+                            contentDescription = stopLabel,
+                            modifier = Modifier.size(IconButtonDefaults.smallIconSize),
+                        )
+                    }
+                }
+                Spacer(Modifier.width(8.dp))
                 FilledTonalButton(onClick = onEdit, shapes = ButtonDefaults.shapes()) {
                     Text(stringResource(R.string.physical_update))
                 }

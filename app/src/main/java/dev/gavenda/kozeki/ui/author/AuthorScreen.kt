@@ -56,10 +56,10 @@ import dev.gavenda.kozeki.data.model.MetadataSource
 import dev.gavenda.kozeki.ui.LookupError
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.authorViewModel
-import dev.gavenda.kozeki.ui.components.ExpandableText
 import dev.gavenda.kozeki.ui.components.AddSelectedToolbar
 import dev.gavenda.kozeki.ui.components.BulkAddedSnackbarEffect
 import dev.gavenda.kozeki.ui.components.EmptyState
+import dev.gavenda.kozeki.ui.components.ExpandableText
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
