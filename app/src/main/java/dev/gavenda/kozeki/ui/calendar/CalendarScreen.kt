@@ -16,7 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -49,7 +49,11 @@ import dev.gavenda.kozeki.ui.calendarViewModel
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.CoverAspectRatio
 import dev.gavenda.kozeki.ui.components.HaloMark
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.RatingBar
+import dev.gavenda.kozeki.ui.components.SettingsButton
+import dev.gavenda.kozeki.ui.components.iconButtonColors
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
 import dev.gavenda.kozeki.ui.formatMonth
@@ -114,9 +118,7 @@ fun CalendarContent(
                     )
                 },
                 actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
-                    }
+                    SettingsButton(onSettingsClick)
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -162,14 +164,22 @@ private fun MonthNavigator(
         if (state.canGoForward) {
             TextButton(onClick = onToday) { Text(stringResource(R.string.stats_today)) }
         }
-        FilledTonalIconButton(onClick = onPrevious) {
+        // Gold, as the month range is in statistics.
+        val colors = OptionColor.GOLD.iconButtonColors()
+        FilledTonalIconButton(onClick = onPrevious, shapes = IconButtonDefaults.shapes(), colors = colors, modifier = Modifier.narrowIconButton()) {
             Icon(
                 painterResource(R.drawable.keyboard_arrow_left_48px),
                 contentDescription = stringResource(R.string.calendar_previous_month),
                 modifier = Modifier.size(24.dp),
             )
         }
-        FilledTonalIconButton(onClick = onNext, enabled = state.canGoForward) {
+        FilledTonalIconButton(
+            onClick = onNext,
+            shapes = IconButtonDefaults.shapes(),
+            enabled = state.canGoForward,
+            colors = colors,
+            modifier = Modifier.narrowIconButton(),
+        ) {
             Icon(
                 painterResource(R.drawable.keyboard_arrow_right_48px),
                 contentDescription = stringResource(R.string.calendar_next_month),

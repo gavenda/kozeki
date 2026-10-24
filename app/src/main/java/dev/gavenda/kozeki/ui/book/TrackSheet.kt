@@ -53,6 +53,7 @@ import dev.gavenda.kozeki.data.model.TrackStatus
 import dev.gavenda.kozeki.data.tracking.anilist.AniListMedia
 import dev.gavenda.kozeki.data.tracking.anilist.ScoreFormat
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 
 /** What the sheet can ask for. */
@@ -195,12 +196,14 @@ private fun TrackEntry(track: ComicTrackEntity, state: TrackingUiState, actions:
             FilledTonalIconButton(
                 onClick = { actions.onEdit { it.copy(progress = (it.progress - 1).coerceAtLeast(0)) } },
                 enabled = track.progress > 0 && !sheet.working,
+                modifier = Modifier.narrowIconButton(),
             ) {
                 Icon(painterResource(R.drawable.remove_48px), contentDescription = stringResource(R.string.track_progress_less), modifier = Modifier.size(24.dp))
             }
             FilledTonalIconButton(
                 onClick = { actions.onEdit { it.copy(progress = it.progress + 1) } },
                 enabled = (track.totalChapters == null || track.progress < track.totalChapters) && !sheet.working,
+                modifier = Modifier.narrowIconButton(),
             ) {
                 Icon(painterResource(R.drawable.add_48px), contentDescription = stringResource(R.string.track_progress_more), modifier = Modifier.size(24.dp))
             }

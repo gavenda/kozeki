@@ -44,6 +44,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +58,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -87,6 +89,7 @@ import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.SpeechBubble
+import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.settingsViewModel
@@ -225,10 +228,14 @@ fun SettingsContent(
     onAniListSignOut: () -> Unit = {},
     onDismissAniListError: () -> Unit = {},
 ) {
+    // The bar takes the surface container once the page scrolls under it, as the library's does.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -770,10 +777,11 @@ private fun YearlyGoalSetting(year: Int, books: Int?, onSet: (Int) -> Unit) {
             FilledTonalIconButton(
                 onClick = { onSet((books ?: DEFAULT_YEARLY_GOAL) - 1) },
                 enabled = (books ?: 0) > 1,
+                modifier = Modifier.narrowIconButton(),
             ) {
                 Icon(painterResource(R.drawable.remove_48px), contentDescription = stringResource(R.string.settings_goal_decrease), modifier = Modifier.size(24.dp))
             }
-            FilledTonalIconButton(onClick = { onSet(books?.plus(1) ?: DEFAULT_YEARLY_GOAL) }) {
+            FilledTonalIconButton(onClick = { onSet(books?.plus(1) ?: DEFAULT_YEARLY_GOAL) }, modifier = Modifier.narrowIconButton()) {
                 Icon(painterResource(R.drawable.add_48px), contentDescription = stringResource(R.string.settings_goal_increase), modifier = Modifier.size(24.dp))
             }
         }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -41,6 +42,9 @@ import dev.gavenda.kozeki.data.comic.LoadedExtension
 import dev.gavenda.kozeki.data.comic.ComicExtension
 import dev.gavenda.kozeki.data.settings.SettingsRepository.Companion.comicLanguageKey
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
+import dev.gavenda.kozeki.ui.components.iconButtonColors
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import java.util.Locale
@@ -73,7 +77,7 @@ internal fun ComicSourcesSetting(
         subtitle = stringResource(R.string.settings_comic_description),
         modifier = Modifier.clickable(enabled = extensions.isNotEmpty()) { expanded = !expanded },
     ) {
-        FilledTonalIconButton(onClick = onRefresh) {
+        FilledTonalIconButton(onClick = onRefresh, modifier = Modifier.narrowIconButton()) {
             Icon(
                 painterResource(R.drawable.refresh_48px),
                 contentDescription = stringResource(R.string.settings_comic_refresh),
@@ -136,8 +140,8 @@ private fun SingleLanguageExtension(extension: ComicExtension) {
 }
 
 /**
- * An extension in several languages, with a chevron to open it. Open, it stands on the tertiary
- * container with a switch for each language, the last one shown staying on.
+ * An extension in several languages, with a chevron to open it. Open, it stands on the highest
+ * surface container with a switch for each language, the last one shown staying on.
  */
 @Composable
 private fun MultiLanguageExtension(
@@ -149,18 +153,12 @@ private fun MultiLanguageExtension(
     val context = LocalContext.current
     var open by rememberSaveable { mutableStateOf(false) }
     val container by animateColorAsState(
-        if (open) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
+        if (open) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
         label = "extension container",
     )
-    val content by animateColorAsState(
-        if (open) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface,
-        label = "extension content",
-    )
-    val subtitleColor = if (open) {
-        MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    // On a surface container the text keeps the colours it has on the page.
+    val content = MaterialTheme.colorScheme.onSurface
+    val subtitleColor = MaterialTheme.colorScheme.onSurfaceVariant
     val turn by animateFloatAsState(if (open) 0f else 180f, label = "extension arrow")
     val shown = languages.keys.filter { comicLanguageKey(extension.packageName, it) !in hiddenLanguages }
 
@@ -183,14 +181,20 @@ private fun MultiLanguageExtension(
                 modifier = Modifier.clickable { open = !open },
             ) {
                 // Up while the languages show, down while they are folded away.
-                Icon(
-                    painterResource(R.drawable.keyboard_arrow_up_48px),
-                    contentDescription = stringResource(
-                        if (open) R.string.settings_comic_languages_hide else R.string.settings_comic_languages_show,
-                    ),
-                    tint = subtitleColor,
-                    modifier = Modifier.size(24.dp).rotate(turn),
-                )
+                FilledTonalIconButton(
+                    onClick = { open = !open },
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = OptionColor.LEATHER.iconButtonColors(),
+                    modifier = Modifier.narrowIconButton(),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.keyboard_arrow_up_48px),
+                        contentDescription = stringResource(
+                            if (open) R.string.settings_comic_languages_hide else R.string.settings_comic_languages_show,
+                        ),
+                        modifier = Modifier.size(24.dp).rotate(turn),
+                    )
+                }
             }
             AnimatedVisibility(open) {
                 Column {

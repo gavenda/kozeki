@@ -26,13 +26,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -60,6 +64,9 @@ import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
+import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
 import dev.gavenda.kozeki.ui.downloadQueueViewModel
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
@@ -107,10 +114,14 @@ fun DownloadQueueContent(
     actions: DownloadQueueActions,
     modifier: Modifier = Modifier,
 ) {
+    // The bar takes the surface container once the page scrolls under it, as the library's does.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = {
                     Column {
                         Text(stringResource(R.string.downloads_title), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -135,7 +146,12 @@ fun DownloadQueueContent(
                 },
                 actions = {
                     if (state.anyFailed) {
-                        IconButton(onClick = actions.onRetryFailed) {
+                        FilledTonalIconButton(
+                            onClick = actions.onRetryFailed,
+                            shapes = IconButtonDefaults.shapes(),
+                            colors = OptionColor.VIOLET.appBarIconButtonColors(),
+                            modifier = Modifier.narrowIconButton(),
+                        ) {
                             Icon(
                                 painterResource(R.drawable.refresh_48px),
                                 contentDescription = stringResource(R.string.downloads_retry_failed),
@@ -195,7 +211,12 @@ fun DownloadQueueContent(
 private fun QueueMenu(actions: DownloadQueueActions) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }) {
+        FilledTonalIconButton(
+            onClick = { expanded = true },
+            shapes = IconButtonDefaults.shapes(),
+            colors = appBarIconButtonColors(),
+            modifier = Modifier.narrowIconButton(),
+        ) {
             Icon(
                 painterResource(R.drawable.more_vert_48px),
                 contentDescription = stringResource(R.string.downloads_more_actions),

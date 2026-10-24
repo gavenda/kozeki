@@ -11,8 +11,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -34,6 +35,10 @@ import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.offset
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
+import dev.gavenda.kozeki.ui.components.SettingsButton
+import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
 import kotlin.math.roundToInt
 
 private val SearchBarInset = 16.dp
@@ -132,9 +137,15 @@ fun SearchTopBar(
                 },
         ) {
             if (onDownloadsClick != null) {
-                IconButton(onClick = onDownloadsClick) {
-                    BadgedBox(
-                        badge = { if (queuedDownloads > 0) Badge { Text(queuedDownloads.toString()) } },
+                // The count goes on the button rather than the icon, whose container would cut it off.
+                BadgedBox(
+                    badge = { if (queuedDownloads > 0) Badge(Modifier.offset(x = (-10).dp, y = 6.dp)) { Text(queuedDownloads.toString()) } },
+                ) {
+                    FilledTonalIconButton(
+                        onClick = onDownloadsClick,
+                        shapes = IconButtonDefaults.shapes(),
+                        colors = OptionColor.GOLD.appBarIconButtonColors(),
+                        modifier = Modifier.narrowIconButton(),
                     ) {
                         Icon(
                             painterResource(R.drawable.download_48px),
@@ -144,9 +155,7 @@ fun SearchTopBar(
                     }
                 }
             }
-            IconButton(onClick = onSettingsClick) {
-                Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
-            }
+            SettingsButton(onSettingsClick)
         }
     }
 }

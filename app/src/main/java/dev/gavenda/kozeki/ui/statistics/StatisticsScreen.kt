@@ -17,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -43,8 +44,11 @@ import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.components.BookCover
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.RatingBar
+import dev.gavenda.kozeki.ui.components.SettingsButton
+import dev.gavenda.kozeki.ui.components.iconButtonColors
 import dev.gavenda.kozeki.ui.components.toggleButtonColors
 import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatDuration
@@ -110,9 +114,7 @@ fun StatisticsContent(
                 LargeFlexibleTopAppBar(
                     title = { Text(stringResource(R.string.nav_statistics)) },
                     actions = {
-                        IconButton(onClick = onSettingsClick) {
-                            Icon(painterResource(R.drawable.settings_fill_48px), contentDescription = stringResource(R.string.settings_title), modifier = Modifier.size(24.dp))
-                        }
+                        SettingsButton(onSettingsClick)
                     },
                     scrollBehavior = scrollBehavior,
                 )
@@ -157,7 +159,7 @@ fun StatisticsContent(
                             // day, the longer periods, and everything at once.
                             optionColors = ranges.map { it.color.toggleButtonColors() },
                         )
-                        periodLabel(state)?.let { PeriodNavigator(it, state.canGoForward, onPrevious, onNext) }
+                        periodLabel(state)?.let { PeriodNavigator(it, state.range.color, state.canGoForward, onPrevious, onNext) }
                     }
                 }
                 when (state.range) {
@@ -196,9 +198,11 @@ private fun periodLabel(state: StatisticsUiState): String? = when (state.range) 
 }
 
 @Composable
-private fun PeriodNavigator(label: String, canGoForward: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
+private fun PeriodNavigator(label: String, color: OptionColor, canGoForward: Boolean, onPrevious: () -> Unit, onNext: () -> Unit) {
+    // The arrows take the colour of the range they step through.
+    val colors = color.iconButtonColors()
     Row(verticalAlignment = Alignment.CenterVertically) {
-        FilledTonalIconButton(onClick = onPrevious) {
+        FilledTonalIconButton(onClick = onPrevious, shapes = IconButtonDefaults.shapes(), colors = colors, modifier = Modifier.narrowIconButton()) {
             Icon(
                 painterResource(R.drawable.keyboard_arrow_left_48px),
                 contentDescription = stringResource(R.string.stats_previous),
@@ -211,7 +215,13 @@ private fun PeriodNavigator(label: String, canGoForward: Boolean, onPrevious: ()
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
         )
-        FilledTonalIconButton(onClick = onNext, enabled = canGoForward) {
+        FilledTonalIconButton(
+            onClick = onNext,
+            shapes = IconButtonDefaults.shapes(),
+            enabled = canGoForward,
+            colors = colors,
+            modifier = Modifier.narrowIconButton(),
+        ) {
             Icon(painterResource(R.drawable.keyboard_arrow_right_48px), contentDescription = stringResource(R.string.stats_next), modifier = Modifier.size(24.dp))
         }
     }

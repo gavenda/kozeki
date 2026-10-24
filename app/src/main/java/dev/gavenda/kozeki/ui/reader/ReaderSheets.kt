@@ -32,6 +32,7 @@ import dev.gavenda.kozeki.data.settings.ReaderFont
 import dev.gavenda.kozeki.data.settings.ReaderPreferences
 import dev.gavenda.kozeki.data.settings.ReaderTheme
 import dev.gavenda.kozeki.ui.components.ConnectedButtonGroup
+import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.rememberExpandedSheetState
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import kotlin.math.roundToInt
@@ -132,6 +133,7 @@ private fun AppearanceSheetContent(
                 FilledTonalIconButton(
                     onClick = { onChange(preferences.copy(fontScale = stepped(preferences.fontScale, -1))) },
                     enabled = preferences.fontScale > MIN_FONT_SCALE + 0.001,
+                    modifier = Modifier.narrowIconButton(),
                 ) {
                     Icon(painterResource(R.drawable.remove_48px), contentDescription = stringResource(R.string.reader_text_smaller), modifier = Modifier.size(24.dp))
                 }
@@ -144,6 +146,7 @@ private fun AppearanceSheetContent(
                 FilledTonalIconButton(
                     onClick = { onChange(preferences.copy(fontScale = stepped(preferences.fontScale, 1))) },
                     enabled = preferences.fontScale < MAX_FONT_SCALE - 0.001,
+                    modifier = Modifier.narrowIconButton(),
                 ) {
                     Icon(painterResource(R.drawable.add_48px), contentDescription = stringResource(R.string.reader_text_larger), modifier = Modifier.size(24.dp))
                 }

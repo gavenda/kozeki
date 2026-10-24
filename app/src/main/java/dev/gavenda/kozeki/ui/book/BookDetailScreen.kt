@@ -45,6 +45,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.ToggleButtonDefaults
@@ -57,7 +63,6 @@ import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -111,6 +116,10 @@ import dev.gavenda.kozeki.data.metadata.BookReview
 import dev.gavenda.kozeki.data.metadata.BookReviews
 import dev.gavenda.kozeki.data.model.Acquisition
 import dev.gavenda.kozeki.data.model.Book
+import dev.gavenda.kozeki.ui.components.appBarIconToggleButtonColors
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
+import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
 import dev.gavenda.kozeki.ui.library.ShelfChecklistSheet
 import dev.gavenda.kozeki.data.comic.ChapterDownload
 import dev.gavenda.kozeki.data.model.ComicChapter
@@ -384,10 +393,14 @@ fun BookDetailContent(
         }
     }
 
+    // The bar stays put and takes the surface container once the page scrolls under it, as the library's does.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
+                scrollBehavior = scrollBehavior,
                 title = {
                     AnimatedVisibility(
                         visible = book != null && titleInBar,
@@ -408,12 +421,13 @@ fun BookDetailContent(
                 },
                 actions = {
                     if (book != null && owned) {
-                        val chapters = state.chapters
-                        if (book.isComic && chapters != null && chapters.chapters.isNotEmpty()) {
-                            DownloadMenu(chapters, actions)
-                        }
                         if (book.canFavorite) {
-                            IconToggleButton(checked = book.isFavorite, onCheckedChange = actions.onSetFavorite) {
+                            FilledTonalIconToggleButton(
+                                checked = book.isFavorite,
+                                onCheckedChange = actions.onSetFavorite,
+                                colors = appBarIconToggleButtonColors(),
+                                modifier = Modifier.narrowIconButton(),
+                            ) {
                                 Icon(
                                     if (book.isFavorite) painterResource(R.drawable.favorite_fill_48px) else painterResource(R.drawable.favorite_48px),
                                     contentDescription = stringResource(
@@ -423,8 +437,17 @@ fun BookDetailContent(
                                 )
                             }
                         }
+                        val chapters = state.chapters
+                        if (book.isComic && chapters != null && chapters.chapters.isNotEmpty()) {
+                            DownloadMenu(chapters, actions)
+                        }
                         Box {
-                            IconButton(onClick = { menuOpen = true }) {
+                            FilledTonalIconButton(
+                                onClick = { menuOpen = true },
+                                shapes = IconButtonDefaults.shapes(),
+                                colors = appBarIconButtonColors(),
+                                modifier = Modifier.narrowIconButton(),
+                            ) {
                                 Icon(
                                     painterResource(R.drawable.more_vert_48px),
                                     contentDescription = stringResource(R.string.book_more_actions),
@@ -859,7 +882,7 @@ private fun ComicAddActions(
 @Composable
 private fun ComicPrimaryAction(book: Book, chapters: ComicChaptersUiState?, actions: BookDetailActions) {
     val resume = chapters?.resume
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         Button(
             onClick = { resume?.let { actions.onReadChapter(it.url) } },
             enabled = resume != null,
@@ -906,18 +929,21 @@ private fun EditButton(onClick: () -> Unit) {
 /** Puts the book on shelves, or takes it off them. Sits beside the button that opens the book. */
 @Composable
 private fun ShelfButton(onClick: () -> Unit) {
-    Button(
+    // Narrow, at the height of the buttons beside it. The row already spaces them, and the touch
+    // target reaches past the button on its own.
+    FilledIconButton(
         onClick = onClick,
-        shapes = ButtonDefaults.shapes(),
-        colors = ButtonDefaults.buttonColors(
+        shapes = IconButtonDefaults.shapes(),
+        colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.tertiary,
             contentColor = MaterialTheme.colorScheme.onTertiary,
         ),
+        modifier = Modifier.size(IconButtonDefaults.smallContainerSize(IconButtonDefaults.IconButtonWidthOption.Narrow)),
     ) {
         Icon(
             painterResource(R.drawable.shelves_fill_48px),
             contentDescription = stringResource(R.string.shelf_add_to),
-            modifier = Modifier.size(ButtonDefaults.IconSize),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -1118,7 +1144,12 @@ private fun ChapterSelectionToolbar(
 private fun DownloadMenu(chapters: ComicChaptersUiState, actions: BookDetailActions) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }) {
+        FilledTonalIconButton(
+            onClick = { expanded = true },
+            shapes = IconButtonDefaults.shapes(),
+            colors = OptionColor.GOLD.appBarIconButtonColors(),
+            modifier = Modifier.narrowIconButton(),
+        ) {
             Icon(
                 painterResource(R.drawable.download_48px),
                 contentDescription = stringResource(R.string.comic_download_menu),
@@ -1377,7 +1408,7 @@ private fun PrimaryAction(book: Book, chapters: ComicChaptersUiState?, importing
         when {
             book.isComic -> ComicPrimaryAction(book, chapters, actions)
 
-            book.canRead -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            book.canRead -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     onClick = actions.onRead,
                     shapes = ButtonDefaults.shapes(),
@@ -1406,7 +1437,7 @@ private fun PrimaryAction(book: Book, chapters: ComicChaptersUiState?, importing
 
             else -> {
                 if (book.inLibrary) MutedText(stringResource(R.string.book_file_missing_message))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(
                         onClick = actions.onImportEpub,
                         enabled = !importing,

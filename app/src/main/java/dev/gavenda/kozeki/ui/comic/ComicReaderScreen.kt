@@ -1,5 +1,7 @@
 package dev.gavenda.kozeki.ui.comic
 
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import dev.gavenda.kozeki.data.metadata.MetadataException
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
@@ -79,6 +81,10 @@ import dev.gavenda.kozeki.data.model.ComicChapter
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
+import dev.gavenda.kozeki.ui.components.iconButtonColors
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.comicReaderViewModel
 import dev.gavenda.kozeki.ui.reader.ImmersiveMode
@@ -539,7 +545,12 @@ private fun TopChrome(
                 )
             }
             Box {
-                IconButton(onClick = { menuOpen = true }) {
+                FilledTonalIconButton(
+                    onClick = { menuOpen = true },
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = appBarIconButtonColors(),
+                    modifier = Modifier.narrowIconButton(),
+                ) {
                     Icon(
                         painterResource(R.drawable.more_vert_48px),
                         contentDescription = stringResource(R.string.comic_reader_mode),
@@ -595,7 +606,14 @@ private fun BottomChrome(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onPrevious, enabled = state.previous != null) {
+                    // Gold, so the chapter steps stand apart from the violet slider between them.
+                    FilledTonalIconButton(
+                        onClick = onPrevious,
+                        shapes = IconButtonDefaults.shapes(),
+                        enabled = state.previous != null,
+                        colors = OptionColor.GOLD.iconButtonColors(),
+                        modifier = Modifier.narrowIconButton(),
+                    ) {
                         Icon(
                             // The arrows mirror with the layout direction, which is turned round above.
                             painterResource(R.drawable.keyboard_arrow_left_48px),
@@ -614,7 +632,13 @@ private fun BottomChrome(
                         enabled = lastIndex > 0,
                         modifier = Modifier.weight(1f),
                     )
-                    IconButton(onClick = onNext, enabled = state.next != null) {
+                    FilledTonalIconButton(
+                        onClick = onNext,
+                        shapes = IconButtonDefaults.shapes(),
+                        enabled = state.next != null,
+                        colors = OptionColor.GOLD.iconButtonColors(),
+                        modifier = Modifier.narrowIconButton(),
+                    ) {
                         Icon(
                             painterResource(R.drawable.keyboard_arrow_right_48px),
                             contentDescription = stringResource(R.string.comic_reader_next_chapter),

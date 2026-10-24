@@ -50,6 +50,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
@@ -129,11 +130,14 @@ import dev.gavenda.kozeki.ui.components.DraggableScrollbar
 import dev.gavenda.kozeki.ui.components.EmptyState
 import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
 import dev.gavenda.kozeki.ui.components.ReadingProgressRing
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.SpeechBubble
 import dev.gavenda.kozeki.ui.components.icon
+import dev.gavenda.kozeki.ui.components.iconButtonColors
 import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.components.outlinedIcon
 import dev.gavenda.kozeki.ui.components.ownershipBadge
@@ -1153,12 +1157,19 @@ private fun GroupHeader(
                 )
             }
             // Up while the books show, down once they are folded away.
-            Icon(
-                painterResource(R.drawable.keyboard_arrow_up_48px),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 12.dp).size(24.dp).rotate(turn),
-            )
+            // Leather, with the title. The button folds the books as the row does.
+            FilledTonalIconButton(
+                onClick = onToggle,
+                shapes = IconButtonDefaults.shapes(),
+                colors = OptionColor.LEATHER.iconButtonColors(),
+                modifier = Modifier.padding(start = 8.dp).narrowIconButton(),
+            ) {
+                Icon(
+                    painterResource(R.drawable.keyboard_arrow_up_48px),
+                    contentDescription = toggleLabel,
+                    modifier = Modifier.size(24.dp).rotate(turn),
+                )
+            }
             trailing()
         }
         // A faint grey rule, as wide as the books under it.

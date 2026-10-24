@@ -9,7 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonColors
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButtonColors
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
@@ -21,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -124,6 +129,72 @@ fun OptionColor.toggleButtonColors(): ToggleButtonColors {
         )
     }
 }
+
+/**
+ * The same three colours for a tonal icon button: the colour's container, as its toggle buttons
+ * have when not selected.
+ */
+@Composable
+fun OptionColor.iconButtonColors(): IconButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return when (this) {
+        OptionColor.VIOLET -> IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = scheme.primaryContainer,
+            contentColor = scheme.onPrimaryContainer,
+        )
+        OptionColor.GOLD -> IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = scheme.secondaryContainer,
+            contentColor = scheme.onSecondaryContainer,
+        )
+        OptionColor.LEATHER -> IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = scheme.tertiaryContainer,
+            contentColor = scheme.onTertiaryContainer,
+        )
+    }
+}
+
+/**
+ * The same three colours for an icon button in a top app bar: the surface container, with the
+ * colour on the icon.
+ */
+@Composable
+fun OptionColor.appBarIconButtonColors(): IconButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return appBarIconButtonColors(
+        when (this) {
+            OptionColor.VIOLET -> scheme.primary
+            OptionColor.GOLD -> scheme.secondary
+            OptionColor.LEATHER -> scheme.tertiary
+        },
+    )
+}
+
+/** An icon button in a top app bar with no colour of its own: the surface container, the icon as usual. */
+@Composable
+fun appBarIconButtonColors(contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant): IconButtonColors =
+    IconButtonDefaults.filledTonalIconButtonColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = contentColor,
+    )
+
+/** A toggle in a top app bar: the surface container while off, filled violet while on. */
+@Composable
+fun appBarIconToggleButtonColors(): IconToggleButtonColors {
+    val scheme = MaterialTheme.colorScheme
+    return IconButtonDefaults.filledTonalIconToggleButtonColors(
+        containerColor = scheme.surfaceContainer,
+        contentColor = scheme.onSurfaceVariant,
+        checkedContainerColor = scheme.primary,
+        checkedContentColor = scheme.onPrimary,
+    )
+}
+
+/**
+ * A narrow icon button: 32dp wide inside the usual 48dp touch target, which also keeps it clear of
+ * whatever sits next to it.
+ */
+fun Modifier.narrowIconButton(): Modifier = minimumInteractiveComponentSize()
+    .size(IconButtonDefaults.smallContainerSize(IconButtonDefaults.IconButtonWidthOption.Narrow))
 
 @PreviewLightDark
 @Composable

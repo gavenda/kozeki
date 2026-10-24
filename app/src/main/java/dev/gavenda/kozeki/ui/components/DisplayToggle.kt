@@ -1,8 +1,10 @@
 package dev.gavenda.kozeki.ui.components
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -26,9 +28,14 @@ enum class BookDisplay {
 
 /** Flips between covers and a list. The button shows the layout a tap leads to. */
 @Composable
-fun DisplayToggle(display: BookDisplay, onDisplaySelected: (BookDisplay) -> Unit, modifier: Modifier = Modifier) {
+fun DisplayToggle(
+    display: BookDisplay,
+    onDisplaySelected: (BookDisplay) -> Unit,
+    modifier: Modifier = Modifier,
+    inAppBar: Boolean = false,
+) {
     val other = if (display == BookDisplay.LIST) BookDisplay.COVERS else BookDisplay.LIST
-    IconButton(onClick = { onDisplaySelected(other) }, modifier = modifier) {
+    val icon: @Composable () -> Unit = {
         Icon(
             painter = painterResource(if (other == BookDisplay.LIST) R.drawable.view_list_fill_48px else R.drawable.grid_view_fill_48px),
             contentDescription = stringResource(
@@ -36,5 +43,17 @@ fun DisplayToggle(display: BookDisplay, onDisplaySelected: (BookDisplay) -> Unit
             ),
             modifier = Modifier.size(24.dp),
         )
+    }
+    // In an app bar it takes the bar's pill, as the other actions there do.
+    if (inAppBar) {
+        FilledTonalIconButton(
+            onClick = { onDisplaySelected(other) },
+            shapes = IconButtonDefaults.shapes(),
+            colors = appBarIconButtonColors(),
+            modifier = modifier.narrowIconButton(),
+            content = icon,
+        )
+    } else {
+        IconButton(onClick = { onDisplaySelected(other) }, modifier = modifier, content = icon)
     }
 }

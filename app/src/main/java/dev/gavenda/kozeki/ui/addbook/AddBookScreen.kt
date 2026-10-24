@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.DropdownMenu
@@ -77,8 +78,11 @@ import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.LoadMoreEffect
 import dev.gavenda.kozeki.ui.components.MetadataResultCover
 import dev.gavenda.kozeki.ui.components.MetadataResultItem
+import dev.gavenda.kozeki.ui.components.narrowIconButton
+import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.OwnedBadge
 import dev.gavenda.kozeki.ui.components.SelectionToolbarRoom
+import dev.gavenda.kozeki.ui.components.appBarIconButtonColors
 import dev.gavenda.kozeki.ui.components.loadingMoreItem
 import dev.gavenda.kozeki.ui.components.nameRes
 import dev.gavenda.kozeki.ui.components.onClick
@@ -185,7 +189,7 @@ fun AddBookContent(
                             },
                         )
                     }
-                    DisplayToggle(state.display, onDisplayChange)
+                    DisplayToggle(state.display, onDisplayChange, inAppBar = true)
                 },
             )
         },
@@ -431,7 +435,12 @@ private fun BrowseMenu(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier) {
-        IconButton(onClick = { expanded = true }) {
+        FilledTonalIconButton(
+            onClick = { expanded = true },
+            shapes = IconButtonDefaults.shapes(),
+            colors = OptionColor.GOLD.appBarIconButtonColors(),
+            modifier = Modifier.narrowIconButton(),
+        ) {
             Icon(painterResource(R.drawable.sort_48px), contentDescription = stringResource(R.string.browse_lists), modifier = Modifier.size(24.dp))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
