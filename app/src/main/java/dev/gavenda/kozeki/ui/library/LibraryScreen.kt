@@ -56,7 +56,9 @@ import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -539,7 +541,8 @@ fun LibraryContent(
                                                 actions = selectionActions,
                                                 onOpen = onBookClick,
                                                 onOpenAuthor = onAuthorClick,
-                                                modifier = Modifier.animateItem(),
+                                                // Picked rows next to each other stay apart, as connected cards do.
+                                                modifier = Modifier.animateItem().padding(bottom = ButtonGroupDefaults.ConnectedSpaceBetween),
                                             )
                                         } else {
                                             LibraryBookItem(
@@ -1496,7 +1499,10 @@ private fun CoverBadge(
     }
 }
 
-/** Floats over the grid while books are picked: how many, and what can be done to them together. */
+/**
+ * Floats over the grid while books are picked: how many, and what can be done to them together.
+ * Making them favourites is the button beside it; the rest is in its menu.
+ */
 @Composable
 private fun SelectionToolbar(
     selection: LibrarySelection,
@@ -1507,15 +1513,10 @@ private fun SelectionToolbar(
     onOpenShelves: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var stateMenuOpen by remember { mutableStateOf(false) }
     var moreOpen by remember { mutableStateOf(false) }
     val countLabel = pluralStringResource(R.plurals.selection_count, selection.size, selection.size)
 
-    HorizontalFloatingToolbar(
-        expanded = true,
-        modifier = modifier,
-        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-    ) {
+    val tools: @Composable RowScope.() -> Unit = {
         IconButton(onClick = actions.onClear) {
             Icon(painterResource(R.drawable.close_48px), contentDescription = stringResource(R.string.selection_clear), modifier = Modifier.size(24.dp))
         }
@@ -1530,41 +1531,6 @@ private fun SelectionToolbar(
         IconButton(onClick = actions.onSelectAll, enabled = !allSelected) {
             Icon(painterResource(R.drawable.select_all_48px), contentDescription = stringResource(R.string.selection_select_all), modifier = Modifier.size(24.dp))
         }
-        if (selection.favoritable.isNotEmpty()) {
-            val favorites = selection.allFavorite
-            IconButton(onClick = { actions.onSetFavorite(!favorites) }) {
-                Icon(
-                    if (favorites) painterResource(R.drawable.favorite_fill_48px) else painterResource(R.drawable.favorite_48px),
-                    contentDescription = stringResource(
-                        if (favorites) R.string.favorite_remove else R.string.favorite_add,
-                    ),
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-        }
-        if (selection.stateChangeable.isNotEmpty()) {
-            Box {
-                IconButton(onClick = { stateMenuOpen = true }) {
-                    Icon(
-                        painterResource(R.drawable.label_fill_48px),
-                        contentDescription = stringResource(R.string.selection_change_state),
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-                DropdownMenu(expanded = stateMenuOpen, onDismissRequest = { stateMenuOpen = false }) {
-                    ReadingStateOrder.filter { it != selection.sharedState }.forEach { state ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.book_mark_as, stringResource(state.labelRes))) },
-                            leadingIcon = { Icon(painterResource(state.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                            onClick = {
-                                stateMenuOpen = false
-                                actions.onSetState(state)
-                            },
-                        )
-                    }
-                }
-            }
-        }
         IconButton(onClick = onOpenShelves) {
             Icon(
                 painterResource(R.drawable.shelves_48px),
@@ -1577,6 +1543,19 @@ private fun SelectionToolbar(
                 Icon(painterResource(R.drawable.more_vert_48px), contentDescription = stringResource(R.string.book_more_actions), modifier = Modifier.size(24.dp))
             }
             DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                if (selection.stateChangeable.isNotEmpty()) {
+                    ReadingStateOrder.filter { it != selection.sharedState }.forEach { state ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.book_mark_as, stringResource(state.labelRes))) },
+                            leadingIcon = { Icon(painterResource(state.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                            onClick = {
+                                moreOpen = false
+                                actions.onSetState(state)
+                            },
+                        )
+                    }
+                    HorizontalDivider()
+                }
                 val single = selection.books.singleOrNull()
                 // One book gets the full details; several are simply marked as bought today.
                 if (single != null || selection.notPurchased.isNotEmpty()) {
@@ -1635,6 +1614,27 @@ private fun SelectionToolbar(
                 )
             }
         }
+    }
+    if (selection.favoritable.isNotEmpty()) {
+        val favorites = selection.allFavorite
+        HorizontalFloatingToolbar(
+            expanded = true,
+            floatingActionButton = {
+                FloatingToolbarDefaults.StandardFloatingActionButton(onClick = { actions.onSetFavorite(!favorites) }) {
+                    Icon(
+                        if (favorites) painterResource(R.drawable.favorite_fill_48px) else painterResource(R.drawable.favorite_48px),
+                        contentDescription = stringResource(
+                            if (favorites) R.string.favorite_remove else R.string.favorite_add,
+                        ),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            },
+            modifier = modifier,
+            content = tools,
+        )
+    } else {
+        HorizontalFloatingToolbar(expanded = true, modifier = modifier, content = tools)
     }
 }
 

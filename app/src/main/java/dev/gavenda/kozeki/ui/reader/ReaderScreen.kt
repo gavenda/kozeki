@@ -476,7 +476,6 @@ private fun ReaderControls(
         }
         HorizontalFloatingToolbar(
             expanded = true,
-            colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
         ) {
             IconButton(onClick = onOpenContents) {
                 Icon(painterResource(R.drawable.toc_48px), contentDescription = stringResource(R.string.reader_contents), modifier = Modifier.size(24.dp))

@@ -111,7 +111,6 @@ fun BoxScope.AddSelectedToolbar(
     HorizontalFloatingToolbar(
         expanded = true,
         modifier = modifier.align(Alignment.BottomCenter).padding(bottom = FloatingToolbarDefaults.ScreenOffset),
-        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
     ) {
         IconButton(onClick = onClear) {
             Icon(painterResource(R.drawable.close_48px), contentDescription = stringResource(R.string.selection_clear), modifier = Modifier.size(24.dp))

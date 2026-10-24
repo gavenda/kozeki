@@ -24,6 +24,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -101,6 +103,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
@@ -612,7 +617,7 @@ fun BookDetailContent(
                     top = innerPadding.calculateTopPadding(),
                     bottom = innerPadding.calculateBottomPadding() + 24.dp,
                 ),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(DetailItemSpacing),
             ) {
                 item(key = "header") {
                     Header(
@@ -1054,7 +1059,9 @@ private fun LazyListScope.chaptersSection(
 
         else -> {
             val shown = if (showingAll) newestFirst else newestFirst.take(CHAPTERS_PREVIEW)
-            items(shown, key = { "chapter-${it.url}" }) { chapter ->
+            // While some are hidden, the card that shows them ends the group in place of the last chapter.
+            val hasMore = shown.size < newestFirst.size
+            itemsIndexed(shown, key = { _, chapter -> "chapter-${chapter.url}" }) { index, chapter ->
                 val isSelected = chapter.url in selected
                 fun toggle() = onSelectedChange(if (isSelected) selected - chapter.url else selected + chapter.url)
                 ChapterRow(
@@ -1074,12 +1081,31 @@ private fun LazyListScope.chaptersSection(
                         if (selected.isNotEmpty()) toggle() else actions.onReadChapter(chapter.url)
                     },
                     onLongClick = if (owned) ::toggle else null,
+                    first = index == 0,
+                    last = index == shown.lastIndex && !hasMore,
+                    modifier = if (index < shown.lastIndex || hasMore) Modifier.joinedToNext() else Modifier,
                 )
             }
-            if (shown.size < newestFirst.size) {
+            if (hasMore) {
                 item(key = "chapters-more") {
-                    TextButton(onClick = onShowAll) {
-                        Text(stringResource(R.string.comic_chapters_show_all, newestFirst.size))
+                    Surface(
+                        onClick = onShowAll,
+                        shape = RoundedCornerShape(
+                            topStart = ChapterInnerCorner,
+                            topEnd = ChapterInnerCorner,
+                            bottomStart = ChapterOuterCorner,
+                            bottomEnd = ChapterOuterCorner,
+                        ),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.comic_chapters_show_all, newestFirst.size),
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 18.dp),
+                        )
                     }
                 }
             }
@@ -1102,7 +1128,10 @@ private fun LazyListScope.chaptersSection(
     }
 }
 
-/** Floats over the chapters while some are picked, as the library's does for books. */
+/**
+ * Floats over the chapters while some are picked, as the library's does for books. Deleting the
+ * downloaded ones is a button of its own beside it, there only while some of the picked are kept.
+ */
 @Composable
 private fun ChapterSelectionToolbar(
     picked: List<ComicChapter>,
@@ -1117,11 +1146,12 @@ private fun ChapterSelectionToolbar(
 ) {
     val countLabel = pluralStringResource(R.plurals.selection_count, picked.size, picked.size)
     val allRead = picked.all { it.read }
-    HorizontalFloatingToolbar(
-        expanded = true,
-        modifier = modifier,
-        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
-    ) {
+    val kept = picked.filter { it.url in downloads }
+    val notKept = picked.filter { it.url !in downloads }
+    // With none of the picked downloaded, downloading them is the button beside the toolbar;
+    // otherwise deleting is, and downloading the rest stays in the toolbar.
+    val downloadIsFab = kept.isEmpty()
+    val actions: @Composable RowScope.() -> Unit = {
         IconButton(onClick = onClear) {
             Icon(
                 painterResource(R.drawable.close_48px),
@@ -1167,27 +1197,48 @@ private fun ChapterSelectionToolbar(
                 )
             }
         }
-        val notKept = picked.filter { it.url !in downloads }
-        if (notKept.isNotEmpty()) {
+        if (!downloadIsFab && notKept.isNotEmpty()) {
             IconButton(onClick = { onDownload(notKept.map(ComicChapter::url)) }) {
                 Icon(
-                    painterResource(R.drawable.arrow_circle_down_48px),
+                    painterResource(R.drawable.download_48px),
                     contentDescription = stringResource(R.string.comic_download),
                     modifier = Modifier.size(24.dp),
                 )
             }
         }
-        val kept = picked.filter { it.url in downloads }
-        if (kept.isNotEmpty()) {
-            IconButton(onClick = { onDeleteDownloads(kept.map(ComicChapter::url)) }) {
-                Icon(
-                    painterResource(R.drawable.delete_fill_48px),
-                    contentDescription = stringResource(R.string.comic_download_delete_picked),
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-        }
     }
+    HorizontalFloatingToolbar(
+        expanded = true,
+        floatingActionButton = {
+            if (downloadIsFab) {
+                FloatingToolbarDefaults.StandardFloatingActionButton(
+                    onClick = { onDownload(notKept.map(ComicChapter::url)) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.download_48px),
+                        contentDescription = stringResource(R.string.comic_download),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            } else {
+                FloatingToolbarDefaults.StandardFloatingActionButton(
+                    onClick = { onDeleteDownloads(kept.map(ComicChapter::url)) },
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ) {
+                    Icon(
+                        painterResource(R.drawable.delete_fill_48px),
+                        contentDescription = stringResource(R.string.comic_download_delete_picked),
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        },
+        modifier = modifier,
+        content = actions,
+    )
 }
 
 /**
@@ -1259,7 +1310,6 @@ private fun ChapterDownloadIndicator(
     download: ChapterDownload?,
     onDownload: () -> Unit,
     onDelete: () -> Unit,
-    contentColor: Color,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -1281,42 +1331,48 @@ private fun ChapterDownloadIndicator(
             contentAlignment = Alignment.Center,
             label = "chapter download",
         ) { state ->
-            IconButton(onClick = { if (state == null) onDownload() else expanded = true }) {
+            // The button is filled, so the marks in it are bare: an arrow, not an arrow in a circle.
+            FilledTonalIconButton(
+                onClick = { if (state == null) onDownload() else expanded = true },
+                shapes = IconButtonDefaults.shapes(),
+                modifier = Modifier.size(DownloadButtonSize),
+                colors = if (state is ChapterDownload.Failed) {
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                } else {
+                    IconButtonDefaults.filledTonalIconButtonColors()
+                },
+            ) {
                 when (state) {
                     null -> Icon(
-                        painterResource(R.drawable.arrow_circle_down_48px),
+                        painterResource(R.drawable.download_48px),
                         contentDescription = stringResource(R.string.comic_download),
-                        tint = contentColor,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(DownloadIconSize),
                     )
 
                     // The halo waits, faded, while the chapter is queued; its hands follow the pages once it comes.
                     ChapterDownload.Queued -> {
                         val label = stringResource(R.string.comic_download_queued)
-                        HaloLoadingIndicator(Modifier.size(24.dp).alpha(0.5f).semantics { contentDescription = label })
+                        HaloLoadingIndicator(Modifier.size(DownloadIconSize).alpha(0.5f).semantics { contentDescription = label })
                     }
 
                     is ChapterDownload.Downloading -> {
                         val label = stringResource(R.string.comic_download_running)
                         HaloLoadingIndicator(
-                            Modifier.size(24.dp).semantics { contentDescription = label },
+                            Modifier.size(DownloadIconSize).semantics { contentDescription = label },
                             progress = { state.progress },
                         )
                     }
 
                     is ChapterDownload.Failed -> Icon(
-                        painterResource(R.drawable.error_fill_48px),
+                        painterResource(R.drawable.priority_high_48px),
                         contentDescription = stringResource(R.string.comic_download_failed),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(DownloadIconSize),
                     )
 
-                    ChapterDownload.Downloaded -> Icon(
-                        painterResource(R.drawable.check_circle_fill_48px),
-                        contentDescription = stringResource(R.string.comic_downloaded),
-                        tint = contentColor,
-                        modifier = Modifier.size(24.dp),
-                    )
+                    ChapterDownload.Downloaded -> DownloadedMark()
                 }
             }
         }
@@ -1347,8 +1403,38 @@ private fun ChapterDownloadIndicator(
     }
 }
 
+/** The mark of a downloaded chapter, drawn inside a filled circle. */
+@Composable
+private fun DownloadedMark() {
+    Icon(
+        painterResource(R.drawable.check_48px),
+        contentDescription = stringResource(R.string.comic_downloaded),
+        modifier = Modifier.size(DownloadIconSize),
+    )
+}
+
+/** The download button of a chapter row is Material's extra-small icon button. */
+private val DownloadButtonSize = 32.dp
+private val DownloadIconSize = 20.dp
+
 /** How long a finished chapter's halo stays, for its hands to finish going round, before the mark comes. */
 private const val DownloadDoneHoldMs = 300
+
+private val ChapterOuterCorner = 28.dp
+private val ChapterInnerCorner = 4.dp
+
+/** The space the detail list leaves between its items. */
+private val DetailItemSpacing = 20.dp
+
+/**
+ * Lays an item out as shorter than it is drawn, so the next item comes the small gap of a connected
+ * group after it rather than the list's full spacing. The overhang is drawn and takes taps as usual.
+ */
+private fun Modifier.joinedToNext(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints)
+    val overlap = (DetailItemSpacing - ButtonGroupDefaults.ConnectedSpaceBetween).roundToPx()
+    layout(placeable.width, (placeable.height - overlap).coerceAtLeast(0)) { placeable.place(0, 0) }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1363,24 +1449,31 @@ private fun ChapterRow(
     onDeleteDownload: () -> Unit = {},
     /** Whether the row keeps a slot at its end for downloading, even while it shows nothing there. */
     downloadable: Boolean = false,
+    first: Boolean = true,
+    last: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     // On the picked row's container the text takes the colours made for it.
     val muted = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
     val onRow = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+    // Each row is a card of its own, joined to the next as the cards of a settings section are:
+    // round at the list's ends, nearly square where two rows meet.
+    val top = if (first) ChapterOuterCorner else ChapterInnerCorner
+    val bottom = if (last) ChapterOuterCorner else ChapterInnerCorner
     // Laid out by hand, as the rows of the search results are, for the same reason.
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .clip(RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom))
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 8.dp),
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
             Text(
                 text = chapter.name,
-                style = MaterialTheme.typography.bodyLarge,
+                style = MaterialTheme.typography.bodyMedium,
                 color = if (chapter.read) muted else onRow,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -1417,14 +1510,17 @@ private fun ChapterRow(
                         }
                     }
 
-                    onDownload != null -> ChapterDownloadIndicator(download, onDownload, onDeleteDownload, contentColor = muted)
+                    onDownload != null -> ChapterDownloadIndicator(download, onDownload, onDeleteDownload)
 
-                    download == ChapterDownload.Downloaded -> Icon(
-                        painterResource(R.drawable.check_circle_fill_48px),
-                        contentDescription = stringResource(R.string.comic_downloaded),
-                        tint = muted,
-                        modifier = Modifier.size(24.dp),
-                    )
+                    // Without a button, the same tonal circle the button would be.
+                    download == ChapterDownload.Downloaded -> Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(DownloadButtonSize),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) { DownloadedMark() }
+                    }
                 }
             }
         }
