@@ -1,5 +1,9 @@
 # Kozeki
 
+Kozeki is a personal Android app for books and comics (package `dev.gavenda.kozeki`). It reads EPUBs, keeps a library with reading history, notes, goals and statistics, and looks books up on Hardcover or Google Books. It reads comics through installed Mihon extensions and tracks them on AniList. The developer is its only user.
+
+It is named after Kozeki Ui, the librarian of Blue Archive, who is its character. [BRANDING.md](BRANDING.md) records how the app looks and sounds: the halo, the theme colours, her faces and the voice of its text. Read it before changing any of those.
+
 ## Icons
 
 Every icon in `app/src/main/res/drawable/*_48px.xml` is a Google Material Symbol: **Outlined, optical size 48, weight 400, grade 0**. 
