@@ -51,8 +51,8 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 23
-        versionName = "2.7.0"
+        versionCode = 24
+        versionName = "2.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
