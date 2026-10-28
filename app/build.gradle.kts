@@ -187,6 +187,8 @@ dependencies {
     // Mihon extensions look their dependencies up through Injekt; see exposeToExtensions().
     implementation(libs.injekt)
     implementation(project(":mihon-host"))
+    // Plays Ui's rig in her portraits.
+    implementation(project(":rigby"))
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

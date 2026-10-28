@@ -128,47 +128,50 @@ It stays the portrait, themed layer included. The halo does not go here.
 
 `Portrait(expression)` in `ui/components/Expression.kt` shows Ui from the shoulders up in front of a plate, Material's nine-sided cookie shape in `primaryContainer`. The plate cuts her off below, while her head stands clear of it and her halo rises out of its top. It is 128dp wide unless given another width.
 
+She is alive in it: her rig from the game, played by the `:rigby` module (`LiveUi` in `ui/components/UiRig.kt`). She breathes, the outer glow of her halo comes and goes, and she blinks every few seconds when her face has plain open eyes. A new face blends in over a fifth of a second, which is how About changes hers. Pressing and holding on her pats her: she smiles (`HAPPY`) until let go. Her rig has no head to tilt, so the smile is all of it. The press is only watched, so tapping her in About still checks for a newer version. The rig is read once in the background and the still portrait stands in until it is; with the system's "Remove animations" on she holds still. The rig was laid over the source artwork to find where the cut portraits sit on it, so the live and still portraits line up.
+
 Inside the app her portrait is in four kinds of place and nowhere else: wherever a screen has nothing to show or has failed, at the end of some content, About, and the update sheet when nothing was due.
 
 **Empty and error screens.** `EmptyState` requires an `expression` and an `icon`. The icon sits on a 40dp gold badge (`secondaryContainer`) at the plate's lower end corner, over the book she holds. Smaller messages inside a sheet or a card, such as a book with no notes yet, are plain text with no face. One card is the exception: a tab of the longest-books card in statistics with nothing in it has her face and a bubble as at the ends of content (`NEUTRAL`). Physical and EPUB say "No physical book with a page count finished yet. I'll wait at the last page." and the same of an EPUB; Comic says "No comic finished yet. I'll wait at the last chapter."
 
 **About.** The last thing in Settings, with no card and no heading: her `CONTENT` face at 96dp, a speech bubble beside it with her line, and "Kozeki" with the version underneath. Under the version are two plain lines in the third person: "Kept by Ui, Magician of the Old Library" and "Character design and illustration by CHILD, from Blue Archive". On 23 April the bubble says "It's my birthday today. A book read would be present enough." instead.
 
-Tapping her checks GitHub for a newer version of the app, and the app also checks once by itself each time it is freshly opened. The bubble keeps her line and adds a second sentence for the check, and her face changes with it:
+Tapping her checks GitHub for a newer version of the app, and the app also checks once by itself each time it is freshly opened. While she checks and once she knows, what she says about it takes the place of her line, and her face changes with it. The version under her is plain text: she is the only thing to tap. What a tapped check found is forgotten when Settings is opened again, so she starts from her line each time; a newer version found by the launch check stays.
 
-| Check | Second sentence | Face |
+| Check | She says | Face |
 |---|---|---|
-| Not checked yet, or the launch check failed | None | `CONTENT` |
+| Not checked yet, or the launch check failed | Her line | `CONTENT` |
 | Checking (a tapped check lasts at least a second, so the face is seen) | "Let me see if there's a newer version…" | `STUDIOUS` |
-| Up to date | None, until "Kozeki 2.6.0" under her is tapped: then "You are on the latest version." Tapping it again takes the sentence away. | `CONTENT`, then `HAPPY` while she says it |
+| Up to date, after a tapped check | "You are on the latest version." | `HAPPY` |
+| Up to date, after the launch check | Her line | `CONTENT` |
 | A newer version | "Version 2.7.0 is out. Tap me to fetch it." Tapping her again opens its APK. | `CURIOUS` |
 | Offline | "I can't reach GitHub right now." | `WORRIED` |
 | Too many checks | "GitHub won't take more checks for now. Try again later." | `WORRIED` |
 | Refused or unreadable | "GitHub turned me away (404)." / "I couldn't read GitHub's answer." | `DISMAYED` |
 
-The faces cross-fade. Tapping her has no ripple, since a box of it over her and her halo looks pasted on.
+One face blends into the next. Tapping her has no ripple, since a box of it over her and her halo looks pasted on.
 
 **The update sheet.** When a pull to refresh among the comics finds none due for new chapters, the sheet titled "Already up to date" shows her `HAPPY` face at 96dp where the tick would be, with no line under it and no speech bubble, then Close.
 
 **Ends of content.** Her face at 96dp with a speech bubble beside it, centred, the bubble no wider than 360dp: after the last book in the library (`CONTENT`, a different line for comics), at the foot of the manual book form, and on a series' page when every book in this series is already in the library (`HAPPY`, "The set is complete."). The bubble is drawn by `SpeechBubble`, its tail pointing back at her.
 
-Eleven faces are cut, and a new empty state picks from them first. The source number is the `<n>` of `branding/expressions/Ui_Portrait_Expression_<n>.webp`.
+Eleven faces are cut, and a new empty state picks from them first. The source number is the `<n>` of `branding/expressions/Ui_Portrait_Expression_<n>.webp`, and the rig's animation of the same face has that number too (`"01"` to `"23"`, `"99"`). Those marked "blinks" have plain open eyes; a blink shows her plain face for a moment, so the others don't.
 
 | Face | Shows | Source | Used for |
 |---|---|---|---|
 | `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due; About while she says you are on the latest version |
-| `CONTENT` | Slight smile | 3 | All-time statistics with nothing on record; the download queue with nothing in it; About |
-| `NEUTRAL` | Her usual flat look | 1 | A library filter with nothing under it; an empty tab of the longest-books card |
-| `CURIOUS` | A small "o" | 8 | Library search, before typing; About when a newer version is out |
-| `STUDIOUS` | Monocle | 23 | Add book, before searching; About while checking for a newer version |
+| `CONTENT` | Slight smile; blinks | 3 | All-time statistics with nothing on record; the download queue with nothing in it; About |
+| `NEUTRAL` | Her usual flat look; blinks | 1 | A library filter with nothing under it; an empty tab of the longest-books card |
+| `CURIOUS` | A small "o"; blinks | 8 | Library search, before typing; About when a newer version is out |
+| `STUDIOUS` | Monocle; blinks | 23 | Add book, before searching; About while checking for a newer version |
 | `ASLEEP` | Eyes closed | 7 | A day with nothing read |
-| `DOWNCAST` | Half-lidded eyes | 15 | Library search with nothing found; an author with no books listed; Add book on Comics with no source installed |
-| `WORRIED` | Mouth open, a bead of sweat | 13 | Add book, nothing found; About when GitHub cannot be reached or wants no more checks |
+| `DOWNCAST` | Half-lidded eyes; blinks | 15 | Library search with nothing found; an author with no books listed; Add book on Comics with no source installed |
+| `WORRIED` | Mouth open, a bead of sweat; blinks | 13 | Add book, nothing found; About when GitHub cannot be reached or wants no more checks |
 | `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page; About when GitHub refuses the check or its answer cannot be read |
 | `DUMBFOUNDED` | Black dots for eyes | 21 | An author whose page is gone |
 | `SHOCKED` | Comic yell | 14 | A book the reader cannot open |
 
-Thirteen more are in the sources and not cut: 2 neutral with her mouth open, 4 uneasy, 5 tired, 6 a sigh with eyes closed, 9 smug with her tongue out, 11 aghast, 12 grumbling with eyes shut, 16 a shadow over her eyes, 17 and 18 blushing, 19 speaking brightly, 20 yelling in tears, and 99 eyes closed and calm, which is close to `ASLEEP`.
+Thirteen more are in the sources and not cut (the rig has them all, and a plain face, `"00"`): 2 neutral with her mouth open, 4 uneasy, 5 tired, 6 a sigh with eyes closed, 9 smug with her tongue out, 11 aghast, 12 grumbling with eyes shut, 16 a shadow over her eyes, 17 and 18 blushing, 19 speaking brightly, 20 yelling in tears, and 99 eyes closed and calm, which is close to `ASLEEP`.
 
 ### Cutting a new face
 
@@ -176,7 +179,7 @@ The sources are 1000×1625 and hold colour premultiplied by alpha. Drawn as they
 
 1. Divide RGB by alpha (`rgb * 255 / a`, clipped to 255).
 2. Crop 432×546 from the top, starting 234px in from the left. The 432px square at the foot is the plate, centred on her face, and the 114px above it is where the halo stands out. `Portrait` holds this ratio as constants.
-3. Save as WebP at quality 90 to `res/drawable-nodpi/expression_<name>.webp`, about 70 KB, and add it to `enum class Expression`.
+3. Save as WebP at quality 90 to `res/drawable-nodpi/expression_<name>.webp`, about 70 KB, and add it to `enum class Expression` with its animation number, and whether it blinks.
 
 ## The generated cover
 
@@ -242,8 +245,9 @@ The originals are in `/branding`, which is git-ignored and so only on the develo
 | `halo.webp` | The halo on its own. |
 | `expressions/` | 24 full-length portraits, 1000×1625, in one pose with different faces. |
 | `sisterhood.png` | The emblem on her trunk, 880×1364. Not in use. |
+| `CH0169_spr/` | Her rig from the game, Spine 3.8: `.skel`, `.atlas` and a 1024×1024 page in straight alpha. |
 
-What ships in the app is the launcher icon under `res/mipmap-*` and the eleven cut portraits in `res/drawable-nodpi`. The halo, the cover and the speech bubble are drawn in code.
+What ships in the app is the launcher icon under `res/mipmap-*`, the eleven cut portraits in `res/drawable-nodpi`, and her rig in `assets/ui`: the skeleton converted to JSON (`bun ../plana/scripts/spine38_to_json.mjs`), the atlas, and its page as lossless WebP. The halo, the cover and the speech bubble are drawn in code.
 
 Ui and this artwork are from Blue Archive. Her sheet credits her design and illustration to CHILD.
 

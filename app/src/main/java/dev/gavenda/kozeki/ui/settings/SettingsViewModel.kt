@@ -113,6 +113,12 @@ class SettingsViewModel(
 
     private val today: LocalDate = LocalDate.now(clock)
 
+    init {
+        // Each time Settings is opened, Ui starts from her own line, not the last check's answer.
+        // Before uiState below, which starts from the check as it is now.
+        appUpdates.clearAsked()
+    }
+
     private val eventChannel = Channel<SettingsEvent>(Channel.BUFFERED)
     val events: Flow<SettingsEvent> = eventChannel.receiveAsFlow()
 

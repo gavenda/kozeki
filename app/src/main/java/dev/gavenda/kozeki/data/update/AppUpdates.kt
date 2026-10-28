@@ -8,13 +8,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /** The check for a newer version of the app, as far as it has got. */
 sealed interface AppUpdateState {
     data object Idle : AppUpdateState
     data object Checking : AppUpdateState
-    data class Checked(val result: UpdateCheck) : AppUpdateState
+    /** `asked` when the user asked for the check, rather than the app opening. */
+    data class Checked(val result: UpdateCheck, val asked: Boolean = false) : AppUpdateState
 }
 
 /**
@@ -44,6 +46,14 @@ class AppUpdates(private val checker: UpdateChecker, private val scope: Coroutin
     /** The check the user asked for. */
     fun check() = run(quiet = false)
 
+    /**
+     * Forgets how an asked-for check went, so Settings opens with Ui's own line. A newer version
+     * found when the app opened is kept: that is the launch check's only news.
+     */
+    fun clearAsked() {
+        _state.update { if (it is AppUpdateState.Checked && it.asked) AppUpdateState.Idle else it }
+    }
+
     private fun run(quiet: Boolean) {
         if (_state.value == AppUpdateState.Checking) return
         val before = _state.value
@@ -54,7 +64,7 @@ class AppUpdates(private val checker: UpdateChecker, private val scope: Coroutin
             // GitHub often answers faster than Ui's face can change, so an asked-for check lasts
             // long enough for her checking face to be seen.
             if (!quiet) delay(MIN_ASKED_CHECK - started.elapsedNow())
-            _state.value = if (quiet && result is UpdateCheck.Failed) before else AppUpdateState.Checked(result)
+            _state.value = if (quiet && result is UpdateCheck.Failed) before else AppUpdateState.Checked(result, asked = !quiet)
         }
     }
 }

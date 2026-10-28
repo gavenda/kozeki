@@ -8,7 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.browser.customtabs.CustomTabsIntent
-import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -525,9 +524,9 @@ internal fun SettingRow(
  * Ui saying what she is here for, over the app's name and version, then who she is and who drew her.
  * On her birthday she says so instead. It ends the list and is no setting, so it has no card.
  *
- * Tapping her checks for a newer version, or fetches one she has found. A second sentence in her
- * bubble says how the check went, and her face goes with it. Being up to date adds no sentence
- * until the version under her is tapped, and only then is she happy.
+ * Tapping her checks for a newer version, or fetches one she has found. While she checks, and once
+ * she knows, what she says about it takes the place of her line, and her face goes with it. Being
+ * up to date is only said after a check that was asked for: the one on opening the app keeps quiet.
  */
 @Composable
 private fun About(
@@ -537,14 +536,12 @@ private fun About(
     onTapUi: () -> Unit = {},
 ) {
     val result = (update as? AppUpdateState.Checked)?.result
-    val upToDate = result == UpdateCheck.UpToDate
-    // The version under her has been tapped, so she says it is the latest, and is happy about it.
-    var showLatest by remember { mutableStateOf(false) }
-    LaunchedEffect(upToDate) { if (!upToDate) showLatest = false }
+    // She says it is the latest, and is happy about it, only when she was asked to look.
+    val saysLatest = result == UpdateCheck.UpToDate && (update as AppUpdateState.Checked).asked
     val expression = when {
         update == AppUpdateState.Checking -> Expression.STUDIOUS
         result is UpdateCheck.Available -> Expression.CURIOUS
-        upToDate && showLatest -> Expression.HAPPY
+        saysLatest -> Expression.HAPPY
         result == UpdateCheck.Offline || result == UpdateCheck.RateLimited -> Expression.WORRIED
         result is UpdateCheck.Failed -> Expression.DISMAYED
         else -> Expression.CONTENT
@@ -555,7 +552,7 @@ private fun About(
         else -> when (result) {
             null -> null
             is UpdateCheck.Available -> stringResource(R.string.settings_about_update_available, result.version)
-            UpdateCheck.UpToDate -> if (showLatest) stringResource(R.string.settings_about_update_latest) else null
+            UpdateCheck.UpToDate -> if (saysLatest) stringResource(R.string.settings_about_update_latest) else null
             UpdateCheck.Offline -> stringResource(R.string.settings_about_update_offline)
             UpdateCheck.RateLimited -> stringResource(R.string.settings_about_update_rate_limited)
             is UpdateCheck.Refused -> stringResource(R.string.settings_about_update_refused, result.code)
@@ -572,8 +569,9 @@ private fun About(
             verticalAlignment = Alignment.Bottom,
         ) {
             // No ripple: a box of it over her and her halo looks pasted on, and her face answers the tap.
-            Crossfade(
-                targetState = expression,
+            // Her rig blends one face into the next.
+            Portrait(
+                expression = expression,
                 modifier = Modifier
                     .width(ABOUT_PORTRAIT_WIDTH)
                     .clickable(
@@ -586,27 +584,19 @@ private fun About(
                         ),
                         onClick = onTapUi,
                     ),
-                label = "expression",
-            ) { face -> Portrait(face, Modifier.fillMaxWidth()) }
+            )
             // As tall as the plate she is on, which is as tall as it is wide, so the bubble's tail
             // is level with her face and not with the halo over it.
             Box(
                 modifier = Modifier.weight(1f, fill = false).heightIn(min = ABOUT_PORTRAIT_WIDTH),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                SpeechBubble(if (updateLine != null) "$line $updateLine" else line)
+                SpeechBubble(updateLine ?: line)
             }
         }
         Text(
             text = stringResource(R.string.settings_about_version, versionName),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.clickable(
-                interactionSource = null,
-                indication = null,
-                enabled = upToDate,
-                role = Role.Button,
-                onClick = { showLatest = !showLatest },
-            ),
         )
         // Two plain lines in the third person, as they are about her and not from her. The credit
         // is the quieter of the two.

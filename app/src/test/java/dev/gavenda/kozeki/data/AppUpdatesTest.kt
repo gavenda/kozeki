@@ -61,6 +61,19 @@ class AppUpdatesTest {
         updates.checkOnLaunch()
         assertEquals(AppUpdateState.Idle, updates.settled())
         updates.check()
-        assertEquals(AppUpdateState.Checked(UpdateCheck.Refused(500)), updates.settled())
+        assertEquals(AppUpdateState.Checked(UpdateCheck.Refused(500), asked = true), updates.settled())
+    }
+
+    @Test
+    fun `clearing forgets an asked check, not a newer version found on opening`() = runTest {
+        val updates = AppUpdates(UpdateChecker(client(), "2.6.0"), backgroundScope)
+        updates.checkOnLaunch()
+        updates.settled()
+        updates.clearAsked()
+        assertEquals(AppUpdateState.Checked(UpdateCheck.Available("2.7.0", "https://example.com/2.7.0")), updates.state.value)
+        updates.check()
+        updates.settled()
+        updates.clearAsked()
+        assertEquals(AppUpdateState.Idle, updates.state.value)
     }
 }
