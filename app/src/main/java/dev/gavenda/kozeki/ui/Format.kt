@@ -1,5 +1,8 @@
 package dev.gavenda.kozeki.ui
 
+import android.icu.text.DisplayContext
+import android.icu.text.RelativeDateTimeFormatter
+import android.icu.util.ULocale
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.res.stringResource
@@ -51,6 +54,32 @@ fun formatTime(epochMillis: Long): String =
 fun formatDateTime(epochMillis: Long): String =
     Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
         .format(DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT))
+
+/** How long ago [epochMillis] was, such as "Now", "1 minute ago" or "2 days ago". */
+fun formatTimeAgo(epochMillis: Long, now: Long = System.currentTimeMillis()): String {
+    val formatter = RelativeDateTimeFormatter.getInstance(
+        ULocale.getDefault(),
+        null,
+        RelativeDateTimeFormatter.Style.LONG,
+        DisplayContext.CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE,
+    )
+    val minutes = (now - epochMillis).coerceAtLeast(0) / 60_000
+    val hours = minutes / 60
+    val days = hours / 24
+    val (amount, unit) = when {
+        minutes < 1 -> return formatter.format(
+            RelativeDateTimeFormatter.Direction.PLAIN,
+            RelativeDateTimeFormatter.AbsoluteUnit.NOW,
+        )
+        minutes < 60 -> minutes to RelativeDateTimeFormatter.RelativeUnit.MINUTES
+        hours < 24 -> hours to RelativeDateTimeFormatter.RelativeUnit.HOURS
+        days < 7 -> days to RelativeDateTimeFormatter.RelativeUnit.DAYS
+        days < 30 -> days / 7 to RelativeDateTimeFormatter.RelativeUnit.WEEKS
+        days < 365 -> days / 30 to RelativeDateTimeFormatter.RelativeUnit.MONTHS
+        else -> days / 365 to RelativeDateTimeFormatter.RelativeUnit.YEARS
+    }
+    return formatter.format(amount.toDouble(), RelativeDateTimeFormatter.Direction.LAST, unit)
+}
 
 fun formatMonth(month: YearMonth): String = month.format(DateTimeFormatter.ofPattern("LLLL yyyy"))
 

@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -79,6 +80,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -100,6 +102,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -134,6 +137,7 @@ import dev.gavenda.kozeki.ui.components.Expression
 import dev.gavenda.kozeki.ui.components.HaloLoadingIndicator
 import dev.gavenda.kozeki.ui.components.OptionColor
 import dev.gavenda.kozeki.ui.components.Portrait
+import dev.gavenda.kozeki.ui.components.RatingBar
 import dev.gavenda.kozeki.ui.components.ReadingProgressRing
 import dev.gavenda.kozeki.ui.components.ReadingStateOrder
 import dev.gavenda.kozeki.ui.components.SpeechBubble
@@ -143,7 +147,10 @@ import dev.gavenda.kozeki.ui.components.labelRes
 import dev.gavenda.kozeki.ui.components.narrowIconButton
 import dev.gavenda.kozeki.ui.components.outlinedIcon
 import dev.gavenda.kozeki.ui.components.ownershipBadge
+import dev.gavenda.kozeki.ui.formatDate
 import dev.gavenda.kozeki.ui.formatPercent
+import dev.gavenda.kozeki.ui.formatPrice
+import dev.gavenda.kozeki.ui.formatTimeAgo
 import dev.gavenda.kozeki.ui.koinViewModel
 import dev.gavenda.kozeki.ui.libraryViewModel
 import dev.gavenda.kozeki.ui.search.SearchTopBar
@@ -152,6 +159,7 @@ import dev.gavenda.kozeki.ui.search.SearchViewModel
 import dev.gavenda.kozeki.ui.searchViewModel
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import java.time.LocalDate
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** MIME types offered by the file picker. Some providers report EPUBs as generic binary data. */
@@ -465,6 +473,13 @@ fun LibraryContent(
                     // A list is the same grid with rows for cells, so the place scrolled to and the
                     // headings carry over. A wide window sets the rows side by side.
                     val list = state.display == BookDisplay.LIST
+                    // "2 minutes ago" moves on while the screen is open.
+                    val now by produceState(System.currentTimeMillis(), state.sort) {
+                        while (state.sort == LibrarySort.RECENT) {
+                            value = System.currentTimeMillis()
+                            delay(60_000)
+                        }
+                    }
                     // A row brings its own margins, which the tint of a picked one fills.
                     val edge = if (list) 8.dp else 16.dp
                     val rowGap = if (list) 0.dp else 16.dp
@@ -546,6 +561,7 @@ fun LibraryContent(
                                         if (list) {
                                             LibraryBookRow(
                                                 book = book,
+                                                detail = sortDetail(book, state.sort, now),
                                                 selecting = state.selecting,
                                                 selected = book.id in selection.ids,
                                                 actions = selectionActions,
@@ -557,6 +573,7 @@ fun LibraryContent(
                                         } else {
                                             LibraryBookItem(
                                                 book = book,
+                                                detail = sortDetail(book, state.sort, now),
                                                 selecting = state.selecting,
                                                 selected = book.id in selection.ids,
                                                 actions = selectionActions,
@@ -575,6 +592,7 @@ fun LibraryContent(
                                     stickyHeader(key = "shelf-${group.shelf.id}") {
                                         ShelfHeader(
                                             shelf = group.shelf,
+                                            summary = shelfSummary(group.books, state.sort),
                                             collapsed = collapsed,
                                             onToggle = { onToggleGroup(groupKey) },
                                             // Extends over the grid's own side padding, so the books slide under all of it.
@@ -1070,6 +1088,7 @@ private fun SortMenu(
 @Composable
 private fun ShelfHeader(
     shelf: Shelf,
+    summary: SortDetail?,
     collapsed: Boolean,
     onToggle: () -> Unit,
     onAddBooks: () -> Unit,
@@ -1082,6 +1101,7 @@ private fun ShelfHeader(
     GroupHeader(
         title = shelf.name,
         count = shelf.bookCount,
+        summary = summary,
         collapsed = collapsed,
         onToggle = onToggle,
         modifier = modifier,
@@ -1135,6 +1155,8 @@ private fun GroupHeader(
     title: String,
     count: Int,
     collapsed: Boolean,
+    // Shown in place of the count, when the order has something better to say.
+    summary: SortDetail? = null,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
     indent: Dp = 8.dp,
@@ -1163,11 +1185,15 @@ private fun GroupHeader(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    text = pluralStringResource(R.plurals.shelf_book_count, count, count),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (summary != null) {
+                    SortDetailLine(summary, MaterialTheme.typography.bodySmall, MaterialTheme.colorScheme.onSurfaceVariant, starSize = 12.dp)
+                } else {
+                    Text(
+                        text = pluralStringResource(R.plurals.shelf_book_count, count, count),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             // Up while the books show, down once they are folded away.
             // Leather, with the title. The button folds the books as the row does.
@@ -1224,6 +1250,7 @@ private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun LibraryBookItem(
     book: Book,
+    detail: SortDetail?,
     selecting: Boolean,
     selected: Boolean,
     actions: SelectionActions,
@@ -1319,7 +1346,9 @@ private fun LibraryBookItem(
         val authorModifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 6.dp)
         // Who wrote it stays put whatever the state, which the cover shows as a badge.
         // While picking, a tap on a name picks the book like a tap anywhere else on it.
-        if (book.authors.isNotEmpty() && !selecting) {
+        if (detail != null) {
+            SortDetailLine(detail, MaterialTheme.typography.bodySmall, subtitleColor, starSize = 12.dp, modifier = authorModifier)
+        } else if (book.authors.isNotEmpty() && !selecting) {
             AuthorLinks(
                 authors = book.authors,
                 refs = book.authorRefs,
@@ -1345,6 +1374,7 @@ private fun LibraryBookItem(
 @Composable
 private fun LibraryBookRow(
     book: Book,
+    detail: SortDetail?,
     selecting: Boolean,
     selected: Boolean,
     actions: SelectionActions,
@@ -1399,7 +1429,9 @@ private fun LibraryBookRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (book.authors.isNotEmpty()) {
+            if (detail != null) {
+                SortDetailLine(detail, MaterialTheme.typography.bodyMedium, subtitleColor, starSize = 14.dp)
+            } else if (book.authors.isNotEmpty()) {
                 // While picking, a tap on a name picks the book like a tap anywhere else on it.
                 if (selecting) {
                     Text(
@@ -1463,6 +1495,61 @@ private fun LibraryBookRow(
         }
         if (book.state == ReadingState.READING) {
             ReadingProgressRing(book.overallProgression)
+        }
+    }
+}
+
+/** What the order of the library goes by, shown under a book's title in place of its authors. */
+private sealed interface SortDetail {
+    data class Line(val text: String) : SortDetail
+    /** [rating] as stars, with [label] after them when the stars alone would round it. */
+    data class Stars(val rating: Float, val label: String? = null) : SortDetail
+}
+
+/** What a shelf of [books] says in place of its count under [sort]: the total price, or the average rating. */
+private fun shelfSummary(books: List<Book>, sort: LibrarySort): SortDetail? = when (sort) {
+    LibrarySort.PRICE -> priceTotals(books)
+        .joinToString(" + ") { (currency, total) -> formatPrice(total, currency) }
+        .takeIf { it.isNotEmpty() }
+        ?.let(SortDetail::Line)
+    LibrarySort.RATING -> averageRating(books)?.let { SortDetail.Stars(it, "%.1f".format(it)) }
+    else -> null
+}
+
+/** The [SortDetail] of [book] under [sort], or null to show its authors as usual. */
+private fun sortDetail(book: Book, sort: LibrarySort, now: Long): SortDetail? = when (sort) {
+    LibrarySort.RECENT -> book.lastReadAt?.let { SortDetail.Line(formatTimeAgo(it, now)) }
+    LibrarySort.DATE_ADDED -> book.addedAt.takeIf { it > 0 }?.let { SortDetail.Line(formatDate(it)) }
+    LibrarySort.RATING -> book.rating?.let(SortDetail::Stars)
+    LibrarySort.PRICE -> book.purchasePriceMinor?.let { SortDetail.Line(formatPrice(it, book.purchaseCurrency)) }
+    LibrarySort.TITLE, LibrarySort.AUTHOR, LibrarySort.SERIES -> null
+}
+
+@Composable
+private fun SortDetailLine(
+    detail: SortDetail,
+    style: TextStyle,
+    color: Color,
+    starSize: Dp,
+    modifier: Modifier = Modifier,
+) {
+    when (detail) {
+        is SortDetail.Line -> Text(
+            text = detail.text,
+            style = style,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = modifier,
+        )
+        // As tall as a line of text, so the cells beside it stay level.
+        is SortDetail.Stars -> Row(
+            modifier = modifier.height(with(LocalDensity.current) { style.lineHeight.toDp() }),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RatingBar(rating = detail.rating, starSize = starSize)
+            detail.label?.let { Text(it, style = style, color = color, maxLines = 1) }
         }
     }
 }
@@ -1709,6 +1796,63 @@ private fun LibraryListPreview() {
         )
     }
 }
+
+/** The library in [sort], with a rating and a price on most of the sample books. */
+@Composable
+private fun SortedLibraryPreview(sort: LibrarySort, display: BookDisplay, kind: LibraryKind = LibraryKind.BOOKS) {
+    val books = sort.sorted(
+        PreviewData.books.mapIndexed { i, book ->
+            if (i % 4 == 3) book else book.copy(rating = 5f - i % 4 * 1.5f, purchasePriceMinor = 1299L + i * 250, purchaseCurrency = "USD")
+        },
+    )
+    val shelves = listOf(Shelf("a", "Favourites", 3), Shelf("b", "Science fiction", 4))
+    val memberships = mapOf("a" to books.take(3).mapTo(HashSet()) { it.id }, "b" to books.drop(3).mapTo(HashSet()) { it.id })
+    AppTheme {
+        LibraryContent(
+            state = LibraryUiState(
+                loading = false,
+                filter = LibraryFilter.ALL,
+                sort = sort,
+                display = display,
+                kind = kind,
+                sections = librarySections(LibraryFilter.ALL, books),
+                shelves = if (kind == LibraryKind.SHELVES) shelves else emptyList(),
+                shelfGroups = if (kind == LibraryKind.SHELVES) shelfGroups(shelves, memberships, books, LibraryFilter.ALL) else emptyList(),
+                counts = LibraryFilter.entries.associateWith { filter -> books.count(filter::matches) },
+                totalBooks = books.size,
+            ),
+            search = SearchUiState(),
+            snackbarHostState = remember { SnackbarHostState() },
+            onSearchQueryChange = {},
+            onFilterSelected = {},
+            onSortSelected = {},
+            onDisplaySelected = {},
+            onImportClick = {},
+            onAddBook = {},
+            onAddManually = {},
+            onBookClick = {},
+            onAuthorClick = {},
+            selectionActions = SelectionActions(),
+            onSettingsClick = {},
+        )
+    }
+}
+
+@ScreenPreviews
+@Composable
+private fun LibraryByRatingPreview() = SortedLibraryPreview(LibrarySort.RATING, BookDisplay.COVERS)
+
+@ScreenPreviews
+@Composable
+private fun LibraryByPricePreview() = SortedLibraryPreview(LibrarySort.PRICE, BookDisplay.LIST)
+
+@ScreenPreviews
+@Composable
+private fun ShelvesByPricePreview() = SortedLibraryPreview(LibrarySort.PRICE, BookDisplay.LIST, LibraryKind.SHELVES)
+
+@ScreenPreviews
+@Composable
+private fun ShelvesByRatingPreview() = SortedLibraryPreview(LibrarySort.RATING, BookDisplay.LIST, LibraryKind.SHELVES)
 
 @ScreenPreviews
 @Composable

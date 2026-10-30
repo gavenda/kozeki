@@ -9,6 +9,21 @@ data class ShelfGroup(val shelf: Shelf, val sections: List<LibrarySection>) {
     val books: List<Book> get() = sections.flatMap { it.books }
 }
 
+/**
+ * What [books] cost, one sum for each currency, the one most of them were bought in first. A book
+ * without a currency counts in the default one, as its price is shown in it. Empty when none has a price.
+ */
+fun priceTotals(books: List<Book>): List<Pair<String?, Long>> = books
+    .filter { it.purchasePriceMinor != null }
+    .groupBy { it.purchaseCurrency }
+    .entries
+    .sortedByDescending { it.value.size }
+    .map { (currency, priced) -> currency to priced.sumOf { it.purchasePriceMinor ?: 0L } }
+
+/** The average of the ratings given to [books], or null when none is rated. */
+fun averageRating(books: List<Book>): Float? =
+    books.mapNotNull { it.rating }.takeIf { it.isNotEmpty() }?.average()?.toFloat()
+
 /** The ids of every book that is on some shelf, given what [memberships] says of each shelf. */
 fun shelvedIds(memberships: Map<String, Set<String>>): Set<String> = memberships.values.flatMapTo(HashSet()) { it }
 
