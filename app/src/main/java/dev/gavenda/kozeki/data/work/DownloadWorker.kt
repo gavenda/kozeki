@@ -57,7 +57,7 @@ class DownloadWorker(context: Context, parameters: WorkerParameters) :
             ?: queue.firstOrNull { it.state is ChapterDownload.Queued }
         val left = queue.count { it.isActive }
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.download_48px)
+            .setSmallIcon(R.drawable.notification_download)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)

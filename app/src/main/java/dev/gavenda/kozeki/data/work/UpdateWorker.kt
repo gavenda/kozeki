@@ -71,7 +71,7 @@ class UpdateWorker(context: Context, parameters: WorkerParameters) :
     private fun foregroundInfo(progress: UpdateCheckProgress): ForegroundInfo {
         val context = applicationContext
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.refresh_48px)
+            .setSmallIcon(R.drawable.notification_refresh)
             .setContentTitle(context.getString(R.string.update_check_title))
             .setContentText(progress.current)
             .setSubText(

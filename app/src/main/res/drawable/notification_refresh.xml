@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The status bar icon of the chapter update check: refresh_48px spinning. The status bar plays an animation-list, not an animated vector. -->
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:oneshot="false">
+    <item android:drawable="@drawable/notification_refresh_00" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_01" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_02" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_03" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_04" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_05" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_06" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_07" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_08" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_09" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_10" android:duration="80" />
+    <item android:drawable="@drawable/notification_refresh_11" android:duration="80" />
+</animation-list>
