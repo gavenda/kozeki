@@ -56,6 +56,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -164,6 +173,19 @@ private fun ComicReaderReady(state: ComicReaderUiState.Ready, viewModel: ComicRe
     var interactions by remember { mutableIntStateOf(0) }
     ImmersiveMode(hideSystemBars = !chromeVisible)
     KeepScreenOn(interactions)
+    // A page held down, with the menu to save or share it open where the finger is.
+    var held by remember { mutableStateOf<HeldPage?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val haptics = LocalHapticFeedback.current
+    // Outside the chapter's own scope, so a save carries on when the next chapter takes over.
+    val exportScope = rememberCoroutineScope()
+    val hold: (File, String, Int, Offset) -> Unit = { file, chapter, page, at ->
+        val name = state.segments.firstOrNull { it.chapter.url == chapter }?.chapter?.name ?: state.chapter.name
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        held = HeldPage(file, PageExport.name(state.bookTitle, name, page), at)
+    }
 
     // A new chapter or another mode starts its scroll state afresh, at the page the ViewModel holds.
     key(state.generation, mode) {
@@ -330,24 +352,49 @@ private fun ComicReaderReady(state: ComicReaderUiState.Ready, viewModel: ComicRe
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             if (vertical) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
+                val zoom = remember(listState) { StripZoom(listState) }
+                // The taps are read out here, where the strip is not zoomed, so they land where the finger is.
+                Box(
+                    Modifier
                         .fillMaxSize()
                         .onSizeChanged { widthPx = it.width }
-                        .pointerInput(Unit) { detectTapGestures(onTap = { toggleChrome() }) },
+                        .then(with(zoom) { Modifier.pinchToZoom() })
+                        .pointerInput(zoom) {
+                            detectTapGestures(
+                                onTap = { if (!zoom.moved) toggleChrome() },
+                                onDoubleTap = { at -> scope.launch { zoom.toggle(at) } },
+                                onLongPress = { at ->
+                                    if (zoom.moved) return@detectTapGestures
+                                    val y = zoom.toList(at).y
+                                    val row = listState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull { y >= it.offset && y < it.offset + it.size }
+                                    when (val item = row?.let { itemsByKey[it.key] }) {
+                                        is StripItem.Slice -> hold(item.file, item.chapter, item.page, at)
+                                        is StripItem.Whole -> hold(item.file, item.chapter, item.page, at)
+                                        else -> Unit
+                                    }
+                                },
+                            )
+                        },
                 ) {
-                    items(items, key = { it.key }, contentType = { it::class }) { item ->
-                        StripRow(
-                            item = item,
-                            widthPx = widthPx,
-                            progress = strip::progressOf,
-                            onRetry = { chapter, page ->
-                                state.segments.firstOrNull { it.chapter.url == chapter }?.pages?.retry(page)
-                            },
-                            onNext = viewModel::openNext,
-                            onBack = onBack,
-                        )
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(with(zoom) { Modifier.zoomedLayer() }),
+                    ) {
+                        items(items, key = { it.key }, contentType = { it::class }) { item ->
+                            StripRow(
+                                item = item,
+                                widthPx = widthPx,
+                                progress = strip::progressOf,
+                                onRetry = { chapter, page ->
+                                    state.segments.firstOrNull { it.chapter.url == chapter }?.pages?.retry(page)
+                                },
+                                onNext = viewModel::openNext,
+                                onBack = onBack,
+                            )
+                        }
                     }
                 }
             } else {
@@ -361,6 +408,7 @@ private fun ComicReaderReady(state: ComicReaderUiState.Ready, viewModel: ComicRe
                         FramedPage(
                             pages = state.pages,
                             index = index,
+                            onLongPress = { file, at -> hold(file, state.chapter.url, index, at) },
                             onTap = { fraction ->
                                 // The edges turn the page, the middle brings up the controls.
                                 val atStart = fraction < EDGE_FRACTION
@@ -396,9 +444,47 @@ private fun ComicReaderReady(state: ComicReaderUiState.Ready, viewModel: ComicRe
                     )
                 }
             }
+
+            held?.let { page ->
+                Box(Modifier.offset { IntOffset(page.at.x.roundToInt(), page.at.y.roundToInt()) }) {
+                    DropdownMenu(expanded = true, onDismissRequest = { held = null }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.comic_reader_save_image)) },
+                            leadingIcon = { Icon(painterResource(R.drawable.download_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                            onClick = {
+                                held = null
+                                exportScope.launch {
+                                    val saved = PageExport.save(context, page.file, page.name)
+                                    snackbar.showSnackbar(
+                                        resources.getString(
+                                            if (saved) R.string.comic_reader_image_saved else R.string.comic_reader_image_save_failed,
+                                        ),
+                                    )
+                                }
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.comic_reader_share_image)) },
+                            leadingIcon = { Icon(painterResource(R.drawable.share_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                            onClick = {
+                                held = null
+                                exportScope.launch {
+                                    if (!PageExport.share(context, page.file, page.name)) {
+                                        snackbar.showSnackbar(resources.getString(R.string.comic_reader_image_share_failed))
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+            SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.navigationBars))
         }
     }
 }
+
+/** A page held down: its file, the name it is saved and shared under, and where the finger was. */
+private data class HeldPage(val file: File, val name: String, val at: Offset)
 
 /** The file of a page once it is there, and whether it is a long strip rather than a page. */
 @Composable
@@ -417,7 +503,7 @@ private fun isTall(file: File): Boolean {
 
 /** A page of the paged modes: the whole page in view, with pinch and double tap to zoom. */
 @Composable
-private fun FramedPage(pages: ComicChapterPages, index: Int, onTap: (Float) -> Unit) {
+private fun FramedPage(pages: ComicChapterPages, index: Int, onLongPress: (File, Offset) -> Unit, onTap: (Float) -> Unit) {
     val state by pages.state(index).collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         when (val loaded = state) {
@@ -441,6 +527,7 @@ private fun FramedPage(pages: ComicChapterPages, index: Int, onTap: (Float) -> U
                     contentScale = if (tall) ContentScale.FillWidth else ContentScale.Fit,
                     alignment = if (tall) Alignment.TopCenter else Alignment.Center,
                     onClick = { offset -> onTap(offset.x / width) },
+                    onLongClick = { offset -> onLongPress(loaded.file, offset) },
                 )
             }
         }

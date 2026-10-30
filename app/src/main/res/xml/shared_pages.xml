@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A comic page being shared, copied here for the app it goes to. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

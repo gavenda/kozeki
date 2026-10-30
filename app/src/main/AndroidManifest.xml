@@ -144,6 +144,17 @@
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
 
+
+        <!-- Comic pages shared from the reader. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.pages"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shared_pages" />
+        </provider>
     </application>
 
 </manifest>
