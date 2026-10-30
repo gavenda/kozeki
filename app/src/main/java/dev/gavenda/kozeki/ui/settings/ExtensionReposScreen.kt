@@ -29,8 +29,11 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -44,8 +47,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -207,14 +212,39 @@ fun ExtensionReposContent(
                     }
                     if (state.hasExtensions) {
                         item(key = "search") {
-                            OutlinedTextField(
+                            // Dressed as the library's search bar, though it only filters the list below.
+                            val pillColor = SearchBarDefaults.collapsedContainedSearchBarColor
+                            val keyboard = LocalSoftwareKeyboardController.current
+                            TextField(
                                 value = state.query,
                                 onValueChange = actions.onQuery,
-                                label = { Text(stringResource(R.string.extension_repos_search)) },
+                                placeholder = { Text(stringResource(R.string.extension_repos_search)) },
                                 leadingIcon = {
                                     Icon(painterResource(R.drawable.search_48px), contentDescription = null, modifier = Modifier.size(24.dp))
                                 },
+                                trailingIcon = if (state.query.isNotEmpty()) {
+                                    {
+                                        IconButton(onClick = { actions.onQuery("") }) {
+                                            Icon(
+                                                painterResource(R.drawable.close_48px),
+                                                contentDescription = stringResource(R.string.search_clear),
+                                                modifier = Modifier.size(24.dp),
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    null
+                                },
                                 singleLine = true,
+                                shape = SearchBarDefaults.inputFieldShape,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = pillColor,
+                                    unfocusedContainerColor = pillColor,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             )
                         }
