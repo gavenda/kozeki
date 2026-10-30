@@ -16,7 +16,10 @@ sealed interface UpdateCheck {
     data object UpToDate : UpdateCheck
 
     /** [version] is newer than the installed one. [url] downloads its APK, or opens its release page. */
-    data class Available(val version: String, val url: String) : UpdateCheck
+    data class Available(val version: String, val url: String) : UpdateCheck {
+        /** Whether [url] is the APK itself, which the app can install. */
+        val isApk: Boolean get() = url.endsWith(".apk")
+    }
 
     sealed interface Failed : UpdateCheck
     data object Offline : Failed

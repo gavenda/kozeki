@@ -100,6 +100,7 @@ fun settingsViewModel() = SettingsViewModel(
     comicSources = koin.get(),
     comicPages = koin.get(),
     appUpdates = koin.get(),
+    appUpdateInstaller = koin.get(),
     versionName = BuildConfig.VERSION_NAME,
     clock = koin.get(),
 )

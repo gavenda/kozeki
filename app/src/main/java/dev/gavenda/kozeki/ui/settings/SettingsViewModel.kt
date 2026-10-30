@@ -21,6 +21,7 @@ import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.data.update.AppUpdateState
+import dev.gavenda.kozeki.data.update.AppUpdateInstaller
 import dev.gavenda.kozeki.data.update.AppUpdates
 import dev.gavenda.kozeki.data.update.UpdateCheck
 import dev.gavenda.kozeki.ui.isUiBirthday
@@ -107,6 +108,7 @@ class SettingsViewModel(
     private val comicSources: ComicSources,
     private val comicPages: ComicPages,
     private val appUpdates: AppUpdates,
+    private val appUpdateInstaller: AppUpdateInstaller,
     versionName: String,
     clock: Clock,
 ) : ViewModel() {
@@ -257,11 +259,16 @@ class SettingsViewModel(
 
     fun dismissLocalBackupNotice() = localBackup.dismiss()
 
-    /** Asks for the newest version, or downloads it once a check has found one. */
+    /** Asks for the newest version, or installs it once a check has found one. */
     fun checkForAppUpdate() {
         val current = appUpdates.state.value
         if (current is AppUpdateState.Checked && current.result is UpdateCheck.Available) {
-            eventChannel.trySend(SettingsEvent.Download(Uri.parse(current.result.url)))
+            if (current.result.isApk) {
+                appUpdateInstaller.install(current.result)
+            } else {
+                // No APK on the release; its page is the next best thing.
+                eventChannel.trySend(SettingsEvent.Download(Uri.parse(current.result.url)))
+            }
         } else {
             appUpdates.check()
         }

@@ -28,6 +28,11 @@ class AppUpdates(private val checker: UpdateChecker, private val scope: Coroutin
     private val _state = MutableStateFlow<AppUpdateState>(AppUpdateState.Idle)
     val state: StateFlow<AppUpdateState> = _state.asStateFlow()
 
+    private val _offerDismissed = MutableStateFlow(false)
+
+    /** Whether the user put off the newer version found on launch. It is not offered again this run. */
+    val offerDismissed: StateFlow<Boolean> = _offerDismissed.asStateFlow()
+
     private val launchChecked = AtomicBoolean(false)
 
     private companion object {
@@ -52,6 +57,11 @@ class AppUpdates(private val checker: UpdateChecker, private val scope: Coroutin
      */
     fun clearAsked() {
         _state.update { if (it is AppUpdateState.Checked && it.asked) AppUpdateState.Idle else it }
+    }
+
+    /** Puts off the newer version until the next fresh open. */
+    fun dismissOffer() {
+        _offerDismissed.value = true
     }
 
     private fun run(quiet: Boolean) {

@@ -136,7 +136,7 @@ Inside the app her portrait is in four kinds of place and nowhere else: wherever
 
 **About.** The last thing in Settings, with no card and no heading: her `CONTENT` face at 96dp, a speech bubble beside it with her line, and "Kozeki" with the version underneath. Under the version are two plain lines in the third person: "Kept by Ui, Magician of the Old Library" and "Character design and illustration by CHILD, from Blue Archive". On 23 April the bubble says "It's my birthday today. A book read would be present enough." instead.
 
-Tapping her checks GitHub for a newer version of the app, and the app also checks once by itself each time it is freshly opened. While she checks and once she knows, what she says about it takes the place of her line, and her face changes with it. The version under her is plain text: she is the only thing to tap. What a tapped check found is forgotten when Settings is opened again, so she starts from her line each time; a newer version found by the launch check stays.
+Tapping her checks GitHub for a newer version of the app, and the app also checks once by itself each time it is freshly opened. While she checks and once she knows, what she says about it takes the place of her line, and her face changes with it. The version under her is plain text: she is the only thing to tap. What a tapped check found is forgotten when Settings is opened again, so she starts from her line each time; a newer version found by the launch check stays. That one is also offered straight away in a plain dialog ("Update available", "Kozeki 2.7.0 is out.", Update or Later), with no face, so it is not in her voice.
 
 | Check | She says | Face |
 |---|---|---|
@@ -144,7 +144,7 @@ Tapping her checks GitHub for a newer version of the app, and the app also check
 | Checking (a tapped check lasts at least a second, so the face is seen) | "Let me see if there's a newer version…" | `STUDIOUS` |
 | Up to date, after a tapped check | "You are on the latest version." | `HAPPY` |
 | Up to date, after the launch check | Her line | `CONTENT` |
-| A newer version | "Version 2.7.0 is out. Tap me to fetch it." Tapping her again opens its APK. | `CURIOUS` |
+| A newer version | "Version 2.7.0 is out. Tap me to fetch it." Tapping her again downloads and installs it, the way extensions are installed. | `CURIOUS` |
 | Offline | "I can't reach GitHub right now." | `WORRIED` |
 | Too many checks | "GitHub won't take more checks for now. Try again later." | `WORRIED` |
 | Refused or unreadable | "GitHub turned me away (404)." / "I couldn't read GitHub's answer." | `DISMAYED` |

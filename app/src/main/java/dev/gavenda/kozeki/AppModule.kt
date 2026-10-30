@@ -38,6 +38,8 @@ import dev.gavenda.kozeki.data.settings.SettingsRepository
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListApi
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
+import dev.gavenda.kozeki.data.install.ApkInstaller
+import dev.gavenda.kozeki.data.update.AppUpdateInstaller
 import dev.gavenda.kozeki.data.update.AppUpdates
 import dev.gavenda.kozeki.data.update.UpdateChecker
 import dev.gavenda.kozeki.data.work.DownloadWorker
@@ -199,7 +201,8 @@ fun appModule(app: Application) = module {
 
     single { ExtensionRepos(get(), get(), get(), get()) }
 
-    single { ExtensionInstaller(app, get(), get(), get()) }
+    single { ApkInstaller(app) }
+    single { ExtensionInstaller(app, get(), get(), get(), get()) }
 
     single { ComicImages(get(), get()) }
 
@@ -238,6 +241,8 @@ fun appModule(app: Application) = module {
     single { ComicReaderPreferences(app) }
 
     single { AppUpdates(UpdateChecker(get(), BuildConfig.VERSION_NAME), get()) }
+
+    single { AppUpdateInstaller(app, get(), get(), get()) }
 }
 
 /**

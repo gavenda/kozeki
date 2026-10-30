@@ -13,7 +13,7 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
-    <!-- Installing and removing Mihon extensions from the repositories added in Settings. -->
+    <!-- Installing and removing Mihon extensions from the repositories added in Settings, and installing the app's own updates. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
@@ -133,9 +133,9 @@
             android:name=".ui.settings.SourcePreferencesActivity"
             android:exported="false" />
 
-        <!-- The package installer's answers about extensions being installed. -->
+        <!-- The package installer's answers about extensions and app updates being installed. -->
         <receiver
-            android:name=".data.comic.repo.ExtensionInstallReceiver"
+            android:name=".data.install.ApkInstallReceiver"
             android:exported="false" />
 
         <!-- WorkManager's foreground service, run by chapter downloads and update checks. -->

@@ -828,7 +828,21 @@
     <string name="settings_about_update_refused">GitHub turned me away (%1$s).</string>
     <string name="settings_about_update_unreadable">I couldn\'t read GitHub\'s answer.</string>
     <string name="settings_about_update_check">Check for updates</string>
-    <string name="settings_about_update_download">Download the new version</string>
+    <string name="settings_about_update_download">Install the new version</string>
+    <string name="app_update_title">Update available</string>
+    <string name="app_update_message">Kozeki %1$s is out.</string>
+    <string name="app_update_install">Update</string>
+    <string name="app_update_later">Later</string>
+    <string name="app_update_working_title">Updating</string>
+    <string name="app_update_downloading">Downloading…</string>
+    <string name="app_update_installing">Installing…</string>
+    <string name="app_update_failed_title">Update failed</string>
+    <string name="app_update_offline">Download failed.</string>
+    <string name="app_update_refused">Download refused (%1$s).</string>
+    <string name="app_update_signature">Not signed with this app\'s key.</string>
+    <string name="app_update_not_apk">Not a Kozeki APK.</string>
+    <string name="app_update_system">Not installed: %1$s</string>
+    <string name="app_update_system_unknown">Not installed.</string>
     <string name="settings_about_keeper">Kept by %1$s, Magician of the Old Library</string>
     <string name="settings_about_illustrator">Character design and illustration by CHILD, from Blue Archive</string>
     <!-- Shelves -->
