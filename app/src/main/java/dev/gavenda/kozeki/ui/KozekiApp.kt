@@ -9,15 +9,30 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ShortNavigationBarDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.WideNavigationRailDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuite
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldLayout
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldValue
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.material3.adaptive.navigationsuite.rememberNavigationSuiteScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -317,8 +332,13 @@ private fun AnimatedContentTransitionScope<Scene<NavKey>>.slide(
 /**
  * The navigation frame: the three top-level destinations in a navigation bar on phones and in a
  * rail on wider windows. It slides away when [current] is null, which is how detail screens and
- * the reader get the full window.
+ * the reader get the full window. On the rail, the showing tab's main action sits at its top
+ * (see [RailActionEffect]).
+ *
+ * This is NavigationSuiteScaffold taken apart: given a primary action, the scaffold composes it a
+ * second time beside the rail, unplaced, and the action's state would be split between the two.
  */
+@Suppress("DEPRECATION") // The default type is worked out from this one until the scaffold moves to V2.
 @Composable
 fun KozekiNavigationScaffold(
     current: TopLevelDestination?,
@@ -330,24 +350,60 @@ fun KozekiNavigationScaffold(
     LaunchedEffect(current != null) {
         if (current != null) scaffoldState.show() else scaffoldState.hide()
     }
+    val type = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfo())
+    val onRail = type == NavigationSuiteType.WideNavigationRailCollapsed ||
+        type == NavigationSuiteType.WideNavigationRailExpanded
+    val railAction = remember { RailAction() }
 
-    NavigationSuiteScaffold(
-        navigationItems = {
-            TopLevelDestination.entries.forEach { item ->
-                val selected = item == current
-                NavigationSuiteItem(
-                    selected = selected,
-                    onClick = { onSelect(item) },
-                    icon = { Icon(painterResource(if (selected) item.selectedIcon else item.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                    label = { Text(stringResource(item.label)) },
-                )
+    Surface(modifier = modifier, color = NavigationSuiteScaffoldDefaults.containerColor, contentColor = NavigationSuiteScaffoldDefaults.contentColor) {
+        NavigationSuiteScaffoldLayout(
+            navigationSuite = {
+                NavigationSuite(
+                    navigationSuiteType = type,
+                    primaryActionContent = {
+                        // The rail puts its header at its start edge; the action is centred over the items instead.
+                        railAction.content?.let { action ->
+                            Box(Modifier.width(RailCollapsedWidth), contentAlignment = Alignment.Center) { action() }
+                        }
+                    },
+                ) {
+                    TopLevelDestination.entries.forEach { item ->
+                        val selected = item == current
+                        NavigationSuiteItem(
+                            selected = selected,
+                            onClick = { onSelect(item) },
+                            icon = { Icon(painterResource(if (selected) item.selectedIcon else item.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                            label = { Text(stringResource(item.label)) },
+                            navigationSuiteType = type,
+                        )
+                    }
+                }
+            },
+            navigationSuiteType = type,
+            state = scaffoldState,
+        ) {
+            // What the bar or the rail takes from the window, as the scaffold itself consumes it.
+            val shown = scaffoldState.currentValue != NavigationSuiteScaffoldValue.Hidden || scaffoldState.isAnimating
+            val insets = when {
+                !shown -> WindowInsets(0, 0, 0, 0)
+                onRail -> WideNavigationRailDefaults.windowInsets.only(WindowInsetsSides.Start)
+                else -> ShortNavigationBarDefaults.windowInsets.only(WindowInsetsSides.Bottom)
+                    .add(WindowInsets(bottom = ShortNavigationBarHeight))
             }
-        },
-        modifier = modifier,
-        state = scaffoldState,
-        content = content,
-    )
+            Box(Modifier.consumeWindowInsets(insets)) {
+                CompositionLocalProvider(LocalRailAction provides if (onRail) railAction else null) {
+                    content()
+                }
+            }
+        }
+    }
 }
+
+/** The bar's own height, which NavigationSuiteScaffold keeps private. */
+private val ShortNavigationBarHeight = 64.dp
+
+/** The collapsed rail's width, as WideNavigationRail draws it. */
+private val RailCollapsedWidth = 96.dp
 
 /**
  * Switches tabs and keeps the one being left underneath, so Back walks through the tabs in the

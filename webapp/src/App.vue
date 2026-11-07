@@ -51,6 +51,8 @@ useEventListener(document, 'visibilitychange', () => {
 			v-if="tab"
 			class="fixed inset-x-0 bottom-0 z-40 flex justify-around bg-surface-container pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:end-auto md:w-24 md:flex-col md:justify-start md:gap-3 md:bg-surface md:pt-11"
 		>
+			<!-- The showing page's main action, at the top of the rail as the phone's wide window has it. -->
+			<div id="rail-action" class="contents"></div>
 			<RouterLink
 				v-for="destination in destinations"
 				:key="destination.name"

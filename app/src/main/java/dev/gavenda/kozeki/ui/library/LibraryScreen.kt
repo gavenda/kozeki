@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -122,7 +123,9 @@ import dev.gavenda.kozeki.data.model.Book
 import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.Shelf
+import dev.gavenda.kozeki.ui.LocalRailAction
 import dev.gavenda.kozeki.ui.PreviewData
+import dev.gavenda.kozeki.ui.RailActionEffect
 import dev.gavenda.kozeki.ui.ScreenPreviews
 import dev.gavenda.kozeki.ui.book.DeleteBooksDialog
 import dev.gavenda.kozeki.ui.book.PurchaseDialog
@@ -347,6 +350,24 @@ fun LibraryContent(
         }
     }
 
+    // The empty state has its own button; two of them side by side would be noise. While books
+    // are picked, the selection toolbar takes the corner. On a rail the button sits at its top.
+    val showsAddButton = !state.selecting && (!state.isLibraryEmpty || state.importing)
+    val onRail = LocalRailAction.current != null
+    val addBooksMenu: @Composable (Boolean) -> Unit = { rail ->
+        AddBooksMenu(
+            importing = state.importing,
+            offersTop = offersTop,
+            onScrollToTop = scrollToTop,
+            onImportClick = onImportClick,
+            onAddBook = onAddBook,
+            onAddManually = onAddManually,
+            onNewShelf = if (state.inShelves) ({ shelfPrompt = ShelfPrompt.Create }) else null,
+            onRail = rail,
+        )
+    }
+    if (showsAddButton && onRail) RailActionEffect { addBooksMenu(true) }
+
     BackHandler(state.selecting) { selectionActions.onClear() }
     // A dialog belongs to the selection it was opened for, not to whatever is picked next.
     LaunchedEffect(state.selecting) {
@@ -382,19 +403,7 @@ fun LibraryContent(
             )
         },
         floatingActionButton = {
-            // The empty state has its own button; two of them side by side would be noise.
-            // While books are picked, the selection toolbar takes this corner.
-            if (!state.selecting && (!state.isLibraryEmpty || state.importing)) {
-                AddBooksMenu(
-                    importing = state.importing,
-                    offersTop = offersTop,
-                    onScrollToTop = scrollToTop,
-                    onImportClick = onImportClick,
-                    onAddBook = onAddBook,
-                    onAddManually = onAddManually,
-                    onNewShelf = if (state.inShelves) ({ shelfPrompt = ShelfPrompt.Create }) else null,
-                )
-            }
+            if (showsAddButton && !onRail) addBooksMenu(false)
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
@@ -817,10 +826,20 @@ internal class ScrollTurn(private val threshold: Float) : NestedScrollConnection
     }
 }
 
+/** One of the ways in, as the add button's menu lists them. */
+private class AddOption(
+    @StringRes val label: Int,
+    @DrawableRes val icon: Int,
+    val container: Color,
+    val content: Color,
+    val onClick: () -> Unit,
+)
+
 /**
  * The ways a book gets in: as an EPUB from the device, looked up online without a file, or typed
  * in by hand. While [offersTop] holds, the button leads back to the top of the library instead,
- * unless its menu is open or an import is under way.
+ * unless its menu is open or an import is under way. [onRail] is the button at the top of the
+ * navigation rail, whose menu drops down from it rather than rising.
  */
 @Composable
 private fun AddBooksMenu(
@@ -831,6 +850,7 @@ private fun AddBooksMenu(
     onAddBook: () -> Unit,
     onAddManually: () -> Unit,
     onNewShelf: (() -> Unit)? = null,
+    onRail: Boolean = false,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     BackHandler(expanded) { expanded = false }
@@ -842,81 +862,79 @@ private fun AddBooksMenu(
             else -> R.string.library_add
         },
     )
+    val colors = MaterialTheme.colorScheme
+    val options = buildList {
+        if (onNewShelf != null) add(AddOption(R.string.shelf_new, R.drawable.shelves_fill_48px, colors.primary, colors.onPrimary, onNewShelf))
+        add(AddOption(R.string.library_add_import, R.drawable.upload_file_fill_48px, colors.primaryContainer, colors.onPrimaryContainer, onImportClick))
+        add(AddOption(R.string.library_add_find, R.drawable.travel_explore_48px, colors.secondaryContainer, colors.onSecondaryContainer, onAddBook))
+        add(AddOption(R.string.library_add_manual, R.drawable.edit_note_fill_48px, colors.tertiaryContainer, colors.onTertiaryContainer, onAddManually))
+    }
 
-    FloatingActionButtonMenu(
-        expanded = expanded,
-        button = {
-            ToggleFloatingActionButton(
-                checked = expanded,
-                onCheckedChange = { if (toTop) onScrollToTop() else if (!importing) expanded = it },
-                modifier = Modifier.semantics { contentDescription = label },
-            ) {
-                if (importing) {
-                    HaloLoadingIndicator(Modifier.size(24.dp))
-                } else {
-                    AnimatedContent(
-                        targetState = toTop,
-                        transitionSpec = { (scaleIn() + fadeIn()) togetherWith (scaleOut() + fadeOut()) },
-                        label = "add or to top",
-                    ) { top ->
-                        if (top) {
-                            Icon(painterResource(R.drawable.keyboard_arrow_up_48px), contentDescription = null, modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(
-                                painter = if (checkedProgress > 0.5f) painterResource(R.drawable.close_48px) else painterResource(R.drawable.add_48px),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp).animateIcon({ checkedProgress }),
-                            )
-                        }
+    val button: @Composable () -> Unit = {
+        ToggleFloatingActionButton(
+            checked = expanded,
+            onCheckedChange = { if (toTop) onScrollToTop() else if (!importing) expanded = it },
+            modifier = Modifier.semantics { contentDescription = label },
+        ) {
+            if (importing) {
+                HaloLoadingIndicator(Modifier.size(24.dp))
+            } else {
+                AnimatedContent(
+                    targetState = toTop,
+                    transitionSpec = { (scaleIn() + fadeIn()) togetherWith (scaleOut() + fadeOut()) },
+                    label = "add or to top",
+                ) { top ->
+                    if (top) {
+                        Icon(painterResource(R.drawable.keyboard_arrow_up_48px), contentDescription = null, modifier = Modifier.size(24.dp))
+                    } else {
+                        Icon(
+                            painter = if (checkedProgress > 0.5f) painterResource(R.drawable.close_48px) else painterResource(R.drawable.add_48px),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp).animateIcon({ checkedProgress }),
+                        )
                     }
                 }
             }
-        },
+        }
+    }
+
+    if (onRail) {
+        Box {
+            button()
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(option.label)) },
+                        onClick = {
+                            expanded = false
+                            option.onClick()
+                        },
+                        leadingIcon = { Icon(painterResource(option.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    FloatingActionButtonMenu(
+        expanded = expanded,
+        button = button,
         // The menu brings its own margins, and the scaffold has already applied the same ones.
         modifier = Modifier.offset(x = 16.dp, y = 16.dp),
     ) {
-        if (onNewShelf != null) {
+        options.forEach { option ->
             FloatingActionButtonMenuItem(
                 onClick = {
                     expanded = false
-                    onNewShelf()
+                    option.onClick()
                 },
-                text = { Text(stringResource(R.string.shelf_new)) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                icon = { Icon(painterResource(R.drawable.shelves_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                text = { Text(stringResource(option.label)) },
+                containerColor = option.container,
+                contentColor = option.content,
+                icon = { Icon(painterResource(option.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
             )
         }
-        FloatingActionButtonMenuItem(
-            onClick = {
-                expanded = false
-                onImportClick()
-            },
-            text = { Text(stringResource(R.string.library_add_import)) },
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            icon = { Icon(painterResource(R.drawable.upload_file_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = {
-                expanded = false
-                onAddBook()
-            },
-            text = { Text(stringResource(R.string.library_add_find)) },
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            icon = { Icon(painterResource(R.drawable.travel_explore_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = {
-                expanded = false
-                onAddManually()
-            },
-            text = { Text(stringResource(R.string.library_add_manual)) },
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            icon = { Icon(painterResource(R.drawable.edit_note_fill_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
-        )
     }
 }
 
