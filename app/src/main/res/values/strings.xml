@@ -670,7 +670,7 @@
     <string name="sync_error_offline">Your account can\'t be reached. Try again when you\'re online.</string>
     <string name="sync_error_refused">The sync was refused (%1$s). Try again later.</string>
     <string name="sync_error_unreadable">The sync answer could not be read. Update the app.</string>
-    <string name="settings_account">Kozeki account</string>
+    <string name="settings_account">Account</string>
     <string name="settings_account_sign_out_title">Sign out of Kozeki?</string>
     <string name="settings_account_sign_out_message">The library closes until you sign in again.</string>
     <string name="settings_sync">Sync</string>

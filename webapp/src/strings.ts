@@ -373,7 +373,7 @@ export const s = {
 
 	settings: {
 		title: 'Settings',
-		account: 'Kozeki account',
+		account: 'Account',
 		accountSignOutTitle: 'Sign out of Kozeki?',
 		accountSignOutMessage: 'The library closes until you sign in again.',
 		signOut: 'Sign out',
