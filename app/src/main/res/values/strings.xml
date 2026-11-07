@@ -667,6 +667,21 @@
     <string name="migration_progress">%1$d of %2$d</string>
     <string name="migration_fetching_title">Opening the library</string>
     <string name="migration_fetching_message">I\'m bringing your books from your account.</string>
+    <string name="migration_looking_message">I\'m looking at your account.</string>
+    <plurals name="migration_choose_title">
+        <item quantity="one">Your account has a book</item>
+        <item quantity="other">Your account has %1$d books</item>
+    </plurals>
+    <plurals name="migration_choose_message">
+        <item quantity="one">This phone has one more.</item>
+        <item quantity="other">This phone has %1$d more.</item>
+    </plurals>
+    <plurals name="migration_choose_matched">
+        <item quantity="one">I found this phone\'s book in it.</item>
+        <item quantity="other">I found %2$d of this phone\'s %1$d books in it.</item>
+    </plurals>
+    <string name="migration_merge">Merge</string>
+    <string name="migration_keep_account">Keep only the account\'s</string>
     <string name="sync_error_offline">Your account can\'t be reached. Try again when you\'re online.</string>
     <string name="sync_error_refused">The sync was refused (%1$s). Try again later.</string>
     <string name="sync_error_unreadable">The sync answer could not be read. Update the app.</string>

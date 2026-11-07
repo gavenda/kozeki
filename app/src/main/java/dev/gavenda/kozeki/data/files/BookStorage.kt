@@ -37,6 +37,23 @@ class BookStorage(context: Context) {
 
     fun coverFile(name: String): File = File(coversDir, name)
 
+    /** Writes a cover under the [name] a book already gives it, as one fetched on another device. */
+    suspend fun writeCover(name: String, bytes: ByteArray): Unit = withContext(Dispatchers.IO) {
+        coversDir.mkdirs()
+        val partial = File(coversDir, "$name.part")
+        partial.writeBytes(bytes)
+        partial.renameTo(coverFile(name))
+    }
+
+    /**
+     * Hands [from]'s EPUB to [to], when two entries of one book became one. Nothing moves when [to]
+     * has a file already or [from] has none.
+     */
+    suspend fun moveEpub(from: String, to: String): Unit = withContext(Dispatchers.IO) {
+        if (hasEpub(to) || !hasEpub(from)) return@withContext
+        epubFile(from).renameTo(epubFile(to))
+    }
+
     /** Copies the picked document into the cache, hashing it on the way. */
     suspend fun copyToStaging(uri: Uri): StagedFile = withContext(Dispatchers.IO) {
         importDir.mkdirs()

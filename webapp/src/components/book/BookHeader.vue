@@ -15,6 +15,8 @@ export interface HeaderBook {
 	seriesNumber?: number;
 	coverFile?: string;
 	coverUrl?: string;
+	customCover?: boolean;
+	fileHash?: string;
 	rating?: number;
 }
 

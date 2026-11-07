@@ -56,6 +56,23 @@ class SyncStore(context: Context) {
         store.edit { it.remove(Keys.Cursor) }
     }
 
+    /** Whether the first sync has begun sending, after which its question is not asked again. */
+    suspend fun firstSyncSending(): Boolean = store.data.first()[Keys.FirstSyncSending] ?: false
+
+    suspend fun startedSending() {
+        store.edit { it[Keys.FirstSyncSending] = true }
+    }
+
+    /**
+     * Whether books entered twice before there was an account have been made one. Done once, after
+     * a sync; from then on the first sync's question keeps it from happening.
+     */
+    suspend fun duplicatesMerged(): Boolean = store.data.first()[Keys.DuplicatesMerged] ?: false
+
+    suspend fun mergedDuplicates() {
+        store.edit { it[Keys.DuplicatesMerged] = true }
+    }
+
     suspend fun finished(at: Long) {
         store.edit {
             it[Keys.FirstSyncDone] = true
@@ -77,5 +94,7 @@ class SyncStore(context: Context) {
         val FirstSyncDone = booleanPreferencesKey("first_sync_done")
         val LastSyncedAt = longPreferencesKey("last_synced_at")
         val UploadedCovers = stringSetPreferencesKey("uploaded_covers")
+        val FirstSyncSending = booleanPreferencesKey("first_sync_sending")
+        val DuplicatesMerged = booleanPreferencesKey("duplicates_merged")
     }
 }

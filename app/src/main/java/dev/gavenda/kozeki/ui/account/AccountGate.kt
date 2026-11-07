@@ -12,6 +12,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,20 +52,70 @@ fun AccountGate(content: @Composable () -> Unit) {
                 gate = current,
                 onSignIn = { activity?.let(viewModel::signIn) },
                 onCopy = viewModel::copy,
+                onFetch = viewModel::fetch,
+                onMerge = viewModel::merge,
+                onKeepAccount = viewModel::keepAccount,
             )
         }
     }
 }
 
 @Composable
-private fun GateScreen(gate: Gate, onSignIn: () -> Unit, onCopy: () -> Unit) {
+private fun GateScreen(
+    gate: Gate,
+    onSignIn: () -> Unit = {},
+    onCopy: () -> Unit = {},
+    onFetch: () -> Unit = {},
+    onMerge: () -> Unit = {},
+    onKeepAccount: () -> Unit = {},
+) {
     Box(Modifier.fillMaxSize().safeDrawingPadding(), contentAlignment = Alignment.Center) {
         when (gate) {
             Gate.Loading, Gate.Open -> LoadingIndicator()
             is Gate.SignIn -> SignInPrompt(gate, onSignIn)
+            is Gate.Fetching -> FetchingPrompt(gate, onFetch)
+            is Gate.Choose -> ChoosePrompt(gate, onMerge, onKeepAccount)
             is Gate.FirstSync -> FirstSyncPrompt(gate, onCopy)
         }
     }
+}
+
+@Composable
+private fun FetchingPrompt(gate: Gate.Fetching, onRetry: () -> Unit) {
+    val failed = gate.status as? SyncStatus.Failed
+    EmptyState(
+        expression = if (failed != null) Expression.WORRIED else Expression.STUDIOUS,
+        icon = painterResource(R.drawable.cloud_download_48px),
+        title = stringResource(R.string.migration_fetching_title),
+        message = if (failed != null) syncFailureText(failed) else stringResource(R.string.migration_looking_message),
+        action = {
+            if (failed != null) {
+                Button(onClick = onRetry) { Text(stringResource(R.string.action_retry)) }
+            } else {
+                LinearWavyProgressIndicator(modifier = Modifier.widthIn(max = 280.dp).fillMaxWidth())
+            }
+        },
+    )
+}
+
+@Composable
+private fun ChoosePrompt(gate: Gate.Choose, onMerge: () -> Unit, onKeepAccount: () -> Unit) {
+    EmptyState(
+        expression = Expression.CURIOUS,
+        icon = painterResource(R.drawable.cloud_sync_48px),
+        title = pluralStringResource(R.plurals.migration_choose_title, gate.accountBooks, gate.accountBooks),
+        message = if (gate.matched > 0) {
+            pluralStringResource(R.plurals.migration_choose_matched, gate.deviceBooks, gate.deviceBooks, gate.matched)
+        } else {
+            pluralStringResource(R.plurals.migration_choose_message, gate.deviceBooks, gate.deviceBooks)
+        },
+        action = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onMerge) { Text(stringResource(R.string.migration_merge)) }
+                OutlinedButton(onClick = onKeepAccount) { Text(stringResource(R.string.migration_keep_account)) }
+            }
+        },
+    )
 }
 
 @Composable
@@ -143,17 +194,23 @@ internal fun syncFailureText(failed: SyncStatus.Failed): String = when {
 @PreviewLightDark
 @Composable
 private fun SignInPreview() {
-    AppTheme { Surface { GateScreen(Gate.SignIn(working = false, failure = null), {}, {}) } }
+    AppTheme { Surface { GateScreen(Gate.SignIn(working = false, failure = null)) } }
 }
 
 @PreviewLightDark
 @Composable
 private fun FirstSyncPreview() {
-    AppTheme { Surface { GateScreen(Gate.FirstSync(books = 42, status = SyncStatus.Running(120, 480), started = true), {}, {}) } }
+    AppTheme { Surface { GateScreen(Gate.FirstSync(books = 42, status = SyncStatus.Running(120, 480), started = true)) } }
 }
 
 @PreviewLightDark
 @Composable
 private fun FirstSyncAskPreview() {
-    AppTheme { Surface { GateScreen(Gate.FirstSync(books = 42, status = SyncStatus.Idle, started = false), {}, {}) } }
+    AppTheme { Surface { GateScreen(Gate.FirstSync(books = 42, status = SyncStatus.Idle, started = false)) } }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChoosePreview() {
+    AppTheme { Surface { GateScreen(Gate.Choose(accountBooks = 120, deviceBooks = 114, matched = 36)) } }
 }

@@ -24,6 +24,9 @@ private const val NOT_COMIC = "(source IS NULL OR source NOT IN ('COMICS', 'MANG
 // A book has two clocks, updatedAt for its details and lastReadAt for its reader's columns, and is
 // waiting when the later of them differs from what it was last sent or received as (see BookMerge.kt).
 private const val BOOK_VERSION = "MAX(updatedAt, COALESCE(lastReadAt, 0))"
+// Books this device has that the account never had.
+private const val NEVER_SENT = "(SELECT id FROM books WHERE syncedAt IS NULL AND $NOT_COMIC)"
+
 private const val BOOK_UNSENT = "(syncedAt IS NULL OR syncedAt != $BOOK_VERSION)"
 
 /**
@@ -224,9 +227,74 @@ interface SyncDao {
     @Query("DELETE FROM books WHERE $NOT_COMIC")
     suspend fun forgetBooks()
 
+    // ---- One book entered twice ---------------------------------------------------------------
+
+    /** Every book that syncs and is not removed. */
+    @Query("SELECT * FROM books WHERE deletedAt IS NULL AND $NOT_COMIC")
+    suspend fun liveBooks(): List<BookEntity>
+
+    @Query("DELETE FROM books WHERE id = :id")
+    suspend fun deleteBook(id: String)
+
+    @Query("SELECT * FROM shelf_books WHERE bookId = :bookId")
+    suspend fun shelfLinks(bookId: String): List<ShelfBookEntity>
+
+    @Query("SELECT * FROM shelf_books WHERE shelfId = :shelfId AND bookId = :bookId")
+    suspend fun shelfLink(shelfId: String, bookId: String): ShelfBookEntity?
+
+    @Query("DELETE FROM shelf_books WHERE shelfId = :shelfId AND bookId = :bookId")
+    suspend fun deleteShelfLink(shelfId: String, bookId: String)
+
+    /**
+     * A removed book and a kept one with the same EPUB, as (removed, kept): another device merged
+     * the two, and the file this one holds under the removed book belongs to the kept one now.
+     */
+    @Query(
+        "SELECT dead.id AS dropped, live.id AS kept FROM books dead JOIN books live ON live.fileHash = dead.fileHash " +
+            "WHERE dead.deletedAt IS NOT NULL AND live.deletedAt IS NULL AND dead.id != live.id",
+    )
+    suspend fun mergedEpubs(): List<MergedBook>
+
+    // Keeping the account's library over this device's: what was never sent goes, comics stay.
+
+    @Query("DELETE FROM read_throughs WHERE bookId IN $NEVER_SENT")
+    suspend fun dropUnsentReadThroughs()
+
+    @Query("DELETE FROM reading_sessions WHERE bookId IN $NEVER_SENT")
+    suspend fun dropUnsentReadingSessions()
+
+    @Query("DELETE FROM physical_readings WHERE bookId IN $NEVER_SENT")
+    suspend fun dropUnsentPhysicalReadings()
+
+    @Query("DELETE FROM notes WHERE bookId IN $NEVER_SENT")
+    suspend fun dropUnsentNotes()
+
+    @Query("DELETE FROM shelf_books WHERE bookId IN $NEVER_SENT")
+    suspend fun dropUnsentShelfBooks()
+
+    @Query("DELETE FROM books WHERE syncedAt IS NULL AND $NOT_COMIC")
+    suspend fun dropUnsentBooks()
+
+    /** Shelves made here that the books going away leave empty. */
+    @Query("DELETE FROM shelves WHERE syncedAt IS NULL AND id NOT IN (SELECT shelfId FROM shelf_books)")
+    suspend fun dropUnsentEmptyShelves()
+
     // ---- Covers -------------------------------------------------------------------------------
 
-    /** Cover files the books that sync name, so they can be sent and fetched with them. */
-    @Query("SELECT DISTINCT coverFile FROM books WHERE coverFile IS NOT NULL AND deletedAt IS NULL AND $NOT_COMIC")
-    suspend fun coverFiles(): List<String>
+    /**
+     * Cover files the books that sync name, so they can be sent and fetched with them. [CoverRef.kept]
+     * is whether the account keeps the picture: one the user chose, one from the EPUB, or one with
+     * nowhere else to come from. A catalogue picture is fetched from [CoverRef.url] on each device
+     * instead (`coverInAccount` in webapp/src/lib/covers.ts says the same).
+     */
+    @Query(
+        "SELECT coverFile AS name, MAX(coverUrl) AS url, " +
+            "MAX(customCover = 1 OR fileHash IS NOT NULL OR coverUrl IS NULL) AS kept " +
+            "FROM books WHERE coverFile IS NOT NULL AND deletedAt IS NULL AND $NOT_COMIC GROUP BY coverFile",
+    )
+    suspend fun coverRefs(): List<CoverRef>
 }
+
+data class MergedBook(val dropped: String, val kept: String)
+
+data class CoverRef(val name: String, val url: String?, val kept: Boolean)

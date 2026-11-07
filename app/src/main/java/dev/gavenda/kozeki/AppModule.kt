@@ -158,7 +158,7 @@ fun appModule(app: Application) = module {
 
     single { SyncApi(get(), get(), BuildConfig.KOZEKI_API_URL) }
 
-    single { SyncEngine(get(), get(), get(), get(), get(), get(), get()) }
+    single { SyncEngine(get(), get(), get(), get(), get(), get(), get(), CoverDownloader(get(), get())) }
 
     single { SyncScheduler(get(), get(), get(), get(), get(), get(), retryLater = { SyncWorker.enqueue(app) }) }
 

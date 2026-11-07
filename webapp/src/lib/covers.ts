@@ -9,6 +9,15 @@ import { apiFetch } from './http';
 const urls = reactive(new Map<string, string | null>());
 const pending = new Map<string, Promise<void>>();
 
+/**
+ * Whether the account keeps this book's cover picture: one the user chose, one from its EPUB, or
+ * one with nowhere else to come from. A catalogue picture is not uploaded; it is shown from its
+ * `coverUrl`. The phone decides the same in `SyncDao.coverRefs`.
+ */
+export function coverInAccount(book: { coverFile?: string; coverUrl?: string; customCover?: boolean; fileHash?: string }): boolean {
+	return !!book.coverFile && (!!book.customCover || !!book.fileHash || !book.coverUrl);
+}
+
 export function coverUrl(name: string | undefined): string | null | undefined {
 	if (!name) return null;
 	if (!urls.has(name) && !pending.has(name)) {

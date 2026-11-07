@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { coverUrl } from '@/lib/covers';
+import { coverInAccount, coverUrl } from '@/lib/covers';
 import CoverPlaceholder from './CoverPlaceholder.vue';
 
 /**
@@ -9,15 +9,21 @@ import CoverPlaceholder from './CoverPlaceholder.vue';
  * caller's, as the phone's shape parameter: rounded-xl unless told otherwise.
  */
 const props = withDefaults(
-	defineProps<{ book: { title: string; coverFile?: string; coverUrl?: string }; showTitle?: boolean; rounded?: string }>(),
+	defineProps<{
+		book: { title: string; coverFile?: string; coverUrl?: string; customCover?: boolean; fileHash?: string };
+		showTitle?: boolean;
+		rounded?: string;
+	}>(),
 	{ showTitle: true, rounded: 'rounded-xl' },
 );
 
-// The account's own copy of the cover first, then the catalogue's, as the phone does.
+// The account's own copy of the cover first, then the catalogue's, as the phone does. A catalogue
+// picture is never in the account, so it is not asked for there.
 const src = computed(() => {
+	if (!coverInAccount(props.book)) return props.book.coverUrl ?? null;
 	const own = coverUrl(props.book.coverFile);
 	if (own) return own;
-	if (own === undefined && props.book.coverFile) return null;
+	if (own === undefined) return null;
 	return props.book.coverUrl ?? null;
 });
 const failed = ref(false);

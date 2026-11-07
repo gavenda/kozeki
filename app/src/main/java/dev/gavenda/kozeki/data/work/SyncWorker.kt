@@ -12,7 +12,9 @@ import androidx.work.WorkerParameters
 import dev.gavenda.kozeki.data.account.AccountAuth
 import dev.gavenda.kozeki.data.account.AccountState
 import dev.gavenda.kozeki.data.sync.SyncEngine
+import dev.gavenda.kozeki.data.sync.SyncStore
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.first
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -21,10 +23,13 @@ class SyncWorker(context: Context, parameters: WorkerParameters) : CoroutineWork
 
     private val engine: SyncEngine by inject()
     private val auth: AccountAuth by inject()
+    private val store: SyncStore by inject()
 
-    // Signed out, there is nothing to sync until a sign-in, which syncs on its own.
+    // Signed out, there is nothing to sync until a sign-in, which syncs on its own. Before the first
+    // sync it is the account gate's to start, once the question of what to send has been answered.
     override suspend fun doWork(): Result = when {
         auth.state.value !is AccountState.SignedIn -> Result.success()
+        !store.firstSyncDone.first() -> Result.success()
         engine.sync() -> Result.success()
         else -> Result.retry()
     }
