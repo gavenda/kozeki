@@ -1,3 +1,4 @@
+import { HARDCOVER_CALLBACK } from './auth0';
 import { apiFetch } from './http';
 import type { Found } from './library';
 
@@ -21,7 +22,7 @@ interface Session {
 
 export const hardcoverAvailable = (): boolean => Boolean(CLIENT_ID);
 
-const redirectUri = () => `${window.location.origin}/hardcover`;
+const redirectUri = () => `${window.location.origin}${HARDCOVER_CALLBACK}`;
 
 function read<T>(key: string, storage: Storage = localStorage): T | null {
 	try {

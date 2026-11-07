@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
-import { auth0, whenAuthReady } from '@/lib/auth0';
+import { auth0, HARDCOVER_CALLBACK, whenAuthReady } from '@/lib/auth0';
 import { s } from '@/strings';
 
 const routes: RouteRecordRaw[] = [
@@ -11,7 +11,7 @@ const routes: RouteRecordRaw[] = [
 	{ path: '/statistics', name: 'statistics', component: () => import('@/views/StatisticsView.vue'), meta: { title: s.nav.statistics } },
 	{ path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { title: s.nav.settings } },
 	// Where Hardcover sends the browser back to after its sign-in.
-	{ path: '/hardcover', name: 'hardcover', component: () => import('@/views/HardcoverCallbackView.vue') },
+	{ path: HARDCOVER_CALLBACK, name: 'hardcover', component: () => import('@/views/HardcoverCallbackView.vue') },
 	{ path: '/:pathMatch(.*)*', redirect: '/' },
 ];
 
