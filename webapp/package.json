@@ -1,6 +1,6 @@
 {
 	"name": "kozeki",
-	"version": "3.0.0",
+	"version": "3.1.0",
 	"private": true,
 	"type": "module",
 	"description": "Kozeki's book library on the web, running entirely on Cloudflare.",
