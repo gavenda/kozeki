@@ -652,6 +652,31 @@
     <string name="settings_hardcover_sign_out_message">Hardcover lookups stop until you sign in again.</string>
     <string name="settings_hardcover_denied">Access was declined on Hardcover</string>
     <string name="settings_hardcover_rejected">Hardcover did not accept the sign-in.</string>
+    <!-- Kozeki account and sync -->
+    <string name="account_closed_title">The library is closed</string>
+    <string name="account_closed_message">Sign in and I\'ll open it.</string>
+    <string name="account_sign_in">Sign in</string>
+    <string name="account_sign_in_offline">No connection. Try again when you\'re online.</string>
+    <string name="account_sign_in_rejected">The sign-in did not go through. Try again.</string>
+    <string name="migration_title">Moving the library</string>
+    <plurals name="migration_message">
+        <item quantity="one">I\'ll copy your book to your account. Comics stay on this phone.</item>
+        <item quantity="other">I\'ll copy your %1$d books to your account. Comics stay on this phone.</item>
+    </plurals>
+    <string name="migration_copy">Copy books</string>
+    <string name="migration_progress">%1$d of %2$d</string>
+    <string name="migration_fetching_title">Opening the library</string>
+    <string name="migration_fetching_message">I\'m bringing your books from your account.</string>
+    <string name="sync_error_offline">Your account can\'t be reached. Try again when you\'re online.</string>
+    <string name="sync_error_refused">The sync was refused (%1$s). Try again later.</string>
+    <string name="sync_error_unreadable">The sync answer could not be read. Update the app.</string>
+    <string name="settings_account">Kozeki account</string>
+    <string name="settings_account_sign_out_title">Sign out of Kozeki?</string>
+    <string name="settings_account_sign_out_message">The library closes until you sign in again.</string>
+    <string name="settings_sync">Sync</string>
+    <string name="settings_sync_last">Synced %1$s</string>
+    <string name="settings_sync_never">Not synced yet</string>
+    <string name="settings_sync_running">Syncing…</string>
     <string name="settings_appearance_title">Appearance</string>
     <string name="settings_display_mode">Display mode</string>
     <string name="settings_display_mode_description">Change how the application looks</string>

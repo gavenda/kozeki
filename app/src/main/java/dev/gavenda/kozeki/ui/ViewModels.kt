@@ -8,6 +8,7 @@ import dev.gavenda.kozeki.BuildConfig
 import dev.gavenda.kozeki.data.metadata.BookMetadata
 import dev.gavenda.kozeki.cancelMatching
 import dev.gavenda.kozeki.scheduleMatching
+import dev.gavenda.kozeki.ui.account.AccountGateViewModel
 import dev.gavenda.kozeki.ui.addbook.AddBookViewModel
 import dev.gavenda.kozeki.ui.addbook.BookFormViewModel
 import dev.gavenda.kozeki.ui.author.AuthorViewModel
@@ -53,6 +54,8 @@ fun extensionReposViewModel() = ExtensionReposViewModel(koin.get(), koin.get(), 
 
 fun searchViewModel() = SearchViewModel(koin.get())
 
+fun accountGateViewModel() = AccountGateViewModel(koin.get(), koin.get(), koin.get())
+
 fun calendarViewModel() = CalendarViewModel(koin.get(), koin.get())
 
 fun statisticsViewModel(initialDate: LocalDate?) = StatisticsViewModel(koin.get(), koin.get(), initialDate)
@@ -89,6 +92,10 @@ fun comicReaderViewModel(bookId: String, chapterUrl: String) = ComicReaderViewMo
 )
 
 fun settingsViewModel() = SettingsViewModel(
+    accountAuth = koin.get(),
+    syncEngine = koin.get(),
+    syncStore = koin.get(),
+    syncScheduler = koin.get(),
     settings = koin.get(),
     metadata = koin.get(),
     stats = koin.get(),

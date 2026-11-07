@@ -17,3 +17,11 @@
 local.properties
 .kotlin
 /branding
+# Web app
+node_modules/
+webapp/dist/
+.wrangler/
+.dev.vars*
+!.dev.vars.example
+webapp/.env
+webapp/worker-configuration.d.ts

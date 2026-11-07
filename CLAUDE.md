@@ -4,6 +4,24 @@ Kozeki is a personal Android app for books and comics (package `dev.gavenda.koze
 
 It is named after Kozeki Ui, the librarian of Blue Archive, who is its character. [BRANDING.md](BRANDING.md) records how the app looks and sounds: the halo, the theme colours, her faces and the voice of its text. Read it before changing any of those.
 
+## Account and sync
+
+The app needs a sign-in to Kozeki's account (Auth0, the tenant Yuuka shares) and keeps the book side of the library in step with it. The server and the web app are in [webapp/](webapp/); [webapp/CLAUDE.md](webapp/CLAUDE.md) has their details. What must survive a change:
+
+- **Room stays the library's own copy.** The app reads and writes Room as before and works offline. `SyncEngine` pushes rows whose `syncedAt` differs from `updatedAt` and pulls what changed on the server past a cursor, in the same `POST /api/sync`. Every write must bump `updatedAt`, raw SQL included, or the row never syncs.
+- **The later edit wins, per row**, judged by `updatedAt`, on the server and on the phone alike, with one exception: a book's reading position (`locator`, `progression`, `position`, chapters, `lastReadAt`) wins apart by `lastReadAt` (`BookMerge.kt`). The reader's progress writes move `lastReadAt` only; anything else that changes the position (finishing, reading again) moves both. There is no conflict screen.
+- **Comics never leave the phone.** Books whose source is COMICS, their chapters, their AniList tracks and every row that points at one are left out by `SyncDao`, and the server refuses a comic. A new table that can point at a comic needs the same filter.
+- **A new synced column** goes in the Room entity, in `webapp/shared/tables.ts` and in a D1 migration together. The wire format is the entity's own JSON (the backup format), so a field the server does not list is dropped there.
+- **The first sync is the migration.** Rows from before the account had no `syncedAt`, so the first sync after signing in sends them all. The gate (`AccountGate`) keeps the library closed until it has gone through once. Another account signing in wipes the book rows of the last one (comics stay); a restored backup is sent again in full and the cursor starts over.
+- **Settings that sync** are `dailyGoalMinutes` and `lastCurrency` only (`SHARED_SETTINGS`), stamped in DataStore. Theme, sort and reader preferences stay per device.
+
+## Versions and releases
+
+- **The Android app and the web app share one version.** `versionName` in `app/build.gradle.kts` and `version` in `webapp/package.json` always match. A bump of either is a bump of both, even when only one side changed. `versionCode` goes up by one with every release.
+- **Major** for a change that breaks compatibility (3.0.0 made a sign-in required and moved the library onto the account), **minor** for new features, **patch** for fixes.
+- **A release is three steps:** the working-tree commit, then a separate version-bump commit titled `Kozeki X.Y.Z` with a short paragraph on what changed, then a lightweight tag `X.Y.Z` (no `v`) on that commit. Pushing the tag builds the APK in GitHub Actions and publishes the release.
+- **When the API or the database changed**, deploy the Worker after pushing the tag: `cd webapp && bun run db:migrate && bun run deploy`. An app that syncs against an older Worker can be refused.
+
 ## Icons
 
 Every icon in `app/src/main/res/drawable/*_48px.xml` is a Google Material Symbol: **Outlined, optical size 48, weight 400, grade 0**. 

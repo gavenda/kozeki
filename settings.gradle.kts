@@ -31,3 +31,4 @@ rootProject.name = "Kozeki"
 include(":app")
 include(":mihon-host")
 include(":rigby")
+include(":webapp")

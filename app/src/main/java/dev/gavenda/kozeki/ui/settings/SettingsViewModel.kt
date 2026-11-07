@@ -23,6 +23,14 @@ import dev.gavenda.kozeki.data.settings.ThemeMode
 import dev.gavenda.kozeki.data.update.AppUpdateState
 import dev.gavenda.kozeki.data.update.AppUpdateInstaller
 import dev.gavenda.kozeki.data.update.AppUpdates
+import android.app.Activity
+import dev.gavenda.kozeki.data.account.Account
+import dev.gavenda.kozeki.data.account.AccountAuth
+import dev.gavenda.kozeki.data.account.AccountState
+import dev.gavenda.kozeki.data.sync.SyncEngine
+import dev.gavenda.kozeki.data.sync.SyncScheduler
+import dev.gavenda.kozeki.data.sync.SyncStatus
+import dev.gavenda.kozeki.data.sync.SyncStore
 import dev.gavenda.kozeki.data.update.UpdateCheck
 import dev.gavenda.kozeki.ui.isUiBirthday
 import java.time.Clock
@@ -37,6 +45,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
+    /** Who is signed in to Kozeki's account, which the gate guarantees there is while Settings shows. */
+    val account: Account? = null,
+    val sync: SyncStatus = SyncStatus.Idle,
+    val lastSyncedAt: Long? = null,
     val hardcover: HardcoverAccount = HardcoverAccount.SignedOut,
     val signIn: HardcoverSignIn.Status = HardcoverSignIn.Status.IDLE,
     /** Shown so a mismatch with what is registered on Hardcover is easy to spot. */
@@ -97,6 +109,10 @@ private data class AccountsState(
 )
 
 class SettingsViewModel(
+    private val accountAuth: AccountAuth,
+    private val syncEngine: SyncEngine,
+    syncStore: SyncStore,
+    private val syncScheduler: SyncScheduler,
     private val settings: SettingsRepository,
     private val metadata: MetadataRepository,
     private val stats: StatsRepository,
@@ -170,6 +186,9 @@ class SettingsViewModel(
         .combine(comicPages.temporaryBytes) { state, bytes -> state.copy(temporaryPagesBytes = bytes) }
         .combine(settings.temporaryPagesMegabytes) { state, megabytes -> state.copy(temporaryPagesMegabytes = megabytes) }
         .combine(settings.extensionRepos) { state, repos -> state.copy(extensionRepoCount = repos.size) }
+        .combine(accountAuth.state) { state, account -> state.copy(account = (account as? AccountState.SignedIn)?.account) }
+        .combine(syncEngine.status) { state, sync -> state.copy(sync = sync) }
+        .combine(syncStore.lastSyncedAt) { state, at -> state.copy(lastSyncedAt = at) }
         .stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
@@ -188,6 +207,11 @@ class SettingsViewModel(
         // The list is what the section shows, so it is not left for the first time something searches.
         viewModelScope.launch { comicSources.ensureLoaded() }
     }
+
+    fun syncNow() = syncScheduler.requestSync()
+
+    /** Signs out of Kozeki's account. The gate closes the library over Settings. */
+    fun signOutOfAccount(activity: Activity) = accountAuth.signOut(activity)
 
     /** Looks for the installed extensions again, for after one was installed or removed. */
     fun refreshExtensions() {

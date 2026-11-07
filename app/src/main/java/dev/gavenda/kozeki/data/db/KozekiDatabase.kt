@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import dev.gavenda.kozeki.data.sync.SyncDao
 
 @Database(
     entities = [
@@ -39,6 +40,7 @@ abstract class KozekiDatabase : RoomDatabase() {
     abstract fun comicTrackDao(): ComicTrackDao
     abstract fun shelfDao(): ShelfDao
     abstract fun backupDao(): BackupDao
+    abstract fun syncDao(): SyncDao
 
     companion object {
         fun create(context: Context): KozekiDatabase =

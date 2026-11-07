@@ -632,6 +632,8 @@ class LibraryRepository(
                     state = newState,
                     progression = progression,
                     physicalPage = physicalPage,
+                    // The reading position changed, which only a later lastReadAt carries to the other devices.
+                    lastReadAt = if (progression != book.progression) now else book.lastReadAt,
                     sync = book.sync.touched(now),
                 ),
             )
@@ -664,6 +666,7 @@ class LibraryRepository(
                     chapterTitle = null,
                     chapterIndex = null,
                     physicalPage = book.physicalPage?.let { 0 },
+                    lastReadAt = now,
                     sync = book.sync.touched(now),
                 ),
             )

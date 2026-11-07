@@ -7,6 +7,8 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -15,13 +17,20 @@ import dev.gavenda.kozeki.data.backup.drive.DriveLinkStore
 import dev.gavenda.kozeki.data.backup.local.LocalBackupConfig
 import dev.gavenda.kozeki.data.backup.local.LocalBackupStore
 import dev.gavenda.kozeki.data.metadata.BrowseOrder
+import dev.gavenda.kozeki.data.db.SyncStamp
 import dev.gavenda.kozeki.data.model.MetadataSource
+import dev.gavenda.kozeki.data.sync.SettingRow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -251,10 +260,10 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
     /** Takes over what [snapshot] holds, in one write. */
     suspend fun restore(snapshot: SettingsSnapshot) {
         store.edit { prefs ->
-            snapshot.dailyGoalMinutes?.let { prefs[Keys.DailyGoalMinutes] = it.coerceIn(1, 24 * 60) }
+            snapshot.dailyGoalMinutes?.let { prefs.setShared(dailyGoalSetting, it.coerceIn(1, 24 * 60)) }
             snapshot.themeMode?.let { prefs[Keys.ThemeMode] = it.name }
             snapshot.readerPreferences?.let { prefs[Keys.ReaderPreferences] = json.encodeToString(it) }
-            snapshot.lastCurrency?.let { prefs[Keys.LastCurrency] = it }
+            snapshot.lastCurrency?.let { prefs.setShared(lastCurrencySetting, it) }
             snapshot.librarySort?.let { prefs[Keys.LibrarySort] = it }
             snapshot.librarySortReversed?.let { prefs[Keys.LibrarySortReversed] = it }
             snapshot.libraryDisplay?.let { prefs[Keys.LibraryDisplay] = it }
@@ -264,7 +273,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
     }
 
     suspend fun setDailyGoalMinutes(minutes: Int) {
-        store.edit { it[Keys.DailyGoalMinutes] = minutes.coerceIn(1, 24 * 60) }
+        store.edit { it.setShared(dailyGoalSetting, minutes.coerceIn(1, 24 * 60)) }
     }
 
     suspend fun setThemeMode(mode: ThemeMode) {
@@ -276,7 +285,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
     }
 
     suspend fun setLastCurrency(code: String) {
-        store.edit { it[Keys.LastCurrency] = code }
+        store.edit { it.setShared(lastCurrencySetting, code) }
     }
 
     suspend fun setLibrarySort(name: String, reversed: Boolean) {
@@ -327,6 +336,81 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         store.edit { it[Keys.SearchDisplay] = name }
     }
 
+    // ---- Settings the web app shares ----------------------------------------------------------
+
+    /**
+     * One of the settings that sync with the account. Each keeps when it was last changed here and
+     * when it was last sent or received, as a row of the library does.
+     */
+    private class Shared<T>(
+        val name: String,
+        val key: Preferences.Key<T>,
+        val toJson: (T) -> JsonElement,
+        val fromJson: (JsonElement) -> T?,
+    ) {
+        val updatedAt = longPreferencesKey("${key.name}_updated_at")
+        val syncedAt = longPreferencesKey("${key.name}_synced_at")
+    }
+
+    private val dailyGoalSetting = Shared(
+        "dailyGoalMinutes", Keys.DailyGoalMinutes, { JsonPrimitive(it) },
+        { element -> element.jsonPrimitive.intOrNull?.coerceIn(1, 24 * 60) },
+    )
+    private val lastCurrencySetting = Shared(
+        "lastCurrency", Keys.LastCurrency, { JsonPrimitive(it) },
+        { element -> element.jsonPrimitive.contentOrNull?.takeIf { it.length == 3 } },
+    )
+    private val shared = listOf(dailyGoalSetting, lastCurrencySetting)
+
+    private fun <T> MutablePreferences.setShared(setting: Shared<T>, value: T) {
+        if (this[setting.key] == value) return
+        this[setting.key] = value
+        this[setting.updatedAt] = System.currentTimeMillis()
+    }
+
+    /** The shared settings changed here since they were last sent. */
+    suspend fun unsentSharedSettings(): List<SettingRow> {
+        val prefs = store.data.first()
+        return shared.mapNotNull { setting -> prefs.unsent(setting) }
+    }
+
+    private fun <T> Preferences.unsent(setting: Shared<T>): SettingRow? {
+        val value = this[setting.key] ?: return null
+        // One set before settings synced counts as the oldest there is, so the web's wins over it.
+        val updatedAt = this[setting.updatedAt] ?: NEVER_STAMPED
+        if (this[setting.syncedAt] == updatedAt) return null
+        return SettingRow(setting.name, setting.toJson(value), SyncStamp(createdAt = updatedAt, updatedAt = updatedAt))
+    }
+
+    suspend fun sentSharedSetting(name: String, updatedAt: Long) {
+        val setting = shared.find { it.name == name } ?: return
+        store.edit {
+            if ((it[setting.updatedAt] ?: NEVER_STAMPED) != updatedAt) return@edit
+            it[setting.updatedAt] = updatedAt
+            it[setting.syncedAt] = updatedAt
+        }
+    }
+
+    /** Takes a shared setting changed elsewhere, unless it was changed here since. */
+    suspend fun receiveSharedSetting(row: SettingRow) {
+        val setting = shared.find { it.name == row.key } ?: return
+        store.edit { it.receive(setting, row) }
+    }
+
+    private fun <T> MutablePreferences.receive(setting: Shared<T>, row: SettingRow) {
+        val local = this[setting.updatedAt]
+        if (local != null && local > row.sync.updatedAt) return
+        val value = row.value?.let { runCatching { setting.fromJson(it) }.getOrNull() } ?: return
+        this[setting.key] = value
+        this[setting.updatedAt] = row.sync.updatedAt
+        this[setting.syncedAt] = row.sync.updatedAt
+    }
+
+    /** Sends every shared setting again, for after a backup was put back. */
+    suspend fun unsendSharedSettings() {
+        store.edit { prefs -> shared.forEach { prefs.remove(it.syncedAt) } }
+    }
+
     private object Keys {
         val DailyGoalMinutes = intPreferencesKey("daily_goal_minutes")
         val ThemeMode = stringPreferencesKey("theme_mode")
@@ -352,6 +436,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         fun comicLanguageKey(packageName: String, language: String): String = "$packageName/$language"
 
         const val DEFAULT_DAILY_GOAL_MINUTES = 20
+        private const val NEVER_STAMPED = 1L
         const val DEFAULT_UPDATE_INTERVAL_HOURS = 12
         const val DEFAULT_TEMPORARY_PAGES_MB = 250
         private const val SEARCH_SOURCE = "source"

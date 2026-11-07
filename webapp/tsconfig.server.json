@@ -1,0 +1,22 @@
+{
+	/* The server half: the Worker and the tests that exercise it. These
+	   run in workerd, not the browser, so they get the Workers runtime types
+	   rather than the DOM ones. */
+	"compilerOptions": {
+		"target": "es2024",
+		"lib": ["es2024"],
+		"module": "es2022",
+		"moduleResolution": "Bundler",
+		"types": ["./worker-configuration.d.ts", "@cloudflare/vitest-plugin/types", "node"],
+
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"allowSyntheticDefaultImports": true,
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.server.tsbuildinfo"
+	},
+	"include": ["server/**/*.ts", "shared/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "worker-configuration.d.ts"]
+}

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import dev.gavenda.kozeki.data.account.AccountAuth
 import dev.gavenda.kozeki.data.backup.BackupRepository
 import dev.gavenda.kozeki.data.backup.drive.DriveApi
 import dev.gavenda.kozeki.data.backup.drive.DriveBackup
@@ -35,6 +36,10 @@ import dev.gavenda.kozeki.data.repository.LibraryRepository
 import dev.gavenda.kozeki.data.repository.ShelfRepository
 import dev.gavenda.kozeki.data.repository.StatsRepository
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.sync.SyncApi
+import dev.gavenda.kozeki.data.sync.SyncEngine
+import dev.gavenda.kozeki.data.sync.SyncScheduler
+import dev.gavenda.kozeki.data.sync.SyncStore
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListApi
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
@@ -44,6 +49,7 @@ import dev.gavenda.kozeki.data.update.AppUpdates
 import dev.gavenda.kozeki.data.update.UpdateChecker
 import dev.gavenda.kozeki.data.work.DownloadWorker
 import dev.gavenda.kozeki.data.work.MatchWorker
+import dev.gavenda.kozeki.data.work.SyncWorker
 import dev.gavenda.kozeki.data.work.TrackWorker
 import java.security.MessageDigest
 import java.time.Clock
@@ -138,6 +144,24 @@ fun appModule(app: Application) = module {
 
     single { MatchService(get(), get()) }
 
+    single {
+        AccountAuth(
+            context = app,
+            clientId = BuildConfig.AUTH0_CLIENT_ID,
+            domain = BuildConfig.AUTH0_DOMAIN,
+            audience = BuildConfig.AUTH0_AUDIENCE,
+            scheme = "kozeki",
+        )
+    }
+
+    single { SyncStore(app) }
+
+    single { SyncApi(get(), get(), BuildConfig.KOZEKI_API_URL) }
+
+    single { SyncEngine(get(), get(), get(), get(), get(), get(), get()) }
+
+    single { SyncScheduler(get(), get(), get(), get(), get(), get(), retryLater = { SyncWorker.enqueue(app) }) }
+
     single { BackupRepository(get(), get(), get(), get(), BuildConfig.VERSION_NAME, Build.MODEL) }
 
     single {
@@ -151,10 +175,7 @@ fun appModule(app: Application) = module {
             links = get<SettingsRepository>(),
             scope = scope,
             // The books come back without their cover pictures, and some still waiting for a lookup.
-            onRestored = {
-                matchPending()
-                scope.launch { library.downloadMissingCovers() }
-            },
+            onRestored = { afterRestore(matchPending, scope, library) },
         )
     }
 
@@ -168,10 +189,7 @@ fun appModule(app: Application) = module {
             store = get<SettingsRepository>(),
             scope = scope,
             // As after a restore from Drive.
-            onRestored = {
-                matchPending()
-                scope.launch { library.downloadMissingCovers() }
-            },
+            onRestored = { afterRestore(matchPending, scope, library) },
         )
     }
 
@@ -260,6 +278,20 @@ fun Koin.exposeToExtensions() {
     Injekt.addSingletonFactory<Json> { koin.get() }
     Injekt.addSingletonFactory<ProtoBuf> { koin.get() }
     Injekt.addSingletonFactory<XML> { koin.get() }
+}
+
+/**
+ * After a backup was put back: lookups still owed are queued, covers fetched again, and the
+ * library synced over from the start, the later edit of each row winning.
+ */
+private fun afterRestore(matchPending: () -> Unit, scope: CoroutineScope, library: LibraryRepository) {
+    matchPending()
+    scope.launch {
+        library.downloadMissingCovers()
+        val koin = GlobalContext.get()
+        koin.get<SyncEngine>().startOverAfterRestore()
+        koin.get<SyncScheduler>().requestSync()
+    }
 }
 
 /** Queues a metadata lookup for every book still waiting for one. Safe to call repeatedly. */

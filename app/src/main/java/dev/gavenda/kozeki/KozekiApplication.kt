@@ -3,12 +3,14 @@ package dev.gavenda.kozeki
 import android.app.Application
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
+import dev.gavenda.kozeki.data.account.AccountAuth
 import dev.gavenda.kozeki.data.comic.PageImages
 import dev.gavenda.kozeki.data.comic.ComicCoverFetcher
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAuth
 import dev.gavenda.kozeki.data.tracking.TrackRepository
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
 import dev.gavenda.kozeki.data.settings.SettingsRepository
+import dev.gavenda.kozeki.data.sync.SyncScheduler
 import dev.gavenda.kozeki.data.work.LocalBackupWorker
 import dev.gavenda.kozeki.data.work.MatchWorker
 import dev.gavenda.kozeki.data.work.UpdateWorker
@@ -37,6 +39,9 @@ class KozekiApplication : Application() {
                 }
                 .build()
         }
+        // Before the first screen, which waits on it to know whether to ask for a sign-in.
+        koin.get<AccountAuth>().restore()
+        koin.get<SyncScheduler>().start()
         koin.get<CoroutineScope>().launch { koin.get<HardcoverAuth>().restore() }
         koin.get<CoroutineScope>().launch {
             koin.get<AniListAuth>().restore()

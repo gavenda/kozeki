@@ -1,0 +1,134 @@
+@import 'tailwindcss';
+
+/*
+ * Kozeki's colours, the same Material 3 roles as the Android theme (MaterialKolor's CMF style from the
+ * seed #665EC2, with gold #DBBC95 and leather #998584 in place of secondary and tertiary; see
+ * BRANDING.md). The values were printed from that very scheme, so the two apps cannot drift apart
+ * except by hand. Use the role classes (bg-surface, text-on-surface-variant), never palette scales.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme static {
+	--font-sans: 'Google Sans Flex Variable', ui-sans-serif, system-ui, sans-serif;
+	--color-primary: #3d3396;
+	--color-on-primary: #dad5ff;
+	--color-primary-container: #665ec2;
+	--color-on-primary-container: #ffffff;
+	--color-secondary: #543f21;
+	--color-on-secondary: #f5d5ac;
+	--color-secondary-container: #8a704e;
+	--color-on-secondary-container: #ffffff;
+	--color-tertiary: #4f3f3e;
+	--color-on-tertiary: #ecd4d3;
+	--color-tertiary-container: #796766;
+	--color-on-tertiary-container: #ffffff;
+	--color-error: #7d202b;
+	--color-on-error: #ffcece;
+	--color-error-container: #be515a;
+	--color-on-error-container: #ffffff;
+	--color-surface: #fcf8ff;
+	--color-on-surface: #232137;
+	--color-surface-variant: #e4dffd;
+	--color-on-surface-variant: #424058;
+	--color-surface-container-lowest: #ffffff;
+	--color-surface-container-low: #f6f1ff;
+	--color-surface-container: #f0ebff;
+	--color-surface-container-high: #eae5ff;
+	--color-surface-container-highest: #e4dffd;
+	--color-inverse-surface: #0d0b20;
+	--color-inverse-on-surface: #c6c3d2;
+	--color-inverse-primary: #9890f8;
+	--color-outline: #5f5c75;
+	--color-outline-variant: #7b7892;
+	--color-scrim: #000000;
+	/* Her halo keeps its own colour in both themes. */
+	--color-halo: #dacbbd;
+}
+
+.dark {
+	--color-primary: #b6b0ff;
+	--color-on-primary: #25167f;
+	--color-primary-container: #6f68cc;
+	--color-on-primary-container: #ffffff;
+	--color-secondary: #d2b48d;
+	--color-on-secondary: #3b290d;
+	--color-secondary-container: #8a704e;
+	--color-on-secondary-container: #ffffff;
+	--color-tertiary: #cab4b2;
+	--color-on-tertiary: #372928;
+	--color-tertiary-container: #83706f;
+	--color-on-tertiary-container: #ffffff;
+	--color-error: #ff9ea2;
+	--color-on-error: #5d0517;
+	--color-error-container: #be515a;
+	--color-on-error-container: #ffffff;
+	--color-surface: #0e0d18;
+	--color-on-surface: #ffffff;
+	--color-surface-variant: #252339;
+	--color-on-surface-variant: #b9b5d2;
+	--color-surface-container-lowest: #000000;
+	--color-surface-container-low: #131220;
+	--color-surface-container: #191828;
+	--color-surface-container-high: #1f1d30;
+	--color-surface-container-highest: #252339;
+	--color-inverse-surface: #fcf8ff;
+	--color-inverse-on-surface: #383743;
+	--color-inverse-primary: #4f47aa;
+	--color-outline: #9490ac;
+	--color-outline-variant: #75738d;
+	--color-scrim: #000000;
+}
+
+html {
+	color-scheme: light;
+}
+html.dark {
+	color-scheme: dark;
+}
+
+body {
+	@apply bg-surface text-on-surface font-sans antialiased;
+}
+
+@layer components {
+	.btn,
+	.btn-filled,
+	.btn-tonal,
+	.btn-text,
+	.btn-danger {
+		@apply inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition-colors disabled:cursor-default disabled:opacity-40;
+	}
+	.btn-filled {
+		@apply bg-primary text-on-primary hover:brightness-110;
+	}
+	.btn-tonal {
+		@apply bg-secondary-container text-on-secondary-container hover:brightness-110;
+	}
+	.btn-text {
+		@apply text-primary hover:bg-primary/10;
+	}
+	.btn-danger {
+		@apply bg-error text-on-error hover:brightness-110;
+	}
+	.icon-btn {
+		@apply inline-flex size-10 items-center justify-center rounded-full text-on-surface-variant hover:bg-on-surface/10 cursor-pointer transition-colors;
+	}
+	.card {
+		@apply rounded-3xl bg-surface-container;
+	}
+	.chip {
+		@apply inline-flex h-8 items-center gap-1.5 rounded-lg border border-outline-variant px-3 text-sm text-on-surface-variant cursor-pointer transition-colors;
+	}
+	.chip.chip-on {
+		@apply border-transparent bg-secondary-container text-on-secondary-container;
+	}
+	.field {
+		@apply w-full rounded-xl border border-outline-variant bg-surface-container-lowest px-3 py-2 text-on-surface outline-none focus:border-primary focus:ring-1 focus:ring-primary;
+	}
+	.label {
+		@apply mb-1 block text-xs font-medium text-on-surface-variant;
+	}
+	.section-title {
+		@apply px-1 text-sm font-medium text-primary;
+	}
+}

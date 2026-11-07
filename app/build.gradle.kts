@@ -35,6 +35,14 @@ val hardcoverScopes = localProperty(
     "read:catalog read:social read:library:public read:users read:me:content read:me:email",
 )
 
+// Kozeki's own account, on the Auth0 tenant Yuuka shares. The native application is a public
+// client, so its ID is not a secret. The API is the Worker in webapp/, which accepts tokens for
+// this audience. kozeki.apiUrl in local.properties points a debug build at `wrangler dev`.
+val auth0Domain = localProperty("auth0.domain", "auth.gavenda.dev")
+val auth0ClientId = localProperty("auth0.clientId", "qBH7QNR7HLGq3J5a4WJ6L8NjhGcBFsf5")
+val auth0Audience = localProperty("auth0.audience", "https://kozeki.gavenda.dev/api")
+val kozekiApiUrl = localProperty("kozeki.apiUrl", "https://kozeki.gavenda.dev/api/")
+
 // AniList OAuth client. The implicit grant has no secret, so the ID is all the app holds.
 val aniListClientId = localProperty("anilist.clientId", "53791")
 
@@ -69,6 +77,14 @@ android {
 
         buildConfigField("String", "ANILIST_CLIENT_ID", "\"$aniListClientId\"")
         buildConfigField("String", "ANILIST_REDIRECT_URI", "\"$aniListRedirectUri\"")
+
+        buildConfigField("String", "AUTH0_DOMAIN", "\"$auth0Domain\"")
+        buildConfigField("String", "AUTH0_CLIENT_ID", "\"$auth0ClientId\"")
+        buildConfigField("String", "AUTH0_AUDIENCE", "\"$auth0Audience\"")
+        buildConfigField("String", "KOZEKI_API_URL", "\"$kozekiApiUrl\"")
+        // Read by the Auth0 SDK's own manifest, for the activity the sign-in returns to.
+        manifestPlaceholders["auth0Domain"] = auth0Domain
+        manifestPlaceholders["auth0Scheme"] = "kozeki"
 
         manifestPlaceholders["aniListRedirectScheme"] = aniListRedirectUri.scheme
         manifestPlaceholders["aniListRedirectHost"] = aniListRedirectUri.host.orEmpty()
@@ -184,6 +200,8 @@ dependencies {
     implementation(libs.readium.navigator.web.fixedlayout)
 
     implementation(libs.koin.core)
+    // Signs in to Kozeki's account, which the library syncs through.
+    implementation(libs.auth0)
     // Mihon extensions look their dependencies up through Injekt; see exposeToExtensions().
     implementation(libs.injekt)
     implementation(project(":mihon-host"))

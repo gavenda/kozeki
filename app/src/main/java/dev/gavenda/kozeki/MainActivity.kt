@@ -22,6 +22,7 @@ import dev.gavenda.kozeki.data.update.AppUpdateInstaller
 import dev.gavenda.kozeki.data.update.AppUpdates
 import dev.gavenda.kozeki.data.work.DownloadWorker
 import dev.gavenda.kozeki.ui.KozekiApp
+import dev.gavenda.kozeki.ui.account.AccountGate
 import dev.gavenda.kozeki.ui.theme.AppTheme
 import dev.gavenda.kozeki.ui.update.AppUpdateDialog
 import kotlinx.coroutines.channels.Channel
@@ -64,7 +65,9 @@ class MainActivity : ComponentActivity(), KoinComponent {
                 enableEdgeToEdge()
             }
             AppTheme {
-                KozekiApp(incomingEpubs, openDownloads.receiveAsFlow(), addRepos.receiveAsFlow())
+                AccountGate {
+                    KozekiApp(incomingEpubs, openDownloads.receiveAsFlow(), addRepos.receiveAsFlow())
+                }
                 AppUpdateDialog(appUpdates, appUpdateInstaller)
             }
         }

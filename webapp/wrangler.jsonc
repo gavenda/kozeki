@@ -1,0 +1,61 @@
+/**
+ * Cloudflare Workers configuration for Kozeki's web app.
+ *
+ * One Worker serves both halves: Vite's build output in `dist/` is the static
+ * site (Workers Static Assets), and `server/index.ts` answers `/api/*`. They
+ * share an origin, so the frontend calls the API with a relative path and no
+ * CORS is involved.
+ *
+ * Authentication is Auth0; this Worker only verifies the access tokens the
+ * browser and the Android app present, so it holds no auth secrets of its own.
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "kozeki",
+	"main": "server/index.ts",
+	"compatibility_date": "2026-09-11",
+	"compatibility_flags": ["nodejs_compat"],
+	// `custom_domain` makes Cloudflare create the DNS record and certificate on
+	// deploy, so the hostname must not already have a record.
+	"routes": [{ "pattern": "kozeki.gavenda.dev", "custom_domain": true }],
+	"assets": {
+		"directory": "dist",
+		// API paths always reach the Worker, whether opened in the address bar or
+		// fetched, so an unknown one gets a JSON 404 rather than the SPA shell.
+		"run_worker_first": ["/api/*"],
+		// Client-side routing: every path that is not a file gets the SPA shell.
+		"not_found_handling": "single-page-application",
+	},
+	"vars": {
+		// Auth0 tenant domain. Tokens must carry `https://<domain>/` as their issuer.
+		"AUTH0_DOMAIN": "auth.gavenda.dev",
+		// Must match the audience the web app and the Android app request.
+		"AUTH0_AUDIENCE": "https://kozeki.gavenda.dev/api",
+	},
+	"observability": {
+		"enabled": true,
+		"head_sampling_rate": 1,
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "kozeki",
+			"database_id": "7a521050-c112-4d76-bf59-216f3c583bae",
+			"migrations_dir": "migrations",
+		},
+	],
+	// Cover pictures. D1 holds the rows, R2 the JPEGs they name.
+	"r2_buckets": [
+		{
+			"binding": "COVERS",
+			"bucket_name": "kozeki-covers",
+		},
+	],
+	// The Auth0 JWKS, cached for an hour.
+	"kv_namespaces": [
+		{
+			"binding": "CACHE",
+			"id": "3a55a862039245a4aec5b8c06e417203",
+		},
+	],
+}

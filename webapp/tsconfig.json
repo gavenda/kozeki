@@ -1,0 +1,7 @@
+{
+	/* The browser half. The server half (server/ and test/) is a standalone
+	   project — see tsconfig.server.json — because it targets the Workers
+	   runtime rather than the DOM. */
+	"files": [],
+	"references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+}

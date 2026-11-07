@@ -71,6 +71,8 @@ The app has one theme, its own, the same on every device in light and in dark. `
 | Gold | `#DBBC95` | Her pendant | `secondary` |
 | Leather | `#998584` | Her trunk | `tertiary` |
 
+The web app (`webapp/src/style.css`) has the same roles, printed from this scheme by a throwaway JVM test rather than worked out again in JavaScript, which has no CMF style. A change to the theme is printed again for it. Its portraits are the same cut faces, and its icons the launcher portrait on `#E8EAF6`.
+
 Each input sets a hue and the style picks the tones, so the gold and the leather are never on screen as written. The gold shows as bronze. These are the roles as MaterialKolor 6.0.0-beta01 resolves them:
 
 | Role | Light | Dark |
@@ -161,13 +163,13 @@ Eleven faces are cut, and a new empty state picks from them first. The source nu
 |---|---|---|---|
 | `HAPPY` | Closed-eye smile | 22 | The library with no books; a day with nothing read that is her birthday; a series with every book in the library; the update sheet when no comic was due; About while she says you are on the latest version |
 | `CONTENT` | Slight smile; blinks | 3 | All-time statistics with nothing on record; the download queue with nothing in it; About |
-| `NEUTRAL` | Her usual flat look; blinks | 1 | A library filter with nothing under it; an empty tab of the longest-books card |
-| `CURIOUS` | A small "o"; blinks | 8 | Library search, before typing; About when a newer version is out |
-| `STUDIOUS` | Monocle; blinks | 23 | Add book, before searching; About while checking for a newer version |
+| `NEUTRAL` | Her usual flat look; blinks | 1 | A library filter with nothing under it; an empty tab of the longest-books card; the sign-in that opens the library ("The library is closed" over "Sign in and I'll open it."), on the phone and the web |
+| `CURIOUS` | A small "o"; blinks | 8 | Library search, before typing; About when a newer version is out; the first sync after signing in, asking to copy the library to the account ("I'll copy your 42 books to your account. Comics stay on this phone.") |
+| `STUDIOUS` | Monocle; blinks | 23 | Add book, before searching; About while checking for a newer version; the first sync while it copies, and the web app while it opens the library |
 | `ASLEEP` | Eyes closed | 7 | A day with nothing read |
 | `DOWNCAST` | Half-lidded eyes; blinks | 15 | Library search with nothing found; an author with no books listed; Add book on Comics with no source installed |
-| `WORRIED` | Mouth open, a bead of sweat; blinks | 13 | Add book, nothing found; About when GitHub cannot be reached or wants no more checks |
-| `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page; About when GitHub refuses the check or its answer cannot be read |
+| `WORRIED` | Mouth open, a bead of sweat; blinks | 13 | Add book, nothing found; About when GitHub cannot be reached or wants no more checks; a sign-in or first sync that did not go through |
+| `DISMAYED` | White eyes, sweat | 10 | A failed lookup, in Add book and on an author's page; About when GitHub refuses the check or its answer cannot be read; the web app when the library cannot be opened |
 | `DUMBFOUNDED` | Black dots for eyes | 21 | An author whose page is gone |
 | `SHOCKED` | Comic yell | 14 | A book the reader cannot open |
 

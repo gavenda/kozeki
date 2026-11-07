@@ -144,12 +144,15 @@ interface BookDao {
     /**
      * Targeted so that frequent progress writes from the reader never clobber other edits. A
      * completed book stays at 100% even while it is being browsed again.
+     *
+     * Only lastReadAt moves, not updatedAt: the reader's columns sync on lastReadAt apart from the
+     * rest of the book, so a page turned here and an edit made on the web both survive.
      */
     @Query(
         "UPDATE books SET locator = :locator, " +
             "progression = CASE WHEN state = 'COMPLETED' THEN 1.0 ELSE :progression END, position = :position, " +
             "positionCount = :positionCount, chapterTitle = :chapterTitle, chapterIndex = :chapterIndex, " +
-            "chapterCount = :chapterCount, lastReadAt = :now, updatedAt = :now WHERE id = :id",
+            "chapterCount = :chapterCount, lastReadAt = :now WHERE id = :id",
     )
     suspend fun updateProgress(
         id: String,

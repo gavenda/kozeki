@@ -92,6 +92,10 @@ import coil3.compose.rememberAsyncImagePainter
 import dev.gavenda.kozeki.R
 import dev.gavenda.kozeki.data.comic.BrokenExtension
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverAccount
+import dev.gavenda.kozeki.data.sync.SyncStatus
+import dev.gavenda.kozeki.ui.formatTimeAgo
+import dev.gavenda.kozeki.ui.account.syncFailureText
+import androidx.activity.compose.LocalActivity
 import dev.gavenda.kozeki.data.metadata.hardcover.HardcoverSignIn
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAccount
 import dev.gavenda.kozeki.data.tracking.anilist.AniListAuth
@@ -208,9 +212,12 @@ fun SettingsScreen(
         )
     }
 
+    val activity = LocalActivity.current
     SettingsContent(
         state = state,
         onBack = onBack,
+        onSyncNow = viewModel::syncNow,
+        onSignOutOfAccount = { activity?.let(viewModel::signOutOfAccount) },
         onSignIn = viewModel::signIn,
         onSignOut = viewModel::signOut,
         onDismissSignInError = viewModel::dismissSignInError,
@@ -238,6 +245,8 @@ fun SettingsScreen(
 fun SettingsContent(
     state: SettingsUiState,
     onBack: () -> Unit,
+    onSyncNow: () -> Unit = {},
+    onSignOutOfAccount: () -> Unit = {},
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
     onDismissSignInError: () -> Unit,
@@ -292,6 +301,13 @@ fun SettingsContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                item(key = "account") {
+                    SplitSection(title = stringResource(R.string.settings_account)) {
+                        SettingSubgroup {
+                            KozekiAccountSetting(state, onSyncNow, onSignOutOfAccount)
+                        }
+                    }
+                }
                 item(key = "source") {
                     SplitSection(title = stringResource(R.string.settings_source_title)) {
                         SettingSubgroup(SubgroupPosition.FIRST, label = stringResource(R.string.settings_source_books)) {
@@ -691,6 +707,68 @@ private fun AniListSetting(
             iconContentColor = MaterialTheme.colorScheme.error,
             title = { Text(stringResource(R.string.settings_anilist_sign_out_title)) },
             text = { Text(stringResource(R.string.settings_anilist_sign_out_message)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmSignOut = false
+                        onSignOut()
+                    },
+                    shapes = ButtonDefaults.shapes(),
+                ) {
+                    Text(stringResource(R.string.settings_hardcover_sign_out))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmSignOut = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+/** Kozeki's account the library syncs with: who is signed in, and how the sync stands. */
+@Composable
+private fun KozekiAccountSetting(state: SettingsUiState, onSyncNow: () -> Unit, onSignOut: () -> Unit) {
+    var confirmSignOut by rememberSaveable { mutableStateOf(false) }
+    val account = state.account
+
+    val name = account?.name ?: account?.email ?: stringResource(R.string.settings_hardcover_signed_in)
+    SettingRow(
+        leading = { AccountAvatar(account?.picture) },
+        title = name,
+        subtitle = account?.email?.takeIf { it != name },
+        modifier = Modifier.clickable(
+            onClickLabel = stringResource(R.string.settings_hardcover_sign_out),
+            role = Role.Button,
+        ) { confirmSignOut = true },
+    )
+    val syncing = state.sync is SyncStatus.Running
+    SettingRow(
+        icon = painterResource(R.drawable.cloud_upload_48px),
+        title = stringResource(R.string.settings_sync),
+        subtitle = when (val sync = state.sync) {
+            is SyncStatus.Running -> stringResource(R.string.settings_sync_running)
+            is SyncStatus.Failed -> syncFailureText(sync)
+            SyncStatus.Idle -> state.lastSyncedAt?.let { stringResource(R.string.settings_sync_last, formatTimeAgo(it)) }
+                ?: stringResource(R.string.settings_sync_never)
+        },
+        subtitleColor = if (state.sync is SyncStatus.Failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.clickable(enabled = !syncing, role = Role.Button, onClick = onSyncNow),
+        trailing = if (syncing) {
+            { HaloLoadingIndicator(Modifier.size(24.dp)) }
+        } else {
+            null
+        },
+    )
+
+    if (confirmSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            icon = { Icon(painterResource(R.drawable.logout_48px), contentDescription = null, modifier = Modifier.size(24.dp)) },
+            iconContentColor = MaterialTheme.colorScheme.error,
+            title = { Text(stringResource(R.string.settings_account_sign_out_title)) },
+            text = { Text(stringResource(R.string.settings_account_sign_out_message)) },
             confirmButton = {
                 Button(
                     onClick = {
