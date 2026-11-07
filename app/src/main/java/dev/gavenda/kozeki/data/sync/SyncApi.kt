@@ -10,6 +10,7 @@ import dev.gavenda.kozeki.data.db.ShelfBookEntity
 import dev.gavenda.kozeki.data.db.ShelfEntity
 import dev.gavenda.kozeki.data.db.SyncStamp
 import dev.gavenda.kozeki.data.db.YearlyGoalEntity
+import dev.gavenda.kozeki.data.metadata.MetadataException
 import dev.gavenda.kozeki.data.metadata.await
 import java.io.File
 import java.io.IOException
@@ -19,6 +20,7 @@ import kotlinx.serialization.json.JsonElement
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -88,11 +90,7 @@ class SyncApi(
     /** @return false when the server has no such cover. */
     suspend fun downloadCover(name: String, target: File): Boolean {
         val request = authorized("covers/$name").get().build()
-        val response = try {
-            client.newCall(request).await()
-        } catch (e: IOException) {
-            throw SyncException.Offline(e.message ?: "No connection")
-        }
+        val response = connect(request)
         response.use {
             if (it.code == 404) return false
             if (!it.isSuccessful) throw SyncException.Refused(it.code, "Cover download failed")
@@ -104,6 +102,18 @@ class SyncApi(
         }
     }
 
+    /**
+     * Sends [request]. [await] reports a failed connection as [MetadataException.Network], which is
+     * not an IOException; left as it is, it would get past the sync's handling and take the app down.
+     */
+    private suspend fun connect(request: Request): Response = try {
+        client.newCall(request).await()
+    } catch (e: MetadataException.Network) {
+        throw SyncException.Offline(e.cause?.message ?: "No connection")
+    } catch (e: IOException) {
+        throw SyncException.Offline(e.message ?: "No connection")
+    }
+
     private suspend fun authorized(path: String): Request.Builder {
         val token = auth.accessToken() ?: throw SyncException.Offline("No access token")
         return Request.Builder().url(baseUrl + path).header("Authorization", "Bearer $token")
@@ -111,13 +121,13 @@ class SyncApi(
 
     private suspend fun call(path: String, method: Request.Builder.() -> Request.Builder): String? {
         val request = authorized(path).method().build()
-        val response = try {
-            client.newCall(request).await()
-        } catch (e: IOException) {
-            throw SyncException.Offline(e.message ?: "No connection")
-        }
+        val response = connect(request)
         response.use {
-            val text = it.body.string()
+            val text = try {
+                it.body.string()
+            } catch (e: IOException) {
+                throw SyncException.Offline(e.message ?: "Connection lost")
+            }
             if (!it.isSuccessful) {
                 val reason = runCatching { SyncJson.decodeFromString<ErrorBody>(text).error }.getOrNull()
                 throw SyncException.Refused(it.code, reason ?: "HTTP ${it.code}")
