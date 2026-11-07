@@ -1,5 +1,6 @@
 package dev.gavenda.kozeki.ui
 
+import dev.gavenda.kozeki.R
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.ContentTransform
@@ -9,6 +10,8 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.add
@@ -18,10 +21,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ShortNavigationBarDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.WideNavigationRail
 import androidx.compose.material3.WideNavigationRailDefaults
+import androidx.compose.material3.WideNavigationRailItem
+import androidx.compose.material3.WideNavigationRailValue
+import androidx.compose.material3.rememberWideNavigationRailState
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuite
@@ -35,6 +43,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -353,29 +363,65 @@ fun KozekiNavigationScaffold(
     val type = NavigationSuiteScaffoldDefaults.navigationSuiteType(currentWindowAdaptiveInfo())
     val onRail = type == NavigationSuiteType.WideNavigationRailCollapsed ||
         type == NavigationSuiteType.WideNavigationRailExpanded
+    // NavigationSuite keeps its rail collapsed whatever it is told, so the rail is drawn here and
+    // its menu button drives the rail's own state.
+    val railState = rememberWideNavigationRailState(
+        initialValue = if (type == NavigationSuiteType.WideNavigationRailExpanded) WideNavigationRailValue.Expanded else WideNavigationRailValue.Collapsed,
+    )
+    val expanded = railState.targetValue == WideNavigationRailValue.Expanded
+    val railScope = rememberCoroutineScope()
     val railAction = remember { RailAction() }
+    railAction.expanded = onRail && expanded
 
     Surface(modifier = modifier, color = NavigationSuiteScaffoldDefaults.containerColor, contentColor = NavigationSuiteScaffoldDefaults.contentColor) {
         NavigationSuiteScaffoldLayout(
             navigationSuite = {
-                NavigationSuite(
-                    navigationSuiteType = type,
-                    primaryActionContent = {
-                        // The rail puts its header at its start edge; the action is centred over the items instead.
-                        railAction.content?.let { action ->
-                            Box(Modifier.width(RailCollapsedWidth), contentAlignment = Alignment.Center) { action() }
+                if (onRail) {
+                    WideNavigationRail(
+                        state = railState,
+                        header = {
+                            Column(Modifier.padding(start = 20.dp)) {
+                                IconButton(
+                                    onClick = { railScope.launch { if (expanded) railState.collapse() else railState.expand() } },
+                                    // Its icon sits over the button's own, 48dp in from the rail's edge.
+                                    modifier = Modifier.padding(start = 4.dp),
+                                ) {
+                                    Icon(
+                                        painterResource(if (expanded) R.drawable.menu_open_48px else R.drawable.menu_48px),
+                                        contentDescription = stringResource(if (expanded) R.string.nav_collapse else R.string.nav_expand),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                }
+                                // Collapsed, the action is centred over the items; expanded, it sits at the start edge.
+                                railAction.content?.let { action ->
+                                    if (expanded) Box { action() } else Box(Modifier.width(RailCollapsedWidth - 20.dp), contentAlignment = Alignment.CenterStart) { action() }
+                                }
+                            }
+                        },
+                    ) {
+                        TopLevelDestination.entries.forEach { item ->
+                            val selected = item == current
+                            WideNavigationRailItem(
+                                selected = selected,
+                                onClick = { onSelect(item) },
+                                icon = { Icon(painterResource(if (selected) item.selectedIcon else item.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                                label = { Text(stringResource(item.label)) },
+                                railExpanded = expanded,
+                            )
                         }
-                    },
-                ) {
-                    TopLevelDestination.entries.forEach { item ->
-                        val selected = item == current
-                        NavigationSuiteItem(
-                            selected = selected,
-                            onClick = { onSelect(item) },
-                            icon = { Icon(painterResource(if (selected) item.selectedIcon else item.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                            label = { Text(stringResource(item.label)) },
-                            navigationSuiteType = type,
-                        )
+                    }
+                } else {
+                    NavigationSuite(navigationSuiteType = type) {
+                        TopLevelDestination.entries.forEach { item ->
+                            val selected = item == current
+                            NavigationSuiteItem(
+                                selected = selected,
+                                onClick = { onSelect(item) },
+                                icon = { Icon(painterResource(if (selected) item.selectedIcon else item.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
+                                label = { Text(stringResource(item.label)) },
+                                navigationSuiteType = type,
+                            )
+                        }
                     }
                 }
             },

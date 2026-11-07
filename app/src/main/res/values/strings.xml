@@ -5,6 +5,8 @@
     <string name="nav_library">Library</string>
     <string name="nav_calendar">Calendar</string>
     <string name="nav_statistics">Statistics</string>
+    <string name="nav_expand">Expand menu</string>
+    <string name="nav_collapse">Collapse menu</string>
 
     <!-- Common actions -->
     <string name="action_back">Back</string>

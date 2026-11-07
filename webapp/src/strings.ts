@@ -15,7 +15,7 @@ const fixed1 = (value: number) => value.toFixed(1);
 export const s = {
 	appName: 'Kozeki',
 	characterName: 'Ui',
-	nav: { library: 'Library', calendar: 'Calendar', statistics: 'Statistics' },
+	nav: { library: 'Library', calendar: 'Calendar', statistics: 'Statistics', expand: 'Expand menu', collapse: 'Collapse menu' },
 	action: {
 		back: 'Back',
 		cancel: 'Cancel',

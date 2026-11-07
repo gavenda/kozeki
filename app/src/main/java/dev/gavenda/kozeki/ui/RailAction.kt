@@ -2,10 +2,11 @@ package dev.gavenda.kozeki.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 
@@ -16,6 +17,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
 @Stable
 class RailAction {
     var content: (@Composable () -> Unit)? by mutableStateOf(null)
+
+    /** Whether the rail shows its labels beside the icons; the action then gets its own label too. */
+    var expanded: Boolean by mutableStateOf(false)
 }
 
 val LocalRailAction = staticCompositionLocalOf<RailAction?> { null }
@@ -24,11 +28,14 @@ val LocalRailAction = staticCompositionLocalOf<RailAction?> { null }
 @Composable
 fun RailActionEffect(action: @Composable () -> Unit) {
     val rail = LocalRailAction.current ?: return
-    val current by rememberUpdatedState(action)
+    // Each recomposition hands the rail the new lambda, so what it draws never goes stale.
+    val mine = remember { arrayOfNulls<@Composable () -> Unit>(1) }
+    SideEffect {
+        mine[0] = action
+        if (rail.content !== action) rail.content = action
+    }
     DisposableEffect(rail) {
-        val content: @Composable () -> Unit = { current() }
-        rail.content = content
         // A tab sliding out goes after the one sliding in has taken the slot.
-        onDispose { if (rail.content === content) rail.content = null }
+        onDispose { if (rail.content === mine[0]) rail.content = null }
     }
 }

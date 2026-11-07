@@ -53,6 +53,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
@@ -124,6 +125,7 @@ import dev.gavenda.kozeki.data.model.ImportResult
 import dev.gavenda.kozeki.data.model.ReadingState
 import dev.gavenda.kozeki.data.model.Shelf
 import dev.gavenda.kozeki.ui.LocalRailAction
+import dev.gavenda.kozeki.ui.RailAction
 import dev.gavenda.kozeki.ui.PreviewData
 import dev.gavenda.kozeki.ui.RailActionEffect
 import dev.gavenda.kozeki.ui.ScreenPreviews
@@ -354,6 +356,8 @@ fun LibraryContent(
     // are picked, the selection toolbar takes the corner. On a rail the button sits at its top.
     val showsAddButton = !state.selecting && (!state.isLibraryEmpty || state.importing)
     val onRail = LocalRailAction.current != null
+    // Taken here: the rail draws the button outside this screen's composition locals.
+    val railAction = LocalRailAction.current
     val addBooksMenu: @Composable (Boolean) -> Unit = { rail ->
         AddBooksMenu(
             importing = state.importing,
@@ -364,6 +368,7 @@ fun LibraryContent(
             onAddManually = onAddManually,
             onNewShelf = if (state.inShelves) ({ shelfPrompt = ShelfPrompt.Create }) else null,
             onRail = rail,
+            railAction = railAction,
         )
     }
     if (showsAddButton && onRail) RailActionEffect { addBooksMenu(true) }
@@ -842,6 +847,22 @@ private class AddOption(
  * navigation rail, whose menu drops down from it rather than rising.
  */
 @Composable
+private fun AddOptionsMenu(expanded: Boolean, onDismiss: () -> Unit, options: List<AddOption>) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        options.forEach { option ->
+            DropdownMenuItem(
+                text = { Text(stringResource(option.label)) },
+                onClick = {
+                    onDismiss()
+                    option.onClick()
+                },
+                leadingIcon = { Icon(painterResource(option.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun AddBooksMenu(
     importing: Boolean,
     offersTop: Boolean,
@@ -851,6 +872,7 @@ private fun AddBooksMenu(
     onAddManually: () -> Unit,
     onNewShelf: (() -> Unit)? = null,
     onRail: Boolean = false,
+    railAction: RailAction? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     BackHandler(expanded) { expanded = false }
@@ -899,19 +921,26 @@ private fun AddBooksMenu(
     }
 
     if (onRail) {
-        Box {
-            button()
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(option.label)) },
-                        onClick = {
-                            expanded = false
-                            option.onClick()
-                        },
-                        leadingIcon = { Icon(painterResource(option.icon), contentDescription = null, modifier = Modifier.size(24.dp)) },
-                    )
-                }
+        if (railAction?.expanded == true) {
+            // The expanded rail gets the extended button, which is only as wide as its label.
+            Box {
+                ExtendedFloatingActionButton(
+                    onClick = { if (toTop) onScrollToTop() else if (!importing) expanded = !expanded },
+                    icon = {
+                        when {
+                            importing -> HaloLoadingIndicator(Modifier.size(24.dp))
+                            toTop -> Icon(painterResource(R.drawable.keyboard_arrow_up_48px), contentDescription = null, modifier = Modifier.size(24.dp))
+                            else -> Icon(painterResource(if (expanded) R.drawable.close_48px else R.drawable.add_48px), contentDescription = null, modifier = Modifier.size(24.dp))
+                        }
+                    },
+                    text = { Text(label) },
+                )
+                AddOptionsMenu(expanded, { expanded = false }, options)
+            }
+        } else {
+            Box {
+                button()
+                AddOptionsMenu(expanded, { expanded = false }, options)
             }
         }
         return
