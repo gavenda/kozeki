@@ -21,6 +21,7 @@ Run `bun run typecheck` and `bun run test` before calling a change done.
 - **Nothing is hard-deleted.** `deleted_at` is a tombstone, so deletions sync like edits.
 - **Every query is scoped by `user_id`**, the Auth0 subject from the verified token (`middleware/auth.ts`), never from the request.
 - **Covers** are R2 objects at `covers/<subject>/<file>`. File names are unique per save (`<bookId>-<millis>.jpg`, as the phone names them), so objects never change and can be cached for good. Replaced covers are not cleaned up.
+- **Google Books** searches go through `GET /api/books/search`, which adds the `GOOGLE_BOOKS_API_KEY` secret: keyless requests share a small per-address allowance and answer 429, and the phone's key is locked to the Android app.
 - **Hardcover** for the web is its own OAuth client with PKCE; the token stays in the browser. The Worker only forwards `/token`, `/revoke` and `/graphql`, because Hardcover does not answer other origins.
 
 ## Browser app

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { HttpError } from './errors';
+import { bookRoutes } from './routes/books';
 import { coverRoutes } from './routes/covers';
 import { hardcoverRoutes } from './routes/hardcover';
 import { syncRoutes } from './routes/sync';
@@ -18,6 +19,7 @@ app.get('/api/health', (c) => c.json({ status: 'ok', service: 'kozeki' }));
 app.route('/api/sync', syncRoutes);
 app.route('/api/covers', coverRoutes);
 app.route('/api/hardcover', hardcoverRoutes);
+app.route('/api/books', bookRoutes);
 
 app.notFound((c) => c.json({ error: 'Not found.' }, 404));
 

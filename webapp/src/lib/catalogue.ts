@@ -1,9 +1,10 @@
 import type { Found } from './library';
 import { hardcoverSearch, hardcoverSignedIn } from './hardcover';
+import { apiFetch } from './http';
 
 /**
  * Looking books up: Hardcover when the browser is signed in to it, Google Books otherwise, which
- * needs no account. Either way the answer is what [addFound] takes.
+ * needs no account of the user's. Either way the answer is what [addFound] takes.
  */
 export async function search(query: string): Promise<Found[]> {
 	if (!query.trim()) return [];
@@ -28,9 +29,8 @@ interface Volume {
 }
 
 async function googleBooksSearch(query: string): Promise<Found[]> {
-	const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=20&printType=books`;
-	const response = await fetch(url);
-	if (!response.ok) throw new Error(`Google Books answered ${response.status}.`);
+	// Through the Worker, which adds the API key (see server/routes/books.ts).
+	const response = await apiFetch(`/books/search?q=${encodeURIComponent(query)}`);
 	const body = (await response.json()) as { items?: Volume[] };
 	return (body.items ?? []).flatMap(({ id, volumeInfo: info }) =>
 		info.title

@@ -209,3 +209,11 @@ describe('limits', () => {
 		expect(count).toBe(300);
 	});
 });
+
+describe('GET /api/books/search', () => {
+	it('needs a token and a search', async () => {
+		expect((await request('/books/search?q=dune')).status).toBe(401);
+		const call = await authedClient();
+		expect((await call('/books/search?q=')).status).toBe(400);
+	});
+});
