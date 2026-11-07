@@ -1,188 +1,165 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import AppIcon from '@/components/AppIcon.vue';
-import BookCover from '@/components/BookCover.vue';
-import EmptyState from '@/components/EmptyState.vue';
-import { alive } from '@/lib/library';
-import { formatDay, formatDuration, formatPrice } from '@/lib/format';
-import { today } from '@/lib/dates';
-import { allTimeStats, minutesOn, yearStats } from '@/lib/stats';
+import { useRoute, useRouter } from 'vue-router';
+import ButtonGroup from '@/components/ButtonGroup.vue';
+import SettingsButton from '@/components/SettingsButton.vue';
+import TopAppBar from '@/components/TopAppBar.vue';
+import YearlyGoalDialog from '@/components/YearlyGoalDialog.vue';
+import PeriodNavigator from '@/components/statistics/PeriodNavigator.vue';
+import StatisticsAllTime from '@/components/statistics/StatisticsAllTime.vue';
+import StatisticsDay from '@/components/statistics/StatisticsDay.vue';
+import StatisticsPeriod from '@/components/statistics/StatisticsPeriod.vue';
+import StatisticsYear from '@/components/statistics/StatisticsYear.vue';
+import { dateOfEpochDay, epochDayOfDate, epochDayOfIso, firstDayOfWeek, isoOfEpochDay, today as todayOf } from '@/lib/dates';
+import { formatDay, formatMonth } from '@/lib/format';
+import * as ops from '@/lib/library';
+import type { OptionColor } from '@/lib/optionColor';
+import { allTimeStats, dayStats, periodStats, weekStartOf, yearStats } from '@/lib/stats';
 import { useStatsInput } from '@/lib/statsInput';
 import { useLibrary } from '@/stores/library';
 import { s } from '@/strings';
 
+/**
+ * The statistics, as the phone's `StatisticsScreen`: a day, a week, a month, a year or all of it,
+ * stepped through one at a time. Opened on a day from the calendar ([date]), it is a page of its
+ * own, with a way back. The range and the day it is on are in the address, so Back finds them.
+ */
+const props = defineProps<{ date?: string }>();
+const route = useRoute();
+const router = useRouter();
 const library = useLibrary();
 const input = useStatsInput();
-const range = ref<'year' | 'all'>('year');
-const year = ref(new Date().getFullYear());
 
-const goal = computed(() => {
-	const row = library.tables.yearlyGoals.get(String(year.value));
-	return row && alive(row) ? row.books : null;
+type Range = 'DAY' | 'WEEK' | 'MONTH' | 'YEAR' | 'ALL';
+const RANGES: { value: Range; label: string; color: OptionColor }[] = [
+	{ value: 'DAY', label: s.stats.range.DAY, color: 'violet' },
+	{ value: 'WEEK', label: s.stats.range.WEEK, color: 'gold' },
+	{ value: 'MONTH', label: s.stats.range.MONTH, color: 'gold' },
+	{ value: 'YEAR', label: s.stats.range.YEAR, color: 'gold' },
+	{ value: 'ALL', label: s.stats.range.ALL, color: 'leather' },
+];
+
+const today = todayOf();
+const weekStart = firstDayOfWeek();
+const detail = computed(() => props.date != null);
+const range = computed<Range>(() => {
+	const asked = route.query.range as Range | undefined;
+	return RANGES.some((option) => option.value === asked) ? asked! : 'DAY';
 });
-const yearly = computed(() => yearStats(input.value, year.value, goal.value));
-const allTime = computed(() => allTimeStats(input.value, today()));
-const todayMinutes = computed(() => minutesOn(input.value, today()));
-const dailyGoal = computed(() => library.setting<number>('dailyGoalMinutes', 20));
+const anchor = computed(() => {
+	const asked = typeof route.query.d === 'string' ? epochDayOfIso(route.query.d) : null;
+	return Math.min(asked ?? (props.date ? epochDayOfIso(props.date) : null) ?? today, today);
+});
 
-const monthNames = Array.from({ length: 12 }, (_, month) => new Date(2024, month, 1).toLocaleDateString(undefined, { month: 'narrow' }));
-const maxOf = (values: number[]) => Math.max(1, ...values);
+function go(next: { range?: Range; day?: number }) {
+	const query = { ...route.query, range: next.range ?? range.value, d: isoOfEpochDay(next.day ?? anchor.value) };
+	void router.replace({ query });
+}
+
+const dateOf = (day: number) => dateOfEpochDay(day);
+const period = computed(() => {
+	const day = anchor.value;
+	const date = dateOf(day);
+	switch (range.value) {
+		case 'DAY':
+			return { start: day, end: day };
+		case 'WEEK': {
+			const start = weekStartOf(day, weekStart);
+			return { start, end: start + 6 };
+		}
+		case 'MONTH': {
+			const start = epochDayOfDate(date.getFullYear(), date.getMonth(), 1);
+			return { start, end: epochDayOfDate(date.getFullYear(), date.getMonth() + 1, 1) - 1 };
+		}
+		default: {
+			const start = epochDayOfDate(date.getFullYear(), 0, 1);
+			return { start, end: epochDayOfDate(date.getFullYear() + 1, 0, 1) - 1 };
+		}
+	}
+});
+const canGoForward = computed(() => period.value.end < today);
+function step(by: number) {
+	const date = dateOf(anchor.value);
+	const day =
+		range.value === 'DAY'
+			? anchor.value + by
+			: range.value === 'WEEK'
+				? anchor.value + 7 * by
+				: range.value === 'MONTH'
+					? epochDayOfDate(date.getFullYear(), date.getMonth() + by, 1)
+					: epochDayOfDate(date.getFullYear() + by, 0, 1);
+	go({ day: Math.min(day, today) });
+}
+
+const shortDate = (day: number) => dateOf(day).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const label = computed(() => {
+	const date = dateOf(anchor.value);
+	switch (range.value) {
+		case 'DAY':
+			return anchor.value === today ? s.stats.today : formatDay(anchor.value);
+		case 'WEEK':
+			return s.stats.dateRange(shortDate(period.value.start), shortDate(period.value.end));
+		case 'MONTH':
+			return formatMonth(date.getFullYear(), date.getMonth());
+		default:
+			return String(date.getFullYear());
+	}
+});
+
+const goalMinutes = computed(() => library.setting<number>('dailyGoalMinutes', 20));
+const year = computed(() => dateOf(anchor.value).getFullYear());
+const yearGoal = computed(() => {
+	const row = library.tables.yearlyGoals.get(String(year.value));
+	return row && ops.alive(row) ? row.books : null;
+});
+
+const day = computed(() => (range.value === 'DAY' ? dayStats(input.value, anchor.value, weekStart, goalMinutes.value) : null));
+const periodData = computed(() =>
+	range.value === 'WEEK' || range.value === 'MONTH'
+		? periodStats(input.value, period.value.start, period.value.end, goalMinutes.value)
+		: null,
+);
+const yearly = computed(() => (range.value === 'YEAR' ? yearStats(input.value, year.value, yearGoal.value) : null));
+const allTime = computed(() => (range.value === 'ALL' ? allTimeStats(input.value, today) : null));
+const color = computed(() => RANGES.find((option) => option.value === range.value)!.color);
+const settingGoal = ref(false);
 </script>
 
 <template>
-	<div class="flex flex-col gap-6">
-		<div class="flex flex-wrap items-center gap-2">
-			<div class="flex rounded-full border border-outline-variant p-1">
-				<button
-					v-for="option in ['year', 'all'] as const"
-					:key="option"
-					class="h-8 rounded-full px-4 text-sm font-medium"
-					:class="range === option ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'"
-					@click="range = option"
-				>
-					{{ option === 'year' ? s.stats.year : s.stats.all }}
-				</button>
-			</div>
-			<div v-if="range === 'year'" class="ml-auto flex items-center gap-1">
-				<button class="icon-btn" :aria-label="s.stats.previous" @click="year--"><AppIcon name="arrowBack" /></button>
-				<span class="w-14 text-center font-medium">{{ year }}</span>
-				<button class="icon-btn rotate-180" :aria-label="s.stats.next" @click="year++"><AppIcon name="arrowBack" /></button>
-			</div>
+	<TopAppBar v-if="detail" :title="s.nav.statistics" :back="{ name: 'calendar' }" always-title />
+	<TopAppBar v-else :title="s.nav.statistics" large>
+		<SettingsButton />
+	</TopAppBar>
+
+	<div class="mx-auto flex max-w-[840px] flex-col gap-4 px-4 pb-8">
+		<div class="flex flex-col gap-3">
+			<ButtonGroup :model-value="range" :options="RANGES" @update:model-value="go({ range: $event })" />
+			<PeriodNavigator
+				v-if="range !== 'ALL'"
+				:label="label"
+				:color="color"
+				:can-go-forward="canGoForward"
+				@previous="step(-1)"
+				@next="step(1)"
+			/>
 		</div>
-
-		<div class="card flex items-center gap-4 p-5">
-			<div class="flex-1">
-				<p class="text-sm text-on-surface-variant">{{ s.stats.today }}</p>
-				<p class="text-xl font-medium">{{ s.stats.todayOf(todayMinutes, dailyGoal) }}</p>
-			</div>
-			<div class="h-2 w-40 overflow-hidden rounded-full bg-surface-container-highest">
-				<div class="h-full rounded-full bg-primary" :style="{ width: `${Math.min(100, (todayMinutes / dailyGoal) * 100)}%` }" />
-			</div>
-		</div>
-
-		<template v-if="range === 'year'">
-			<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-				<div class="card p-4">
-					<p class="text-xs text-on-surface-variant">{{ s.stats.finished }}</p>
-					<p class="text-2xl font-medium">{{ yearly.completed.length }}</p>
-					<p v-if="yearly.goalBooks" class="text-xs text-on-surface-variant">
-						{{ s.stats.goalOf(yearly.completed.length, yearly.goalBooks) }}
-					</p>
-				</div>
-				<div class="card p-4">
-					<p class="text-xs text-on-surface-variant">{{ s.stats.timeRead }}</p>
-					<p class="text-2xl font-medium">{{ formatDuration(yearly.durationMs) }}</p>
-				</div>
-				<div class="card p-4">
-					<p class="text-xs text-on-surface-variant">{{ s.stats.pages }}</p>
-					<p class="text-2xl font-medium">{{ yearly.pages.toLocaleString() }}</p>
-				</div>
-				<div class="card p-4">
-					<p class="text-xs text-on-surface-variant">{{ s.stats.ratings }}</p>
-					<p class="text-2xl font-medium">{{ yearly.ratingAverage != null ? s.stats.ratingAverage(yearly.ratingAverage) : '–' }}</p>
-				</div>
-			</div>
-
-			<div v-if="yearly.goalBooks" class="card p-5">
-				<p class="mb-2 text-sm text-on-surface-variant">{{ s.stats.goal }}</p>
-				<div class="h-3 overflow-hidden rounded-full bg-surface-container-highest">
-					<div
-						class="h-full rounded-full bg-secondary"
-						:style="{ width: `${Math.min(100, (yearly.completed.length / yearly.goalBooks) * 100)}%` }"
-					/>
-				</div>
-			</div>
-
-			<div class="grid gap-3 md:grid-cols-2">
-				<div class="card p-5">
-					<p class="mb-3 text-sm text-on-surface-variant">{{ s.stats.booksPerMonth }}</p>
-					<div class="flex h-32 items-end gap-1.5">
-						<div v-for="(count, month) in yearly.completedPerMonth" :key="month" class="flex flex-1 flex-col items-center gap-1">
-							<div
-								class="w-full rounded-t-md bg-primary"
-								:style="{ height: `${(count / maxOf(yearly.completedPerMonth)) * 100}%` }"
-								:title="String(count)"
-							/>
-							<span class="text-[10px] text-on-surface-variant">{{ monthNames[month] }}</span>
-						</div>
-					</div>
-				</div>
-				<div class="card p-5">
-					<p class="mb-3 text-sm text-on-surface-variant">{{ s.stats.timePerMonth }}</p>
-					<div class="flex h-32 items-end gap-1.5">
-						<div v-for="(ms, month) in yearly.durationPerMonth" :key="month" class="flex flex-1 flex-col items-center gap-1">
-							<div
-								class="w-full rounded-t-md bg-tertiary"
-								:style="{ height: `${(ms / maxOf(yearly.durationPerMonth)) * 100}%` }"
-								:title="formatDuration(ms)"
-							/>
-							<span class="text-[10px] text-on-surface-variant">{{ monthNames[month] }}</span>
-						</div>
-					</div>
-				</div>
-			</div>
-
-			<div v-if="yearly.spending.size" class="card p-5 text-sm">
-				<p class="mb-1 text-on-surface-variant">{{ s.stats.spent }}</p>
-				<p v-for="[currency, minor] in yearly.spending" :key="currency" class="text-lg font-medium">
-					{{ formatPrice(minor, currency || undefined) }}
-				</p>
-			</div>
-
-			<EmptyState v-if="yearly.completed.length === 0" face="content" :title="s.stats.emptyYearTitle" :message="s.stats.emptyYearMessage" />
-			<section v-else class="flex flex-col gap-3">
-				<h2 class="section-title">{{ s.stats.finished }}</h2>
-				<ul class="grid grid-cols-[repeat(auto-fill,minmax(6rem,1fr))] gap-3">
-					<li v-for="entry in [...yearly.completed].reverse()" :key="entry.readThroughId">
-						<RouterLink
-							:to="{ name: 'book', params: { id: entry.book.id } }"
-							:title="`${entry.book.title} · ${formatDay(entry.finishedOn)}`"
-						>
-							<BookCover :book="entry.book" />
-						</RouterLink>
-					</li>
-				</ul>
-			</section>
-		</template>
-
-		<template v-else>
-			<EmptyState v-if="allTime.since == null" face="content" :title="s.stats.emptyTitle" :message="s.stats.emptyMessage" />
-			<template v-else>
-				<p class="px-1 text-sm text-on-surface-variant">{{ s.stats.since(formatDay(allTime.since)) }}</p>
-				<div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-					<div class="card p-4">
-						<p class="text-xs text-on-surface-variant">{{ s.stats.finished }}</p>
-						<p class="text-2xl font-medium">{{ allTime.completed.length }}</p>
-						<p class="text-xs text-on-surface-variant">{{ allTime.booksPerMonth.toFixed(1) }} / month</p>
-					</div>
-					<div class="card p-4">
-						<p class="text-xs text-on-surface-variant">{{ s.stats.timeRead }}</p>
-						<p class="text-2xl font-medium">{{ formatDuration(allTime.durationMs) }}</p>
-					</div>
-					<div class="card p-4">
-						<p class="text-xs text-on-surface-variant">{{ s.stats.pages }}</p>
-						<p class="text-2xl font-medium">{{ allTime.pages.toLocaleString() }}</p>
-					</div>
-					<div class="card p-4">
-						<p class="text-xs text-on-surface-variant">{{ s.stats.daysRead }}</p>
-						<p class="text-2xl font-medium">{{ allTime.daysRead }}</p>
-					</div>
-				</div>
-				<div class="card p-5">
-					<ul class="flex flex-col gap-2 text-sm">
-						<li v-for="entry in [...allTime.years].reverse()" :key="entry.year" class="flex items-center gap-4">
-							<span class="w-12 font-medium">{{ entry.year }}</span>
-							<div class="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-highest">
-								<div
-									class="h-full rounded-full bg-primary"
-									:style="{ width: `${(entry.completed / Math.max(1, ...allTime.years.map((y) => y.completed))) * 100}%` }"
-								/>
-							</div>
-							<span class="w-28 text-right text-on-surface-variant">{{ entry.completed }} · {{ formatDuration(entry.durationMs) }}</span>
-						</li>
-					</ul>
-				</div>
-			</template>
-		</template>
+		<StatisticsDay v-if="day" :stats="day" :today="today" @pick="go({ day: $event })" />
+		<StatisticsPeriod v-else-if="periodData" :stats="periodData" :month="range === 'MONTH'" />
+		<StatisticsYear
+			v-else-if="yearly"
+			:stats="yearly"
+			:current-year="dateOf(today).getFullYear()"
+			:current-month="dateOf(today).getMonth()"
+			@set-goal="settingGoal = true"
+		/>
+		<StatisticsAllTime v-else-if="allTime" :stats="allTime" />
 	</div>
+
+	<YearlyGoalDialog
+		v-if="settingGoal"
+		:year="year"
+		:books="yearGoal"
+		@save="(books) => (library.edit((tx) => ops.setYearlyGoal(tx, year, books)), (settingGoal = false))"
+		@close="settingGoal = false"
+	/>
 </template>

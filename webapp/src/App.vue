@@ -5,6 +5,7 @@ import { computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
 import EmptyState from '@/components/EmptyState.vue';
+import HaloMark from '@/components/HaloMark.vue';
 import type { IconName } from '@/lib/icons';
 import '@/lib/theme';
 import { useLibrary } from '@/stores/library';
@@ -15,18 +16,16 @@ const route = useRoute();
 const router = useRouter();
 const library = useLibrary();
 
-const destinations: { name: string; label: string; icon: IconName; active: IconName }[] = [
+// The phone's three top-level destinations. Settings is reached from each one's top bar.
+const destinations: { name: 'library' | 'calendar' | 'statistics'; label: string; icon: IconName; active: IconName }[] = [
 	{ name: 'library', label: s.nav.library, icon: 'shelves', active: 'shelvesFill' },
 	{ name: 'calendar', label: s.nav.calendar, icon: 'calendarMonth', active: 'calendarMonthFill' },
-	{ name: 'statistics', label: s.nav.statistics, icon: 'barChart', active: 'barChartFill' },
-	{ name: 'settings', label: s.nav.settings, icon: 'settings', active: 'settingsFill' },
+	{ name: 'statistics', label: s.nav.statistics, icon: 'leaderboard', active: 'leaderboardFill' },
 ];
 
 const chrome = computed(() => isAuthenticated.value && !route.meta.public && route.name !== 'hardcover');
-const current = computed(() => {
-	if (route.name === 'book' || route.name === 'add') return 'library';
-	return route.name as string;
-});
+// The rail is there for the top-level pages only; one reached from them gets the whole window.
+const tab = computed(() => route.meta.tab);
 
 // The library loads once signed in, and catches up whenever the tab comes back into view.
 watch(
@@ -46,36 +45,40 @@ useEventListener(document, 'visibilitychange', () => {
 	<div v-if="!chrome">
 		<RouterView />
 	</div>
-	<div v-else class="min-h-dvh md:pl-24">
-		<!-- A rail on wide screens, a bar along the bottom on a phone. -->
+	<div v-else class="min-h-dvh" :class="tab ? 'pb-20 md:ps-24 md:pb-0' : ''">
+		<!-- A rail on wide windows, a bar along the bottom on a phone, as NavigationSuiteScaffold. -->
 		<nav
-			class="fixed inset-x-0 bottom-0 z-20 flex justify-around border-t border-outline-variant/40 bg-surface-container pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:right-auto md:w-24 md:flex-col md:justify-start md:gap-3 md:border-t-0 md:pt-6"
+			v-if="tab"
+			class="fixed inset-x-0 bottom-0 z-40 flex justify-around bg-surface-container pb-[env(safe-area-inset-bottom)] md:inset-y-0 md:end-auto md:w-24 md:flex-col md:justify-start md:gap-3 md:bg-surface md:pt-11"
 		>
 			<RouterLink
 				v-for="destination in destinations"
 				:key="destination.name"
 				:to="{ name: destination.name }"
-				class="group flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium text-on-surface-variant md:flex-none md:py-1"
+				class="group flex flex-1 flex-col items-center gap-1 pt-3 pb-4 type-label-medium text-on-surface-variant md:flex-none md:py-1"
+				:aria-current="tab === destination.name ? 'page' : undefined"
 			>
 				<span
-					class="flex h-8 w-16 items-center justify-center rounded-full transition-colors"
-					:class="current === destination.name ? 'bg-secondary-container text-on-secondary-container' : 'group-hover:bg-on-surface/10'"
+					class="flex h-8 w-14 items-center justify-center rounded-full transition-colors"
+					:class="tab === destination.name ? 'bg-secondary-container text-on-secondary-container' : 'group-hover:bg-on-surface/10'"
 				>
-					<AppIcon :name="current === destination.name ? destination.active : destination.icon" />
+					<AppIcon :name="tab === destination.name ? destination.active : destination.icon" />
 				</span>
-				<span :class="current === destination.name ? 'text-on-surface' : ''">{{ destination.label }}</span>
+				<span :class="tab === destination.name ? 'text-secondary' : ''">{{ destination.label }}</span>
 			</RouterLink>
 		</nav>
 
-		<main class="mx-auto max-w-6xl px-4 pt-4 pb-28 md:px-8 md:pb-10">
+		<main>
 			<div
 				v-if="library.loaded && library.error"
-				class="mb-4 rounded-2xl bg-error-container px-4 py-3 text-sm text-on-error-container"
+				class="sticky top-0 z-50 mx-auto max-w-[720px] rounded-b-xl bg-error-container px-4 py-3 type-body-medium text-on-error-container"
 				role="alert"
 			>
 				{{ s.saveFailed(library.error) }}
 			</div>
-			<EmptyState v-if="!library.loaded && library.loading" face="studious" :title="s.loading" />
+			<EmptyState v-if="!library.loaded && library.loading" face="studious" :title="s.loading">
+				<HaloMark loading :aria-label="s.loading" />
+			</EmptyState>
 			<EmptyState v-else-if="!library.loaded" face="dismayed" :title="s.loadFailed.title" :message="library.error ?? undefined">
 				<button class="btn-filled" @click="library.refresh()">{{ s.loadFailed.action }}</button>
 			</EmptyState>

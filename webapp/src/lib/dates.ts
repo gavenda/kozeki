@@ -26,3 +26,26 @@ export function yearOfEpochDay(day: number): number {
 export function monthOfEpochDay(day: number): number {
 	return new Date(day * DAY_MS).getUTCMonth();
 }
+
+/** The day weeks start on in the browser's locale, 0 for Sunday, as the phone takes it from its own; Monday when it does not say. */
+export function firstDayOfWeek(): number {
+	try {
+		const locale = new Intl.Locale(navigator.language) as Intl.Locale & {
+			weekInfo?: { firstDay: number };
+			getWeekInfo?: () => { firstDay: number };
+		};
+		return ((locale.getWeekInfo?.() ?? locale.weekInfo)?.firstDay ?? 1) % 7;
+	} catch {
+		return 1;
+	}
+}
+
+/** The epoch day of a "yyyy-mm-dd" date, or null when it is not one. */
+export function epochDayOfIso(text: string): number | null {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+	return match ? epochDayOfDate(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : null;
+}
+
+export function isoOfEpochDay(day: number): string {
+	return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}

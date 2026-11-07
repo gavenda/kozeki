@@ -1,105 +1,106 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
-import BookCover from '@/components/BookCover.vue';
-import EmptyState from '@/components/EmptyState.vue';
-import { epochDayOfDate, today } from '@/lib/dates';
-import { formatDuration } from '@/lib/format';
+import SettingsButton from '@/components/SettingsButton.vue';
+import TopAppBar from '@/components/TopAppBar.vue';
+import CalendarDayCell from '@/components/calendar/CalendarDayCell.vue';
+import { epochDayOfDate, firstDayOfWeek, isoOfEpochDay, today as todayOf } from '@/lib/dates';
+import { formatDay, formatDuration, formatMonth, isUiBirthday } from '@/lib/format';
 import { calendarDays } from '@/lib/stats';
 import { useStatsInput } from '@/lib/statsInput';
 import { s } from '@/strings';
 
+/**
+ * The book calendar, as the phone's `CalendarScreen`: a month at a time, each day with the cover of
+ * what was read on it. A day with books opens its statistics.
+ */
 const input = useStatsInput();
+const router = useRouter();
 const now = new Date();
 const month = ref({ year: now.getFullYear(), month: now.getMonth() });
+const today = todayOf();
 
 const first = computed(() => epochDayOfDate(month.value.year, month.value.month, 1));
 const next = computed(() => epochDayOfDate(month.value.year, month.value.month + 1, 1));
 const days = computed(() => calendarDays(input.value, first.value, next.value));
-const title = computed(() =>
-	new Date(month.value.year, month.value.month, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-);
+const isCurrent = computed(() => month.value.year === now.getFullYear() && month.value.month === now.getMonth());
 
-// Weeks start on the browser's locale's first day where it says, Monday otherwise.
-const weekStart = (() => {
-	const info = new Intl.Locale(navigator.language) as Intl.Locale & {
-		weekInfo?: { firstDay: number };
-		getWeekInfo?: () => { firstDay: number };
-	};
-	return (info.getWeekInfo?.() ?? info.weekInfo)?.firstDay ?? 1;
-})();
-const weekdays = computed(() =>
-	Array.from({ length: 7 }, (_, index) =>
-		new Date(2024, 0, (weekStart + index) % 7 || 7).toLocaleDateString(undefined, { weekday: 'short' }),
-	),
+const weekStart = firstDayOfWeek();
+const weekdays = Array.from({ length: 7 }, (_, index) =>
+	new Date(2024, 0, 7 + ((weekStart + index) % 7)).toLocaleDateString(undefined, { weekday: 'short' }),
 );
-const blanks = computed(() => (new Date(month.value.year, month.value.month, 1).getDay() - (weekStart % 7) + 7) % 7);
-const length = computed(() => next.value - first.value);
+const blanks = computed(() => (new Date(month.value.year, month.value.month, 1).getDay() - weekStart + 7) % 7);
+// Whole weeks only, the last ending where the month does.
+const cells = computed(() => {
+	const length = next.value - first.value;
+	const total = Math.ceil((blanks.value + length) / 7) * 7;
+	return Array.from({ length: total }, (_, index) => {
+		const date = index - blanks.value + 1;
+		return date >= 1 && date <= length ? first.value + date - 1 : null;
+	});
+});
+
+const summary = computed(() => {
+	const read = [...days.value.values()].filter((books) => books.some((entry) => entry.durationMs > 0 || entry.onPaper)).length;
+	const ms = [...days.value.values()].flat().reduce((sum, entry) => sum + entry.durationMs, 0);
+	if (read === 0) return s.calendar.nothingRead;
+	return ms === 0 ? s.calendar.summaryUntimed(read) : s.calendar.summary(read, formatDuration(ms));
+});
 
 function shift(by: number) {
 	const date = new Date(month.value.year, month.value.month + by, 1);
 	month.value = { year: date.getFullYear(), month: date.getMonth() };
 }
-
-const selected = ref<number | null>(null);
-const selectedBooks = computed(() => (selected.value == null ? [] : (days.value.get(selected.value) ?? [])));
+const openDay = (day: number) => router.push({ name: 'day', params: { date: isoOfEpochDay(day) } });
+const describe = (day: number) =>
+	s.calendar.dayDescription(formatDay(day), (days.value.get(day) ?? []).map((entry) => entry.book.title).join(', '));
 </script>
 
 <template>
-	<div class="flex flex-col gap-4">
-		<div class="flex items-center gap-2">
-			<h1 class="flex-1 text-2xl font-medium">{{ title }}</h1>
-			<button class="icon-btn" :aria-label="s.calendar.previous" @click="shift(-1)"><AppIcon name="arrowBack" /></button>
-			<button class="icon-btn rotate-180" :aria-label="s.calendar.next" @click="shift(1)"><AppIcon name="arrowBack" /></button>
-		</div>
-
-		<div class="grid grid-cols-7 gap-1 text-center text-xs text-on-surface-variant">
-			<span v-for="day in weekdays" :key="day" class="py-1">{{ day }}</span>
-		</div>
-		<div class="grid grid-cols-7 gap-1">
-			<span v-for="blank in blanks" :key="`b${blank}`" />
+	<TopAppBar :title="s.calendar.title" :subtitle="summary" large>
+		<SettingsButton />
+	</TopAppBar>
+	<div class="mx-auto flex max-w-[720px] flex-col gap-2 px-3 pb-6">
+		<div class="flex items-center gap-1">
+			<h2 class="flex-1 ps-1 type-headline-small-em">{{ formatMonth(month.year, month.month) }}</h2>
+			<button v-if="!isCurrent" class="btn-text" @click="month = { year: now.getFullYear(), month: now.getMonth() }">
+				{{ s.stats.today }}
+			</button>
 			<button
-				v-for="index in length"
-				:key="index"
-				class="relative aspect-[2/3] overflow-hidden rounded-lg bg-surface-container text-left"
-				:class="{ 'ring-2 ring-primary': first + index - 1 === today(), 'outline-2 outline-secondary': selected === first + index - 1 }"
-				@click="selected = first + index - 1"
+				class="icon-btn-tonal w-10 bg-secondary-container text-on-secondary-container"
+				:aria-label="s.calendar.previous"
+				:title="s.calendar.previous"
+				@click="shift(-1)"
 			>
-				<template v-if="days.get(first + index - 1)?.length">
-					<div class="absolute inset-0"><BookCover :book="days.get(first + index - 1)![0].book" /></div>
-					<span
-						v-if="days.get(first + index - 1)!.length > 1"
-						class="absolute right-1 bottom-1 rounded-md bg-scrim/60 px-1 text-[10px] text-white"
-					>
-						+{{ days.get(first + index - 1)!.length - 1 }}
-					</span>
-				</template>
-				<span class="absolute top-1 left-1.5 rounded bg-surface/70 px-1 text-xs font-medium">{{ index }}</span>
+				<AppIcon name="keyboardArrowLeft" />
+			</button>
+			<button
+				class="icon-btn-tonal w-10 bg-secondary-container text-on-secondary-container"
+				:disabled="isCurrent"
+				:aria-label="s.calendar.next"
+				:title="s.calendar.next"
+				@click="shift(1)"
+			>
+				<AppIcon name="keyboardArrowRight" />
 			</button>
 		</div>
-
-		<EmptyState v-if="days.size === 0" face="asleep" :title="s.calendar.nothing" />
-
-		<ul v-if="selectedBooks.length" class="flex flex-col gap-2">
-			<li v-for="entry in selectedBooks" :key="entry.book.id">
-				<RouterLink :to="{ name: 'book', params: { id: entry.book.id } }" class="card flex items-center gap-4 p-3">
-					<div class="w-12 shrink-0"><BookCover :book="entry.book" /></div>
-					<div class="min-w-0 flex-1">
-						<p class="truncate font-medium">{{ entry.book.title }}</p>
-						<p class="text-sm text-on-surface-variant">
-							{{
-								[
-									entry.durationMs ? formatDuration(entry.durationMs) : null,
-									entry.onPaper ? s.calendar.onPaper : null,
-									entry.completed ? s.calendar.finished : null,
-								]
-									.filter(Boolean)
-									.join(' · ')
-							}}
-						</p>
-					</div>
-				</RouterLink>
-			</li>
-		</ul>
+		<div class="grid grid-cols-7 gap-1 text-center type-label-medium text-on-surface-variant">
+			<span v-for="day in weekdays" :key="day">{{ day }}</span>
+		</div>
+		<div class="grid grid-cols-7 gap-1">
+			<template v-for="(day, index) in cells" :key="index">
+				<CalendarDayCell
+					v-if="day != null"
+					:day="day - first + 1"
+					:books="days.get(day) ?? []"
+					:today="day === today"
+					:birthday="isUiBirthday(day)"
+					:description="describe(day)"
+					@open="openDay(day)"
+				/>
+				<span v-else />
+			</template>
+		</div>
 	</div>
 </template>

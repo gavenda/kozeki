@@ -52,6 +52,15 @@ function starCounts(rated: number[]): number[] {
 
 const average = (values: number[]) => (values.length ? sum(values) / values.length : null);
 
+/** The currency most of [purchases] were made in, which is the one their chart is drawn in. */
+function mainCurrency(purchases: Book[]): string | null {
+	const counts = new Map<string, number>();
+	for (const book of purchases) counts.set(book.purchaseCurrency ?? '', (counts.get(book.purchaseCurrency ?? '') ?? 0) + 1);
+	let best: string | null = null;
+	for (const [currency, count] of counts) if (best == null || count > counts.get(best)!) best = currency;
+	return best;
+}
+
 function spending(purchases: Book[]): Map<string, number> {
 	const out = new Map<string, number>();
 	for (const book of purchases)
@@ -71,6 +80,9 @@ export interface YearStats {
 	ratingAverage: number | null;
 	ratingCounts: number[];
 	spending: Map<string, number>;
+	/** Monthly spending in [spendingCurrency], the currency most purchases used. */
+	spendingPerMonth: number[];
+	spendingCurrency: string | null;
 }
 
 export function yearStats(input: StatsInput, year: number, goalBooks: number | null): YearStats {
@@ -103,6 +115,14 @@ export function yearStats(input: StatsInput, year: number, goalBooks: number | n
 		ratingAverage: average(rated),
 		ratingCounts: starCounts(rated),
 		spending: spending(purchases),
+		spendingPerMonth: months.map((month) =>
+			sum(
+				purchases
+					.filter((book) => (book.purchaseCurrency ?? '') === mainCurrency(purchases) && monthOfEpochDay(book.purchasedOn!) === month)
+					.map((book) => book.purchasePriceMinor!),
+			),
+		),
+		spendingCurrency: mainCurrency(purchases),
 	};
 }
 
@@ -117,6 +137,9 @@ export interface AllTimeStats {
 	ratingAverage: number | null;
 	ratingCounts: number[];
 	spending: Map<string, number>;
+	/** Yearly spending in [spendingCurrency], from the year of its first purchase to the current one. */
+	spendingPerYear: { year: number; minor: number }[];
+	spendingCurrency: string | null;
 }
 
 export function allTimeStats(input: StatsInput, today: number): AllTimeStats {
@@ -147,6 +170,9 @@ export function allTimeStats(input: StatsInput, today: number): AllTimeStats {
 	for (const row of sessions) timedDays.set(row.day, (timedDays.get(row.day) ?? 0) + row.durationMs);
 	const days = new Set([...[...timedDays].filter(([, ms]) => ms > 0).map(([day]) => day), ...paper.map((row) => row.day)]);
 	const rated = ratings(completed);
+	const purchases = input.books.filter((book) => alive(book) && book.purchasedOn != null && book.purchasePriceMinor != null);
+	const currency = mainCurrency(purchases);
+	const charted = purchases.filter((book) => (book.purchaseCurrency ?? '') === currency);
 
 	return {
 		since,
@@ -158,8 +184,24 @@ export function allTimeStats(input: StatsInput, today: number): AllTimeStats {
 		daysRead: days.size,
 		ratingAverage: average(rated),
 		ratingCounts: starCounts(rated),
-		spending: spending(input.books.filter((book) => alive(book) && book.purchasedOn != null && book.purchasePriceMinor != null)),
+		spending: spending(purchases),
+		spendingPerYear: yearSpan(
+			charted.map((book) => yearOfEpochDay(book.purchasedOn!)),
+			yearOfEpochDay(today),
+		).map((year) => ({
+			year,
+			minor: sum(charted.filter((book) => yearOfEpochDay(book.purchasedOn!) === year).map((book) => book.purchasePriceMinor!)),
+		})),
+		spendingCurrency: currency,
 	};
+}
+
+/** Every year from the first of [years] to [current], or none when there is none to start from. */
+function yearSpan(years: number[], current: number): number[] {
+	if (years.length === 0) return [];
+	const first = Math.min(...years);
+	const last = Math.max(...years, current);
+	return Array.from({ length: last - first + 1 }, (_, index) => first + index);
 }
 
 export interface CalendarBook {
@@ -197,4 +239,202 @@ export function calendarDays(input: StatsInput, fromDay: number, toDay: number):
 export function minutesOn(input: StatsInput, day: number): number {
 	const { sessions } = prepare(input);
 	return Math.round(sum(sessions.filter((row) => row.day === day).map((row) => row.durationMs)) / 60_000);
+}
+
+// ---- Longest books ---------------------------------------------------------------------------
+
+export type LongestKind = 'PHYSICAL' | 'EPUB';
+
+/**
+ * The longest of the [completed] books with their length, longest first, of one [kind]: the
+ * physical ones, which are the books without an EPUB, or the ones with one. A physical copy is as
+ * long as the user says it is; an EPUB without a page count goes by its positions. A book finished
+ * more than once is listed once, and one whose length is not known not at all.
+ */
+export function longestFinished(completed: CompletedBook[], kind: LongestKind, limit = 8): { book: Book; length: number }[] {
+	const seen = new Set<string>();
+	return completed
+		.flatMap(({ book }) => {
+			if (seen.has(book.id)) return [];
+			seen.add(book.id);
+			if ((kind === 'EPUB') !== inLibrary(book)) return [];
+			const length = kind === 'PHYSICAL' ? (book.physicalPageCount ?? book.pageCount) : (book.pageCount ?? book.positionCount);
+			return length && length > 0 ? [{ book, length }] : [];
+		})
+		.sort((a, b) => b.length - a.length)
+		.slice(0, limit);
+}
+
+// ---- Days and periods ------------------------------------------------------------------------
+
+export interface DayReading {
+	day: number;
+	durationMs: number;
+	pages: number;
+}
+
+/** What was read of one book over some period. */
+export interface BookReading {
+	book: Book;
+	durationMs: number;
+	pages: number;
+	startPosition?: number;
+	endPosition?: number;
+	/** Share of the book covered, 0 to 1, from the pages turned. */
+	progressGained: number;
+	/** Read in a physical copy, so untimed, its positions pages of that copy. */
+	physical: boolean;
+}
+
+/** Pages per hour, or null when too little was read to say. */
+export function pagesPerHour(reading: BookReading): number | null {
+	return reading.durationMs >= 60_000 && reading.pages > 0 ? reading.pages / (reading.durationMs / 3_600_000) : null;
+}
+
+export type TimelineEntry =
+	| { kind: 'session'; book: Book; at: number; durationMs: number; chapter?: string }
+	| { kind: 'pages'; book: Book; at: number; startPage: number; endPage: number };
+
+function perDay(sessions: ReadingSession[], paper: PhysicalReading[], start: number, endExclusive: number): DayReading[] {
+	return Array.from({ length: endExclusive - start }, (_, index) => {
+		const day = start + index;
+		const read = sessions.filter((row) => row.day === day);
+		return {
+			day,
+			durationMs: sum(read.map((row) => row.durationMs)),
+			pages: sum(read.map((row) => row.pages ?? 0)) + sum(paper.filter((row) => row.day === day).map(pagesOf)),
+		};
+	});
+}
+
+/** What was read of each book: in the reader, most time first, then on paper, most pages first. */
+function perBook(sessions: ReadingSession[], paper: PhysicalReading[], byId: Map<string, Book>): BookReading[] {
+	const group = <T extends { bookId: string }>(rows: T[]) => {
+		const out = new Map<string, T[]>();
+		for (const row of rows) (out.get(row.bookId) ?? out.set(row.bookId, []).get(row.bookId)!).push(row);
+		return out;
+	};
+	const read = [...group(sessions)].flatMap(([bookId, rows]) => {
+		const book = byId.get(bookId);
+		if (!book) return [];
+		const ordered = [...rows].sort((a, b) => a.startedAt - b.startedAt);
+		const pages = sum(ordered.map((row) => row.pages ?? 0));
+		const ends = ordered.flatMap((row) => (row.endPosition != null ? [row.endPosition] : []));
+		return [
+			{
+				book,
+				durationMs: sum(ordered.map((row) => row.durationMs)),
+				pages,
+				startPosition: ordered.find((row) => row.startPosition != null)?.startPosition,
+				endPosition: ends.length ? Math.max(...ends) : undefined,
+				progressGained: book.positionCount && book.positionCount > 0 ? pages / book.positionCount : 0,
+				physical: false,
+			},
+		];
+	});
+	const onPaper = [...group(paper)].flatMap(([bookId, rows]) => {
+		const book = byId.get(bookId);
+		if (!book) return [];
+		return [
+			{
+				book,
+				durationMs: 0,
+				pages: sum(rows.map(pagesOf)),
+				startPosition: Math.min(...rows.map((row) => row.startPage)),
+				endPosition: Math.max(...rows.map((row) => row.endPage)),
+				progressGained: 0,
+				physical: true,
+			},
+		];
+	});
+	return [...read.sort((a, b) => b.durationMs - a.durationMs), ...onPaper.sort((a, b) => b.pages - a.pages)];
+}
+
+export interface DayStats {
+	day: number;
+	goalMinutes: number;
+	durationMs: number;
+	pages: number;
+	books: BookReading[];
+	timeline: TimelineEntry[];
+	completed: CompletedBook[];
+	/** The week around [day], for the day strip. */
+	week: DayReading[];
+}
+
+/** The week [day] is in, starting on [firstDayOfWeek] (0 Sunday … 6 Saturday, 7 also Sunday). */
+export function weekStartOf(day: number, firstDayOfWeek: number): number {
+	// Epoch day 0, 1 January 1970, was a Thursday.
+	const weekday = (((day + 4) % 7) + 7) % 7;
+	return day - ((weekday - (firstDayOfWeek % 7) + 7) % 7);
+}
+
+export function dayStats(input: StatsInput, day: number, firstDayOfWeek: number, goalMinutes: number): DayStats {
+	const { byId, sessions, paper, completed } = prepare(input);
+	const weekStart = weekStartOf(day, firstDayOfWeek);
+	const today = sessions.filter((row) => row.day === day);
+	// The timeline shows every page entered, the totals only what counts for a book without an EPUB.
+	const entered = input.physical.filter((row) => alive(row) && row.day === day && byId.has(row.bookId));
+	const todayPaper = paper.filter((row) => row.day === day);
+	const timeline: TimelineEntry[] = [
+		...today.map((row) => ({
+			kind: 'session' as const,
+			book: byId.get(row.bookId)!,
+			at: row.startedAt,
+			durationMs: row.durationMs,
+			chapter: row.endChapter ?? row.startChapter,
+		})),
+		...entered.map((row) => ({
+			kind: 'pages' as const,
+			book: byId.get(row.bookId)!,
+			at: row.recordedAt,
+			startPage: row.startPage,
+			endPage: row.endPage,
+		})),
+	].sort((a, b) => a.at - b.at);
+	return {
+		day,
+		goalMinutes,
+		durationMs: sum(today.map((row) => row.durationMs)),
+		pages: sum(today.map((row) => row.pages ?? 0)) + sum(todayPaper.map(pagesOf)),
+		books: perBook(today, todayPaper, byId),
+		timeline,
+		completed: completed.filter((entry) => entry.finishedOn === day),
+		week: perDay(sessions, paper, weekStart, weekStart + 7),
+	};
+}
+
+export interface PeriodStats {
+	start: number;
+	endInclusive: number;
+	goalMinutes: number;
+	days: DayReading[];
+	durationMs: number;
+	pages: number;
+	books: BookReading[];
+	completed: CompletedBook[];
+	/** A day read on paper took no time on record, so its pages tell it was read on. */
+	daysRead: number;
+	goalDaysMet: number;
+}
+
+/** A week or a month: the days from [start] to [endInclusive]. */
+export function periodStats(input: StatsInput, start: number, endInclusive: number, goalMinutes: number): PeriodStats {
+	const { byId, sessions, paper, completed } = prepare(input);
+	const within = (day: number) => day >= start && day <= endInclusive;
+	const known = sessions.filter((row) => within(row.day));
+	const onPaper = paper.filter((row) => within(row.day));
+	const days = perDay(known, onPaper, start, endInclusive + 1);
+	return {
+		start,
+		endInclusive,
+		goalMinutes,
+		days,
+		durationMs: sum(known.map((row) => row.durationMs)),
+		pages: sum(known.map((row) => row.pages ?? 0)) + sum(onPaper.map(pagesOf)),
+		books: perBook(known, onPaper, byId),
+		completed: completed.filter((entry) => within(entry.finishedOn)),
+		daysRead: days.filter((day) => day.durationMs > 0 || day.pages > 0).length,
+		goalDaysMet: days.filter((day) => goalMinutes > 0 && day.durationMs >= goalMinutes * 60_000).length,
+	};
 }

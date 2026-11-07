@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import EmptyState from '@/components/EmptyState.vue';
+import HaloMark from '@/components/HaloMark.vue';
 import { completeHardcoverSignIn } from '@/lib/hardcover';
 import { s } from '@/strings';
 
@@ -15,6 +15,6 @@ onMounted(async () => {
 
 <template>
 	<div class="flex min-h-dvh items-center justify-center">
-		<EmptyState face="studious" :title="s.settings.hardcover" />
+		<HaloMark loading :aria-label="s.source.HARDCOVER" />
 	</div>
 </template>

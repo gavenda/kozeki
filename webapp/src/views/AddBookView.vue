@@ -1,151 +1,209 @@
+<script lang="ts">
+import { reactive } from 'vue';
+import type { BrowseOrder } from '@/lib/catalogue';
+import type { Found } from '@/lib/library';
+import type { MetadataSource } from '@/types';
+
+/** Kept while the tab lives, so coming back from a found book's page finds the results as they were. */
+const kept = reactive({
+	query: '',
+	searched: '',
+	source: null as MetadataSource | null,
+	order: null as BrowseOrder | null,
+	books: [] as Found[],
+	page: 0,
+	hasMore: false,
+	ran: false,
+});
+</script>
+
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useIntersectionObserver } from '@vueuse/core';
+import { computed, ref, toRef } from 'vue';
+import AddSelectedToolbar from '@/components/AddSelectedToolbar.vue';
 import AppIcon from '@/components/AppIcon.vue';
+import DropdownMenu from '@/components/DropdownMenu.vue';
 import EmptyState from '@/components/EmptyState.vue';
-import ModalDialog from '@/components/ModalDialog.vue';
-import { search } from '@/lib/catalogue';
-import { hardcoverSignedIn } from '@/lib/hardcover';
-import * as ops from '@/lib/library';
-import { useLibrary } from '@/stores/library';
+import HaloMark from '@/components/HaloMark.vue';
+import MetadataResultItem from '@/components/MetadataResultItem.vue';
+import TopAppBar from '@/components/TopAppBar.vue';
+import { defaultSource, lookupMessage, providerFor } from '@/lib/catalogue';
+import { useFoundList } from '@/lib/foundList';
+import { hardcoverAvailable } from '@/lib/hardcover';
+import { oneOf, persisted } from '@/lib/persisted';
+import { useFound } from '@/stores/found';
 import { s } from '@/strings';
-import type { Acquisition } from '@/types';
 
-const library = useLibrary();
-const router = useRouter();
+/** Finding a book to add, as the phone's `AddBookScreen`: a search of a catalogue, or one of its lists. */
+const foundStore = useFound();
+kept.source ??= defaultSource();
+const source = computed(() => kept.source!);
+const provider = computed(() => providerFor(source.value));
+const sources = computed<MetadataSource[]>(() => (hardcoverAvailable() ? ['HARDCOVER', 'GOOGLE_BOOKS'] : ['GOOGLE_BOOKS']));
+const display = persisted<'LIST' | 'COVERS'>('add.display', 'LIST', oneOf(['LIST', 'COVERS'] as const));
 
-const query = ref('');
-const results = ref<ops.Found[] | null>(null);
-const searching = ref(false);
-const failed = ref<string | null>(null);
-const sourceName = hardcoverSignedIn() ? 'Hardcover' : 'Google Books';
+const loading = ref(false);
+const error = ref<string | null>(null);
+const list = useFoundList(toRef(kept, 'books'));
 
-async function run() {
-	if (!query.value.trim()) return;
-	searching.value = true;
-	failed.value = null;
+async function fetchPage(page: number) {
+	const p = provider.value;
+	return kept.order && !kept.searched ? p.browse!(kept.order, page) : p.search(kept.searched, page);
+}
+
+async function load(page: number) {
+	if (loading.value) return;
+	loading.value = true;
+	error.value = null;
 	try {
-		results.value = await search(query.value);
+		const result = await fetchPage(page);
+		foundStore.remember(result.books);
+		const seen = new Set(page === 1 ? [] : kept.books.map((book) => book.sourceId));
+		kept.books = [...(page === 1 ? [] : kept.books), ...result.books.filter((book) => !seen.has(book.sourceId))];
+		kept.page = page;
+		kept.hasMore = result.hasMore;
+		kept.ran = true;
 	} catch (e) {
-		failed.value = e instanceof Error ? e.message : String(e);
+		error.value = lookupMessage(e);
 	} finally {
-		searching.value = false;
+		loading.value = false;
 	}
 }
 
-const added = computed(() => new Set(library.books.map((book) => `${book.source}|${book.sourceId}`)));
-
-function add(found: ops.Found, acquisition: Acquisition) {
-	const id = library.edit((tx) => ops.addFound(tx, found, acquisition));
-	void router.push({ name: 'book', params: { id } });
+function search() {
+	const query = kept.query.trim();
+	if (!query) return;
+	kept.searched = query;
+	kept.order = null;
+	list.clear();
+	void load(1);
+}
+function browse(order: BrowseOrder) {
+	kept.order = order;
+	kept.searched = '';
+	kept.query = '';
+	list.clear();
+	void load(1);
+}
+function pickSource(next: MetadataSource) {
+	if (next === kept.source) return;
+	kept.source = next;
+	kept.order = null;
+	kept.books = [];
+	kept.ran = false;
+	error.value = null;
+	list.clear();
+	if (kept.searched) void load(1);
+}
+function clearQuery() {
+	kept.query = '';
 }
 
-const manual = ref<ops.Details | null>(null);
-const authorsText = ref('');
-function openManual() {
-	manual.value = {
-		title: query.value,
-		subtitle: '',
-		authors: [],
-		description: '',
-		publisher: '',
-		series: '',
-		seriesNumber: null,
-		publishedDate: '',
-		pageCount: null,
-		isbn13: '',
-	};
-	authorsText.value = '';
-}
-function saveManual(acquisition: Acquisition) {
-	const details = { ...manual.value!, authors: authorsText.value.split('\n') };
-	const id = library.edit((tx) => ops.addManually(tx, details, acquisition));
-	void router.push({ name: 'book', params: { id } });
-}
+const sentinel = ref<HTMLElement>();
+useIntersectionObserver(sentinel, ([entry]) => {
+	if (entry?.isIntersecting && kept.hasMore && !loading.value && !error.value) void load(kept.page + 1);
+});
+const showLists = computed(() => !kept.query.trim() && provider.value.browseOrders.length > 0);
 </script>
 
 <template>
-	<div class="flex flex-col gap-4">
-		<div class="flex items-center gap-2">
-			<button class="icon-btn" :aria-label="s.nav.library" @click="router.back()"><AppIcon name="arrowBack" /></button>
-			<form
-				class="flex h-12 flex-1 items-center gap-3 rounded-full bg-surface-container-high px-4 text-on-surface-variant"
-				@submit.prevent="run"
-			>
-				<AppIcon name="search" />
+	<TopAppBar :title="s.add.title" :back="{ name: 'library' }" always-title>
+		<DropdownMenu v-if="showLists">
+			<template #trigger="{ toggle }">
+				<button
+					class="icon-btn-tonal bg-secondary-container text-on-secondary-container"
+					:aria-label="s.add.lists"
+					:title="s.add.lists"
+					@click="toggle"
+				>
+					<AppIcon name="sort" />
+				</button>
+			</template>
+			<template #default="{ close }">
+				<button
+					v-for="order in provider.browseOrders"
+					:key="order"
+					class="menu-item"
+					:class="{ 'text-primary': order === kept.order }"
+					@click="(browse(order), close())"
+				>
+					<span class="flex-1">{{ s.add.browse[order] }}</span>
+					<AppIcon v-if="order === kept.order" name="check" />
+				</button>
+			</template>
+		</DropdownMenu>
+		<button
+			class="icon-btn"
+			:aria-label="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
+			:title="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
+			@click="display = display === 'COVERS' ? 'LIST' : 'COVERS'"
+		>
+			<AppIcon :name="display === 'COVERS' ? 'viewListFill' : 'gridViewFill'" />
+		</button>
+	</TopAppBar>
+
+	<div class="mx-auto max-w-[720px] pb-28">
+		<form class="px-4 py-2" @submit.prevent="search">
+			<label class="flex h-14 items-center gap-2 rounded-full bg-surface-container-high ps-2 pe-2 text-on-surface-variant">
+				<button class="icon-btn" :aria-label="s.action.search" type="submit"><AppIcon name="search" /></button>
 				<input
-					v-model="query"
+					v-model="kept.query"
 					type="search"
 					:placeholder="s.add.search"
-					class="w-full bg-transparent text-on-surface outline-none"
+					class="w-full bg-transparent type-body-large text-on-surface outline-none [&::-webkit-search-cancel-button]:hidden"
 					autofocus
 				/>
-			</form>
-		</div>
-		<div class="flex items-center justify-between px-1 text-xs text-on-surface-variant">
-			<span>{{ s.add.source(sourceName) }}</span>
-			<button class="btn-text h-8" @click="openManual">{{ s.add.manual }}</button>
+				<button v-if="kept.query" type="button" class="icon-btn" :aria-label="s.search.clear" @click="clearQuery">
+					<AppIcon name="close" />
+				</button>
+			</label>
+		</form>
+		<div class="flex gap-2 overflow-x-auto px-4 pb-2">
+			<button
+				v-for="option in sources"
+				:key="option"
+				class="chip shrink-0"
+				:class="{ 'chip-on': option === source }"
+				@click="pickSource(option)"
+			>
+				<AppIcon v-if="option === source" name="check" :size="18" />{{ s.source[option] }}
+			</button>
 		</div>
 
-		<EmptyState v-if="searching" face="studious" :title="s.add.promptTitle" />
-		<EmptyState v-else-if="failed" face="dismayed" :title="s.add.errorTitle" :message="failed" />
-		<EmptyState v-else-if="results === null" face="studious" :title="s.add.promptTitle" :message="s.add.promptMessage" />
-		<EmptyState v-else-if="results.length === 0" face="worried" :title="s.add.noResultsTitle" :message="s.add.noResultsMessage" />
-
-		<ul v-else class="flex flex-col gap-3">
-			<li v-for="found in results" :key="found.sourceId" class="card flex gap-4 p-4">
-				<img
-					v-if="found.coverUrl"
-					:src="found.coverUrl"
-					alt=""
-					class="aspect-[2/3] w-20 shrink-0 rounded-lg object-cover"
-					referrerpolicy="no-referrer"
+		<EmptyState v-if="error && kept.page === 0" face="dismayed" icon="errorFill" :title="s.add.errorTitle" :message="error">
+			<button class="btn-filled" @click="load(1)">{{ s.action.retry }}</button>
+		</EmptyState>
+		<div v-else-if="(loading && kept.page === 0) || (loading && !kept.books.length)" class="flex justify-center py-16">
+			<HaloMark loading />
+		</div>
+		<EmptyState v-else-if="!kept.ran" face="studious" icon="travelExplore" :title="s.add.promptTitle" :message="s.add.promptMessage" />
+		<EmptyState
+			v-else-if="kept.books.length === 0"
+			face="worried"
+			icon="searchOff"
+			:title="s.add.noResultsTitle"
+			:message="s.add.noResultsMessage"
+		/>
+		<template v-else>
+			<p v-if="source === 'GOOGLE_BOOKS'" class="px-4 pb-2 type-label-small text-on-surface-variant">{{ s.add.attributionGoogle }}</p>
+			<div :class="display === 'COVERS' ? 'cover-grid' : 'flex flex-col'">
+				<MetadataResultItem
+					v-for="book in kept.books"
+					:key="book.sourceId"
+					:found="book"
+					:owned="list.ownedOf(book)"
+					:layout="display === 'COVERS' ? 'cover' : 'row'"
+					:selected="list.isPicked(book)"
+					:selecting="list.selection.value.length > 0"
+					@open="list.open(book)"
+					@toggle="list.toggle(book)"
 				/>
-				<div v-else class="aspect-[2/3] w-20 shrink-0 rounded-lg bg-surface-container-highest" />
-				<div class="flex min-w-0 flex-1 flex-col gap-1">
-					<p class="font-medium">{{ found.title }}</p>
-					<p class="text-sm text-on-surface-variant">{{ found.authors.join(', ') }}</p>
-					<p class="text-xs text-on-surface-variant">
-						{{ [found.series, found.publishedDate, found.pageCount ? `${found.pageCount} pages` : null].filter(Boolean).join(' · ') }}
-					</p>
-					<div class="mt-auto flex flex-wrap gap-2 pt-2">
-						<span v-if="added.has(`${found.source}|${found.sourceId}`)" class="text-sm text-primary">{{ s.add.added }}</span>
-						<template v-else>
-							<button class="btn-tonal h-9" @click="add(found, 'WISHLIST')">
-								<AppIcon name="bookmarkAdd" :size="18" />{{ s.add.wishlist }}
-							</button>
-							<button class="btn-text h-9" @click="add(found, 'PURCHASED')">
-								<AppIcon name="shoppingBag" :size="18" />{{ s.add.owned }}
-							</button>
-						</template>
-					</div>
-				</div>
-			</li>
-		</ul>
-
-		<ModalDialog v-if="manual" :title="s.add.manualTitle" @close="manual = null">
-			<div class="grid grid-cols-2 gap-3">
-				<label class="col-span-2"
-					><span class="label">{{ s.book.fields.title }}</span
-					><input v-model="manual.title" class="field"
-				/></label>
-				<label class="col-span-2"
-					><span class="label">{{ s.book.fields.authors }}</span
-					><textarea v-model="authorsText" rows="2" class="field" />
-				</label>
-				<label
-					><span class="label">{{ s.book.fields.pageCount }}</span
-					><input v-model.number="manual.pageCount" type="number" class="field"
-				/></label>
-				<label
-					><span class="label">{{ s.book.fields.isbn }}</span
-					><input v-model="manual.isbn13" class="field"
-				/></label>
 			</div>
-			<template #actions>
-				<button class="btn-text" :disabled="!manual.title.trim()" @click="saveManual('PURCHASED')">{{ s.add.owned }}</button>
-				<button class="btn-filled" :disabled="!manual.title.trim()" @click="saveManual('WISHLIST')">{{ s.add.wishlist }}</button>
-			</template>
-		</ModalDialog>
+			<div ref="sentinel" class="flex justify-center py-6">
+				<HaloMark v-if="loading" loading :size="32" />
+				<button v-else-if="error" class="btn-text" @click="load(kept.page + 1)">{{ s.action.retry }}</button>
+			</div>
+		</template>
 	</div>
+	<AddSelectedToolbar v-if="list.selection.value.length" :count="list.selection.value.length" @clear="list.clear" @add="list.addSelected" />
 </template>

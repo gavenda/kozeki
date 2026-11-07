@@ -291,6 +291,27 @@ export function setPurchase(tx: Tx, bookId: string, purchase: Purchase): void {
 	}
 }
 
+/** A purchase with nothing on record of it: marked as bought today, or taken back. */
+export const NO_PURCHASE = { priceMinor: null, currency: null, purchasedOn: null, location: null, memo: null } as const;
+
+/** What [book] has on record of its purchase, to keep when it is marked purchased again. */
+export function purchaseOf(book: Book): Purchase {
+	return {
+		acquisition: 'PURCHASED',
+		priceMinor: book.purchasePriceMinor ?? null,
+		currency: book.purchaseCurrency ?? null,
+		purchasedOn: book.purchasedOn ?? null,
+		location: book.purchaseLocation ?? null,
+		memo: book.purchaseMemo ?? null,
+	};
+}
+
+/** Saves a purchase typed in, and its currency as the one to offer next time, as the phone does. */
+export function recordPurchase(tx: Tx, bookId: string, purchase: Purchase): void {
+	setPurchase(tx, bookId, purchase);
+	if (purchase.priceMinor != null && purchase.currency) setSetting(tx, 'lastCurrency', purchase.currency);
+}
+
 export interface Details {
 	title: string;
 	subtitle: string;
@@ -331,6 +352,12 @@ export function setCover(tx: Tx, bookId: string, coverFile: string): void {
 	if (book) tx.touch('books', book, { coverFile, customCover: true });
 }
 
+/** Drops the user's own cover, so the catalogue's shows again. */
+export function removeCover(tx: Tx, bookId: string): void {
+	const book = tx.get('books', bookId);
+	if (book) tx.touch('books', book, { coverFile: undefined, customCover: false });
+}
+
 /** Removes the book and everything recorded of it. */
 export function deleteBook(tx: Tx, bookId: string): void {
 	const book = tx.get('books', bookId);
@@ -343,20 +370,26 @@ export function deleteBook(tx: Tx, bookId: string): void {
 
 /** What the catalogue says about a book, for adding it. */
 export interface Found {
-	source: Book['source'];
+	source: NonNullable<Book['source']>;
 	sourceId: string;
 	title: string;
 	subtitle?: string;
 	authors: string[];
+	/** The catalogue's own ids for the authors, for their pages. */
+	authorRefs?: { id: string; name: string }[];
 	description?: string;
 	publisher?: string;
 	series?: string;
 	seriesNumber?: number;
 	publishedDate?: string;
 	pageCount?: number;
+	language?: string;
+	isbn10?: string;
 	isbn13?: string;
 	categories?: string[];
 	coverUrl?: string;
+	/** The catalogue's average rating, out of 5. Shown, never stored. */
+	averageRating?: number;
 	infoUrl?: string;
 }
 
@@ -370,13 +403,15 @@ export function addFound(tx: Tx, found: Found, acquisition: Acquisition): string
 		title: found.title,
 		subtitle: found.subtitle,
 		authors: found.authors,
-		authorRefs: [],
+		authorRefs: found.authorRefs ?? [],
 		description: found.description,
 		publisher: found.publisher,
 		series: found.series,
 		seriesNumber: found.series ? found.seriesNumber : undefined,
 		publishedDate: found.publishedDate,
 		pageCount: found.pageCount,
+		language: found.language,
+		isbn10: found.isbn10,
 		isbn13: found.isbn13,
 		categories: found.categories ?? [],
 		coverUrl: found.coverUrl,
@@ -458,6 +493,13 @@ export function setOnShelf(tx: Tx, shelfId: string, bookId: string, on: boolean)
 	} else if (existing && alive(existing)) {
 		tx.remove('shelfBooks', existing);
 	}
+}
+
+/** Puts [bookIds] on the shelves [add] and on new ones named [create], and takes them off [remove]. */
+export function setShelves(tx: Tx, bookIds: string[], add: string[], remove: string[], create: string[] = []): void {
+	for (const shelfId of [...add, ...create.map((name) => createShelf(tx, name))])
+		bookIds.forEach((id) => setOnShelf(tx, shelfId, id, true));
+	for (const shelfId of remove) bookIds.forEach((id) => setOnShelf(tx, shelfId, id, false));
 }
 
 // ---- Goals and settings ----------------------------------------------------------------------

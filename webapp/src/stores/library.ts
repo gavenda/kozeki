@@ -26,6 +26,8 @@ export const useLibrary = defineStore('library', () => {
 	const loaded = ref(false);
 	const loading = ref(false);
 	const error = ref<string | null>(null);
+	/** When an exchange with the server last went through, for Settings. */
+	const lastSyncedAt = ref<number | null>(null);
 	let queue: Promise<void> = Promise.resolve();
 
 	/**
@@ -60,6 +62,7 @@ export const useLibrary = defineStore('library', () => {
 		const answer = await apiJson<SyncResponse>('/sync', { cursor: cursor.value, push });
 		take(answer.rows as Changes);
 		cursor.value = answer.cursor;
+		lastSyncedAt.value = Date.now();
 		return answer.more;
 	}
 
@@ -129,10 +132,47 @@ export const useLibrary = defineStore('library', () => {
 	const books = computed<Book[]>(() => [...tables.books.values()].filter(alive));
 	const shelves = computed(() => [...tables.shelves.values()].filter(alive).sort((a, b) => a.name.localeCompare(b.name)));
 
+	/** The books on each shelf, by shelf. */
+	const members = computed(() => {
+		const out = new Map<string, Set<string>>();
+		for (const row of tables.shelfBooks.values()) {
+			if (!alive(row)) continue;
+			(out.get(row.shelfId) ?? out.set(row.shelfId, new Set()).get(row.shelfId)!).add(row.bookId);
+		}
+		return out;
+	});
+	/** How many of [bookIds] each shelf holds, for the shelf checklist. */
+	const shelfCounts = (bookIds: string[]) =>
+		new Map(shelves.value.map((shelf) => [shelf.id, bookIds.filter((id) => members.value.get(shelf.id)?.has(id)).length]));
+
+	/** The places books were bought at before, offered again in the purchase dialog. */
+	const purchaseLocations = computed(() =>
+		[...new Set(books.value.flatMap((book) => (book.purchaseLocation ? [book.purchaseLocation] : [])))].sort((a, b) => a.localeCompare(b)),
+	);
+
 	function setting<T>(key: string, fallback: T): T {
 		const row = tables.settings.get(key) as Setting | undefined;
 		return (row?.value as T | undefined) ?? fallback;
 	}
 
-	return { tables, cursor, loaded, loading, error, refresh, edit, settled, books, shelves, setting };
+	const lastCurrency = computed(() => setting<string>('lastCurrency', 'USD'));
+
+	return {
+		tables,
+		cursor,
+		loaded,
+		loading,
+		error,
+		lastSyncedAt,
+		refresh,
+		edit,
+		settled,
+		books,
+		shelves,
+		members,
+		shelfCounts,
+		purchaseLocations,
+		lastCurrency,
+		setting,
+	};
 });

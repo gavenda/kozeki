@@ -21,14 +21,18 @@ Run `bun run typecheck` and `bun run test` before calling a change done.
 - **Nothing is hard-deleted.** `deleted_at` is a tombstone, so deletions sync like edits.
 - **Every query is scoped by `user_id`**, the Auth0 subject from the verified token (`middleware/auth.ts`), never from the request.
 - **Covers** are R2 objects at `covers/<subject>/<file>`. File names are unique per save (`<bookId>-<millis>.jpg`, as the phone names them), so objects never change and can be cached for good. Replaced covers are not cleaned up.
-- **Google Books** searches go through `GET /api/books/search`, which adds the `GOOGLE_BOOKS_API_KEY` secret: keyless requests share a small per-address allowance and answer 429, and the phone's key is locked to the Android app.
-- **Hardcover** for the web is its own OAuth client with PKCE; the token stays in the browser. The Worker only forwards `/token`, `/revoke` and `/graphql`, because Hardcover does not answer other origins.
+- **Google Books** goes through `GET /api/books/search` (paged with `start`) and `GET /api/books/volumes/:id`, which add the `GOOGLE_BOOKS_API_KEY` secret: keyless requests share a small per-address allowance and answer 429, and the phone's key is locked to the Android app.
+- **Hardcover** for the web is its own OAuth client with PKCE; the token stays in the browser. It asks for the same scopes as the phone (`app/build.gradle.kts`). The Worker only forwards `/token`, `/revoke` and `/graphql`, because Hardcover does not answer other origins.
 
 ## Browser app
 
 - `stores/library.ts` loads the whole library on sign-in and pulls again whenever the tab comes back into view. It is online only: the PWA caches the app shell, never the data.
 - `lib/library.ts` is a port of the phone's write rules (`LibraryRepository`, `ShelfRepository`): changing state opens and closes read-throughs, deleting a book tombstones its children, and so on. Each operation runs in a `Tx` and returns the rows it changed, which `edit()` shows at once and pushes. Keep it in step with the Kotlin when either changes; `lib/library.spec.ts` covers the rules.
 - `lib/stats.ts` ports `StatsRepository`: nothing is stored aggregated. Days are epoch days in the browser's zone, as the phone stores them in its own.
+- **It looks like the phone on a wide window.** Pages are one centred column, 720px (statistics 840px), as the Android screens cap theirs; only the library grid and the add-book covers fill the width. The rail has the phone's three tabs and shows on them only; Settings is the gear in their top bars, and every other page gets the whole window and a back arrow.
+- **Components mirror the Kotlin.** A component takes the name of the composable it ports (`EmptyState`, `Portrait`, `ColumnChart`, `GoalRing`, `ButtonGroup`, `MetadataResultItem`…), and a screen's parts sit in a folder of its own (`components/library`, `book`, `statistics`, `calendar`). When a screen changes on the phone, its counterpart here is easy to find; keep the two alike. Type is set by Material role (`type-title-medium`), defined in `style.css`.
+- `lib/libraryView.ts` ports the library's filters, orders and groups (`LibraryViewModel.kt`, `Shelves.kt`); `lib/hardcover.ts` and `lib/catalogue.ts` port the catalogue providers, with the GraphQL copied from `HardcoverProvider.kt`; `lib/placeholder.ts` draws the bound-book cover as `BookCover.kt` does. `libraryView`, `isbn`, `chart` and `placeholder` have specs.
+- `stores/found.ts` keeps the catalogue books met in this tab, so a found book's page opens at once; opened afresh, the page asks the catalogue again. The library's filter, sort and layout are kept per browser (`lib/persisted.ts`), as the phone keeps them per device.
 - Copy lives in `src/strings.ts` and follows the voice in BRANDING.md; where the phone shows the same thing, the words match `strings.xml`.
 - Colours in `src/style.css` are printed from the Android theme (see BRANDING.md, "Colour"). Use the role classes, never palette scales.
 - Icons are Material Symbols paths in `lib/icons.ts`, from the same source as the Android drawables (see the root CLAUDE.md).
