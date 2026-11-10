@@ -20,6 +20,7 @@ import * as ops from '@/lib/library';
 import { useTheme, type ThemeMode } from '@/lib/theme';
 import { useLibrary } from '@/stores/library';
 import { s } from '@/strings';
+import { Button, Slider } from 'tailwind-material3';
 
 /**
  * Settings, as the phone's `SettingsScreen` has them, less what only a phone has: comics, backups,
@@ -152,15 +153,16 @@ const birthday = isUiBirthday(today());
 			<div class="setting-card">
 				<SettingRow icon="timerFill" :title="s.settings.dailyGoal" :subtitle="formatDuration(STOPS[dragged] * 60_000)" />
 				<div class="px-5 pb-3">
-					<input
-						v-model.number="dragged"
-						type="range"
-						min="0"
+					<Slider
+						v-model="dragged"
+						:min="0"
 						:max="STOPS.length - 1"
-						step="1"
-						class="w-full accent-primary"
-						:aria-label="s.settings.dailyGoal"
-						:aria-valuetext="formatDuration(STOPS[dragged] * 60_000)"
+						:step="1"
+						stops
+						value-indicator
+						:format="(stop: number) => formatDuration(STOPS[stop] * 60_000)"
+						:label="s.settings.dailyGoal"
+						class="w-full"
 						@change="setDailyGoal"
 					/>
 				</div>
@@ -193,8 +195,8 @@ const birthday = isUiBirthday(today());
 	<ModalDialog v-if="signingOut" :title="s.settings.accountSignOutTitle" icon="logout" icon-class="text-error" @close="signingOut = false">
 		<p>{{ s.settings.accountSignOutMessage }}</p>
 		<template #actions="{ close }">
-			<button class="btn-text" @click="close">{{ s.action.cancel }}</button>
-			<button class="btn-filled" @click="logout({ logoutParams: { returnTo: `${origin}/` } })">{{ s.settings.signOut }}</button>
+			<Button variant="text" @click="close">{{ s.action.cancel }}</Button>
+			<Button @click="logout({ logoutParams: { returnTo: `${origin}/` } })">{{ s.settings.signOut }}</Button>
 		</template>
 	</ModalDialog>
 	<ModalDialog
@@ -206,15 +208,15 @@ const birthday = isUiBirthday(today());
 	>
 		<p>{{ s.settings.hardcoverSignOutMessage }}</p>
 		<template #actions="{ close }">
-			<button class="btn-text" @click="close">{{ s.action.cancel }}</button>
-			<button class="btn-filled" @click="(hardcoverSignOut(), (hardcover = false), close())">{{ s.settings.signOut }}</button>
+			<Button variant="text" @click="close">{{ s.action.cancel }}</Button>
+			<Button @click="(hardcoverSignOut(), (hardcover = false), close())">{{ s.settings.signOut }}</Button>
 		</template>
 	</ModalDialog>
 	<ModalDialog v-if="pastDay" :title="s.settings.pastDayTitle" @close="pastDay = false">
-		<template #icon><Portrait face="dumbfounded" :width="96" /></template>
+		<template #portrait><Portrait face="dumbfounded" :width="96" /></template>
 		<p class="text-center">{{ s.settings.pastDayMessage }}</p>
 		<template #actions="{ close }"
-			><button class="btn-text" @click="close">{{ s.action.close }}</button></template
+			><Button variant="text" @click="close">{{ s.action.close }}</Button></template
 		>
 	</ModalDialog>
 	<YearlyGoalDialog

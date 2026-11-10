@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Card } from 'tailwind-material3';
+import { RouterLink } from 'vue-router';
 import { computed } from 'vue';
 import BookCover from '@/components/BookCover.vue';
 import { formatDuration } from '@/lib/format';
@@ -21,9 +23,12 @@ const lines = computed(() => {
 </script>
 
 <template>
-	<RouterLink
+	<Card
+		:as="RouterLink"
 		:to="{ name: 'book', params: { id: reading.book.id } }"
-		class="card flex gap-3 p-3 transition-colors hover:bg-surface-container-high"
+		interactive
+		:padded="false"
+		class="flex! gap-3 bg-surface-container! p-3"
 	>
 		<span class="w-16 shrink-0"><BookCover :book="reading.book" :show-title="false" rounded="rounded-lg" /></span>
 		<span class="flex min-w-0 flex-col gap-0.5">
@@ -33,5 +38,5 @@ const lines = computed(() => {
 			}}</span>
 			<span v-for="line in lines" :key="line" class="type-body-small text-on-surface-variant">{{ line }}</span>
 		</span>
-	</RouterLink>
+	</Card>
 </template>

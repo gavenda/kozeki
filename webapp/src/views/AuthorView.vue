@@ -13,6 +13,7 @@ import { useFoundList } from '@/lib/foundList';
 import type { Found } from '@/lib/library';
 import { useFound } from '@/stores/found';
 import { s } from '@/strings';
+import { Button, IconButton } from 'tailwind-material3';
 
 /** An author's page on Hardcover, as the phone's `AuthorScreen`: who they are, then their books, most read first. */
 const props = defineProps<{ id: string }>();
@@ -63,26 +64,26 @@ const details = computed(() => {
 	const years = a.bornYear && a.deathYear ? s.author.years(a.bornYear, a.deathYear) : a.bornYear ? s.author.born(a.bornYear) : null;
 	return [years, a.location, a.booksCount ? s.bookCount(a.booksCount) : null].filter(Boolean).join(' · ');
 });
+/** Opens [url] in a new tab, as the phone hands a link to the browser. */
+const openInNew = (url: string | undefined) => url && window.open(url, '_blank', 'noopener');
 </script>
 
 <template>
 	<TopAppBar :title="author?.name ?? ''" :back="{ name: 'library' }" :title-after="100">
-		<a
+		<IconButton
 			v-if="author?.infoUrl"
-			:href="author.infoUrl"
-			target="_blank"
-			rel="noopener"
-			class="icon-btn"
-			:aria-label="s.book.viewInBrowser"
+			variant="standard"
+			:label="s.book.viewInBrowser"
 			:title="s.book.viewInBrowser"
+			@click="openInNew(author.infoUrl)"
 		>
 			<AppIcon name="openInNew" />
-		</a>
+		</IconButton>
 	</TopAppBar>
 	<div class="mx-auto max-w-[720px] pb-28">
 		<div v-if="loading && page === 0" class="flex justify-center py-24"><HaloMark loading /></div>
 		<EmptyState v-else-if="error && page === 0" face="dismayed" icon="errorFill" :title="s.author.errorTitle" :message="error">
-			<button class="btn-filled" @click="load(1)">{{ s.action.retry }}</button>
+			<Button @click="load(1)">{{ s.action.retry }}</Button>
 		</EmptyState>
 		<EmptyState v-else-if="!author" face="dumbfounded" icon="personFill" :title="s.author.notFoundTitle" :message="s.author.notFound" />
 		<template v-else>
@@ -130,7 +131,7 @@ const details = computed(() => {
 				/>
 				<div ref="sentinel" class="flex justify-center py-6">
 					<HaloMark v-if="loading" loading :size="32" />
-					<button v-else-if="error" class="btn-text" @click="load(page + 1)">{{ s.action.retry }}</button>
+					<Button variant="text" v-else-if="error" @click="load(page + 1)">{{ s.action.retry }}</Button>
 				</div>
 			</template>
 		</template>

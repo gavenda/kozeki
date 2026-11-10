@@ -6,11 +6,12 @@ import { canChangeState, canFavorite, READING_STATE_ORDER, STATE_ICON, stateOf }
 import { inLibrary } from '@/lib/library';
 import { s } from '@/strings';
 import type { Book, ReadingState } from '@/types';
+import { Fab, IconButton, MenuGroup, MenuItem, Toolbar } from 'tailwind-material3';
 
 /**
  * Floats over the grid while books are picked, as the phone's `SelectionToolbar`: how many, and
  * what can be done to them together. Making them favourites is the button beside it; the rest is in
- * its menu.
+ * its menu. It is Material's floating toolbar with the favourite FAB beside it.
  */
 const props = defineProps<{ books: Book[]; allSelected: boolean }>();
 const emit = defineEmits<{
@@ -40,74 +41,62 @@ const toWishlist = computed(() => purchased.value.every((book) => !inLibrary(boo
 
 <template>
 	<div class="fixed inset-x-0 bottom-24 z-40 flex justify-center px-4 md:bottom-6">
-		<div class="flex items-center gap-2">
-			<div class="flex h-16 items-center rounded-full bg-surface-container px-2 shadow-lg">
-				<button class="icon-btn" :aria-label="s.selection.clear" :title="s.selection.clear" @click="emit('clear')">
-					<AppIcon name="close" />
-				</button>
-				<span class="ps-1 pe-3 type-title-medium" :aria-label="s.selection.count(books.length)">{{ books.length }}</span>
-				<button
-					class="icon-btn"
-					:disabled="allSelected"
-					:aria-label="s.selection.selectAll"
-					:title="s.selection.selectAll"
-					@click="emit('selectAll')"
-				>
-					<AppIcon name="selectAll" />
-				</button>
-				<button class="icon-btn" :aria-label="s.shelves.addTo" :title="s.shelves.addTo" @click="emit('shelves')">
-					<AppIcon name="shelves" />
-				</button>
-				<DropdownMenu>
-					<template #trigger="{ toggle }">
-						<button class="icon-btn" :aria-label="s.book.moreActions" :title="s.book.moreActions" @click="toggle">
-							<AppIcon name="moreVert" />
-						</button>
-					</template>
-					<template #default="{ close }">
-						<template v-if="changeable.length">
-							<button
-								v-for="state in READING_STATE_ORDER.filter((state) => state !== shared)"
-								:key="state"
-								class="menu-item"
-								@click="(emit('state', state), close())"
-							>
-								<AppIcon :name="STATE_ICON[state]" />{{ s.book.markAs(s.state[state]) }}
-							</button>
-							<hr class="my-2 border-outline-variant" />
-						</template>
-						<!-- One book gets the full details; several are simply marked as bought today. -->
-						<button v-if="single || notPurchased.length" class="menu-item" @click="(emit('purchase'), close())">
-							<AppIcon name="purchasedBookFill" />
-							{{ single?.acquisition === 'PURCHASED' ? s.purchase.dialogTitle : s.purchase.markPurchased }}
-						</button>
-						<button v-if="purchased.length" class="menu-item" @click="(emit('unpurchase'), close())">
-							<AppIcon :name="toWishlist ? 'kidStar' : 'purchasedBookOffFill'" />
-							{{ toWishlist ? s.purchase.moveToWishlist : s.purchase.markNotPurchased }}
-						</button>
-						<hr class="my-2 border-outline-variant" />
-						<button class="menu-item" @click="(emit('remove'), close())"><AppIcon name="deleteFill" />{{ s.action.remove }}</button>
-					</template>
-				</DropdownMenu>
-			</div>
-			<button
-				v-if="favoritable.length"
-				class="flex size-14 cursor-pointer items-center justify-center rounded-2xl bg-primary-container text-on-primary-container shadow-lg hover:brightness-110"
-				:aria-label="allFavorite ? s.favorite.remove : s.favorite.add"
-				:title="allFavorite ? s.favorite.remove : s.favorite.add"
-				@click="emit('favorite', !allFavorite)"
+		<Toolbar variant="floating" :label="s.selection.count(books.length)">
+			<IconButton variant="standard" :label="s.selection.clear" :title="s.selection.clear" @click="emit('clear')">
+				<AppIcon name="close" />
+			</IconButton>
+			<span class="ps-1 pe-3 type-title-medium" :aria-label="s.selection.count(books.length)">{{ books.length }}</span>
+			<IconButton
+				variant="standard"
+				:label="s.selection.selectAll"
+				:disabled="allSelected"
+				:title="s.selection.selectAll"
+				@click="emit('selectAll')"
 			>
-				<AppIcon :name="allFavorite ? 'favoriteFill' : 'favorite'" />
-			</button>
-		</div>
+				<AppIcon name="selectAll" />
+			</IconButton>
+			<IconButton variant="standard" :label="s.shelves.addTo" :title="s.shelves.addTo" @click="emit('shelves')">
+				<AppIcon name="shelves" />
+			</IconButton>
+			<DropdownMenu>
+				<template #trigger="{ toggle, props }">
+					<IconButton v-bind="props" variant="standard" :label="s.book.moreActions" :title="s.book.moreActions" @click="toggle">
+						<AppIcon name="moreVert" />
+					</IconButton>
+				</template>
+				<MenuGroup v-if="changeable.length">
+					<MenuItem v-for="state in READING_STATE_ORDER.filter((state) => state !== shared)" :key="state" @click="emit('state', state)">
+						<template #icon><AppIcon :name="STATE_ICON[state]" /></template>
+						{{ s.book.markAs(s.state[state]) }}
+					</MenuItem>
+				</MenuGroup>
+				<!-- One book gets the full details; several are simply marked as bought today. -->
+				<MenuGroup v-if="single || notPurchased.length || purchased.length">
+					<MenuItem v-if="single || notPurchased.length" @click="emit('purchase')">
+						<template #icon><AppIcon name="purchasedBookFill" /></template>
+						{{ single?.acquisition === 'PURCHASED' ? s.purchase.dialogTitle : s.purchase.markPurchased }}
+					</MenuItem>
+					<MenuItem v-if="purchased.length" @click="emit('unpurchase')">
+						<template #icon><AppIcon :name="toWishlist ? 'kidStar' : 'purchasedBookOffFill'" /></template>
+						{{ toWishlist ? s.purchase.moveToWishlist : s.purchase.markNotPurchased }}
+					</MenuItem>
+				</MenuGroup>
+				<MenuGroup>
+					<MenuItem @click="emit('remove')">
+						<template #icon><AppIcon name="deleteFill" /></template>
+						{{ s.action.remove }}
+					</MenuItem>
+				</MenuGroup>
+			</DropdownMenu>
+			<template v-if="favoritable.length" #fab>
+				<Fab
+					:label="allFavorite ? s.favorite.remove : s.favorite.add"
+					:title="allFavorite ? s.favorite.remove : s.favorite.add"
+					@click="emit('favorite', !allFavorite)"
+				>
+					<template #icon><AppIcon :name="allFavorite ? 'favoriteFill' : 'favorite'" /></template>
+				</Fab>
+			</template>
+		</Toolbar>
 	</div>
 </template>
-
-<style scoped>
-/* The toolbar sits at the foot of the window, so its menu opens upwards. */
-:deep(.menu) {
-	top: auto;
-	bottom: 100%;
-	margin-bottom: 4px;
-}
-</style>

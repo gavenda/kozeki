@@ -18,6 +18,7 @@ import { useFound } from '@/stores/found';
 import { useLibrary } from '@/stores/library';
 import { s } from '@/strings';
 import type { Book } from '@/types';
+import { Button, IconButton } from 'tailwind-material3';
 
 /**
  * A series by its name, as the phone's `SeriesScreen`: the user's books in it, by number, then the
@@ -58,21 +59,21 @@ const more = computed(() =>
 	remoteBooks.value.filter((book) => !list.ownedOf(book) && !yours.value.some((own) => own.sourceId === book.sourceId)),
 );
 const label = (book: Book) => (book.subtitle ? `${book.title}: ${book.subtitle}` : book.title);
+/** Opens [url] in a new tab, as the phone hands a link to the browser. */
+const openInNew = (url: string | undefined) => url && window.open(url, '_blank', 'noopener');
 </script>
 
 <template>
 	<TopAppBar :title="remote?.name ?? name" :back="{ name: 'library' }" always-title>
-		<a
+		<IconButton
 			v-if="remote?.infoUrl"
-			:href="remote.infoUrl"
-			target="_blank"
-			rel="noopener"
-			class="icon-btn"
-			:aria-label="s.book.viewInBrowser"
+			variant="standard"
+			:label="s.book.viewInBrowser"
 			:title="s.book.viewInBrowser"
+			@click="openInNew(remote.infoUrl)"
 		>
 			<AppIcon name="openInNew" />
-		</a>
+		</IconButton>
 	</TopAppBar>
 	<div class="mx-auto max-w-[720px] pb-28">
 		<template v-if="yours.length">
@@ -98,7 +99,7 @@ const label = (book: Book) => (book.subtitle ? `${book.title}: ${book.subtitle}`
 		<template v-if="online">
 			<div v-if="loading" class="flex justify-center py-12"><HaloMark loading /></div>
 			<EmptyState v-else-if="error" face="dismayed" icon="errorFill" :title="s.series.errorTitle" :message="error">
-				<button class="btn-filled" @click="load">{{ s.action.retry }}</button>
+				<Button @click="load">{{ s.action.retry }}</Button>
 			</EmptyState>
 			<EmptyState
 				v-else-if="remote && !remote.name && !yours.length"

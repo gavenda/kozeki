@@ -3,6 +3,7 @@ import { useAuth0 } from '@auth0/auth0-vue';
 import { useRoute } from 'vue-router';
 import EmptyState from '@/components/EmptyState.vue';
 import { s } from '@/strings';
+import { Button } from 'tailwind-material3';
 
 const { loginWithRedirect } = useAuth0();
 const route = useRoute();
@@ -16,7 +17,7 @@ function signIn() {
 <template>
 	<div class="flex min-h-dvh items-center justify-center">
 		<EmptyState face="neutral" :title="s.login.title" :message="s.login.message">
-			<button class="btn-filled mt-2" @click="signIn">{{ s.login.action }}</button>
+			<Button class="mt-2" @click="signIn">{{ s.login.action }}</Button>
 		</EmptyState>
 	</div>
 </template>

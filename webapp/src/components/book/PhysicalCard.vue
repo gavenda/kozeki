@@ -6,6 +6,7 @@ import { formatPercent } from '@/lib/format';
 import { s } from '@/strings';
 import type { Book } from '@/types';
 import BookStat from './BookStat.vue';
+import { Button, IconButton } from 'tailwind-material3';
 
 /**
  * Where the user is in a paper copy, which only they can tell, as the phone's
@@ -22,7 +23,7 @@ const emit = defineEmits<{ edit: []; stop: [] }>();
 			<p class="type-label-large text-tertiary">{{ s.book.progressPhysical }}</p>
 			<p class="type-body-medium text-on-surface-variant">{{ s.physical.prompt }}</p>
 		</div>
-		<button class="btn-tonal" @click="emit('edit')">{{ s.physical.track }}</button>
+		<Button variant="tonal" @click="emit('edit')">{{ s.physical.track }}</Button>
 	</section>
 	<section v-else class="flex flex-col gap-3 rounded-xl bg-surface-container-high p-4">
 		<p class="type-label-large text-tertiary">{{ s.book.progressPhysical }}</p>
@@ -37,15 +38,18 @@ const emit = defineEmits<{ edit: []; stop: [] }>();
 				:value="physicalPageCount(book) ? s.xOfY(book.physicalPage, physicalPageCount(book)!) : String(book.physicalPage)"
 			/>
 			<!-- Narrow, and in the error colours, beside the button it must not be mistaken for. -->
-			<button
-				class="icon-btn-tonal size-8 w-7 bg-error-container text-on-error-container"
-				:aria-label="s.physical.stop"
+			<IconButton
+				variant="tonal"
+				:label="s.physical.stop"
+				size="xs"
+				width="narrow"
+				class="bg-error-container! text-on-error-container!"
 				:title="s.physical.stop"
 				@click="emit('stop')"
 			>
 				<AppIcon name="doNotDisturbOn" :size="20" />
-			</button>
-			<button class="btn-tonal" @click="emit('edit')">{{ s.physical.update }}</button>
+			</IconButton>
+			<Button variant="tonal" @click="emit('edit')">{{ s.physical.update }}</Button>
 		</div>
 	</section>
 </template>

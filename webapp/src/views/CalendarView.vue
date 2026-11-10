@@ -10,6 +10,7 @@ import { formatDay, formatDuration, formatMonth, isUiBirthday } from '@/lib/form
 import { calendarDays } from '@/lib/stats';
 import { useStatsInput } from '@/lib/statsInput';
 import { s } from '@/strings';
+import { Button, IconButton } from 'tailwind-material3';
 
 /**
  * The book calendar, as the phone's `CalendarScreen`: a month at a time, each day with the cover of
@@ -64,26 +65,15 @@ const describe = (day: number) =>
 	<div class="mx-auto flex max-w-[720px] flex-col gap-2 px-3 pb-6">
 		<div class="flex items-center gap-1">
 			<h2 class="flex-1 ps-1 type-headline-small-em">{{ formatMonth(month.year, month.month) }}</h2>
-			<button v-if="!isCurrent" class="btn-text" @click="month = { year: now.getFullYear(), month: now.getMonth() }">
+			<Button variant="text" v-if="!isCurrent" @click="month = { year: now.getFullYear(), month: now.getMonth() }">
 				{{ s.stats.today }}
-			</button>
-			<button
-				class="icon-btn-tonal w-10 bg-secondary-container text-on-secondary-container"
-				:aria-label="s.calendar.previous"
-				:title="s.calendar.previous"
-				@click="shift(-1)"
-			>
+			</Button>
+			<IconButton variant="tonal" :label="s.calendar.previous" :title="s.calendar.previous" @click="shift(-1)">
 				<AppIcon name="keyboardArrowLeft" />
-			</button>
-			<button
-				class="icon-btn-tonal w-10 bg-secondary-container text-on-secondary-container"
-				:disabled="isCurrent"
-				:aria-label="s.calendar.next"
-				:title="s.calendar.next"
-				@click="shift(1)"
-			>
+			</IconButton>
+			<IconButton variant="tonal" :label="s.calendar.next" :disabled="isCurrent" :title="s.calendar.next" @click="shift(1)">
 				<AppIcon name="keyboardArrowRight" />
-			</button>
+			</IconButton>
 		</div>
 		<div class="grid grid-cols-7 gap-1 text-center type-label-medium text-on-surface-variant">
 			<span v-for="day in weekdays" :key="day">{{ day }}</span>

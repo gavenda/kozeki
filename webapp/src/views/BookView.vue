@@ -27,6 +27,7 @@ import * as ops from '@/lib/library';
 import { useLibrary } from '@/stores/library';
 import { s } from '@/strings';
 import type { Note } from '@/types';
+import { Button, IconButton, MenuItem } from 'tailwind-material3';
 
 /** A book of the user's own, as the phone's `BookDetailScreen`: one column of what is known and kept of it. */
 const props = defineProps<{ id: string }>();
@@ -53,6 +54,7 @@ const currentReadings = computed(() => {
 });
 const reviewable = computed(() => book.value?.source === 'HARDCOVER' && !!book.value.sourceId && hardcoverSignedIn());
 const sourceLink = computed(() => webLink(book.value?.sourceUrl));
+const openSource = () => window.open(sourceLink.value!, '_blank', 'noopener');
 
 const edit = library.edit;
 
@@ -113,35 +115,39 @@ function remove() {
 	</template>
 	<template v-else>
 		<TopAppBar :title="book.title" :back="{ name: 'library' }" :title-after="160">
-			<button
+			<IconButton
+				variant="tonal"
+				:label="book.isFavorite ? s.favorite.remove : s.favorite.add"
 				v-if="canFavorite(book)"
-				class="icon-btn-tonal"
-				:class="book.isFavorite ? 'bg-secondary text-on-secondary' : 'bg-surface-container-highest text-on-surface-variant'"
-				:aria-label="book.isFavorite ? s.favorite.remove : s.favorite.add"
+				:class="book.isFavorite ? 'bg-secondary! text-on-secondary!' : 'bg-surface-container-highest! text-on-surface-variant!'"
 				:aria-pressed="book.isFavorite"
 				:title="book.isFavorite ? s.favorite.remove : s.favorite.add"
 				@click="edit((tx) => ops.setFavorite(tx, id, !book!.isFavorite))"
 			>
 				<AppIcon :name="book.isFavorite ? 'favoriteFill' : 'favorite'" />
-			</button>
+			</IconButton>
 			<DropdownMenu>
-				<template #trigger="{ toggle }">
-					<button class="icon-btn" :aria-label="s.book.moreActions" :title="s.book.moreActions" @click="toggle">
+				<template #trigger="{ toggle, props }">
+					<IconButton v-bind="props" variant="standard" :label="s.book.moreActions" :title="s.book.moreActions" @click="toggle">
 						<AppIcon name="moreVert" />
-					</button>
+					</IconButton>
 				</template>
-				<template #default="{ close }">
-					<a v-if="sourceLink" :href="sourceLink" target="_blank" rel="noopener" class="menu-item" @click="close">
-						<AppIcon name="openInNew" />{{ s.book.viewInBrowser }}
-					</a>
-					<button class="menu-item" @click="(coverInput?.click(), close())">
-						<AppIcon name="addPhotoAlternateFill" />{{ s.book.coverChoose }}
-					</button>
-					<button v-if="book.customCover" class="menu-item" @click="(edit((tx) => ops.removeCover(tx, id)), close())">
-						<AppIcon name="delete" />{{ s.book.coverRemove }}
-					</button>
-					<button class="menu-item" @click="((deleting = true), close())"><AppIcon name="deleteFill" />{{ s.action.remove }}</button>
-				</template>
+				<MenuItem v-if="sourceLink" @click="openSource">
+					<template #icon><AppIcon name="openInNew" /></template>
+					{{ s.book.viewInBrowser }}
+				</MenuItem>
+				<MenuItem @click="coverInput?.click()">
+					<template #icon><AppIcon name="addPhotoAlternateFill" /></template>
+					{{ s.book.coverChoose }}
+				</MenuItem>
+				<MenuItem v-if="book.customCover" @click="edit((tx) => ops.removeCover(tx, id))">
+					<template #icon><AppIcon name="delete" /></template>
+					{{ s.book.coverRemove }}
+				</MenuItem>
+				<MenuItem @click="deleting = true">
+					<template #icon><AppIcon name="deleteFill" /></template>
+					{{ s.action.remove }}
+				</MenuItem>
 			</DropdownMenu>
 			<input ref="coverInput" type="file" accept="image/*" class="hidden" @change="pickCover" />
 		</TopAppBar>
@@ -150,24 +156,23 @@ function remove() {
 			<BookHeader :book="book" rateable @rate="(rating) => edit((tx) => ops.setRating(tx, id, rating))" />
 
 			<div class="flex flex-wrap items-center gap-2">
-				<button
-					v-if="book.state === 'COMPLETED' || book.state === 'DROPPED'"
-					class="btn-tonal"
-					@click="edit((tx) => ops.readAgain(tx, id))"
-				>
+				<Button variant="tonal" v-if="book.state === 'COMPLETED' || book.state === 'DROPPED'" @click="edit((tx) => ops.readAgain(tx, id))">
 					{{ s.book.readAgain }}
-				</button>
-				<RouterLink :to="{ name: 'bookEdit', params: { id } }" class="btn-tonal"
-					><AppIcon name="editNoteFill" :size="18" />{{ s.form.editTitle }}</RouterLink
-				>
-				<button
-					class="icon-btn-tonal w-12 bg-tertiary text-on-tertiary"
-					:aria-label="s.shelves.addTo"
+				</Button>
+				<Button variant="tonal" @click="router.push({ name: 'bookEdit', params: { id } })">
+					<template #icon><AppIcon name="editNoteFill" /></template>
+					{{ s.form.editTitle }}
+				</Button>
+				<IconButton
+					variant="tonal"
+					:label="s.shelves.addTo"
+					width="wide"
+					class="bg-tertiary! text-on-tertiary!"
 					:title="s.shelves.addTo"
 					@click="openShelves"
 				>
-					<AppIcon name="shelvesFill" :size="20" />
-				</button>
+					<AppIcon name="shelvesFill" />
+				</IconButton>
 			</div>
 
 			<StatusGroup v-if="canChangeState(book)" :state="stateOf(book)" @change="(state) => edit((tx) => ops.setState(tx, id, state))" />
@@ -190,13 +195,14 @@ function remove() {
 		<ModalDialog v-if="stoppingPhysical" :title="s.physical.stopTitle" icon="history" icon-class="text-error" @close="stoppingPhysical = 0">
 			<p>{{ s.physical.stopMessage(stoppingPhysical) }}</p>
 			<template #actions="{ close }">
-				<button class="btn-text" @click="close">{{ s.action.cancel }}</button>
-				<button
-					class="btn-text text-error"
+				<Button variant="text" @click="close">{{ s.action.cancel }}</Button>
+				<Button
+					variant="text"
+					class="text-error!"
 					@click="(edit((tx) => ops.setPhysicalProgress(tx, id, null, physicalPageCount(book!) ?? null)), close())"
 				>
 					{{ s.physical.stop }}
-				</button>
+				</Button>
 			</template>
 		</ModalDialog>
 		<PurchaseDialog
@@ -225,7 +231,7 @@ function remove() {
 		<DeleteBooksDialog v-if="deleting" :count="1" @confirm="remove" @close="deleting = false" />
 		<ModalDialog v-if="coverFailed" :title="s.book.coverFailed" @close="coverFailed = false">
 			<template #actions="{ close }"
-				><button class="btn-text" @click="close">{{ s.action.ok }}</button></template
+				><Button variant="text" @click="close">{{ s.action.ok }}</Button></template
 			>
 		</ModalDialog>
 	</template>

@@ -1,4 +1,6 @@
 <script setup lang="ts" generic="T extends string | number">
+import { computed } from 'vue';
+import { Button, ButtonGroup, IconButton } from 'tailwind-material3';
 import { optionColorClasses, type OptionColor } from '@/lib/optionColor';
 import type { IconName } from '@/lib/icons';
 import AppIcon from './AppIcon.vue';
@@ -14,42 +16,51 @@ export interface ButtonOption<V> {
 
 /**
  * A single-choice row of toggle buttons, as the phone's `ConnectedButtonGroup` and
- * `StandardButtonGroup`. Connected buttons join with 2px between them, square on the inside and round
- * on the outside, in one colour; standard ones stand apart, round, square when chosen, and take a
- * colour each. The options share the width.
+ * `StandardButtonGroup`, on Material's ButtonGroup. Connected buttons join, 2px apart; standard
+ * ones stand apart and turn square when chosen. The options share the width. A [color] (or an
+ * option's own) replaces Material's toggle colours, as the phone's `OptionColor` does.
  */
-withDefaults(defineProps<{ options: ButtonOption<T>[]; modelValue: T; connected?: boolean; color?: OptionColor; disabled?: boolean }>(), {
-	connected: false,
-});
+const props = withDefaults(
+	defineProps<{ options: ButtonOption<T>[]; modelValue: T; connected?: boolean; color?: OptionColor; disabled?: boolean }>(),
+	{ connected: false },
+);
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
+
+const model = computed({
+	get: () => props.modelValue as string | number,
+	set: (value) => {
+		if (value != null) emit('update:modelValue', value as T);
+	},
+});
+
+/** The option's colours, made to win over the button's own. */
+function colorClasses(option: ButtonOption<T>): string | undefined {
+	const color = option.color ?? props.color;
+	if (!color) return undefined;
+	return optionColorClasses(color, option.value === props.modelValue)
+		.split(' ')
+		.map((name) => `${name}!`)
+		.join(' ');
+}
 </script>
 
 <template>
-	<div class="flex" :class="connected ? 'gap-0.5' : 'gap-2'" role="radiogroup">
-		<button
-			v-for="(option, index) in options"
-			:key="String(option.value)"
-			type="button"
-			role="radio"
-			:aria-checked="option.value === modelValue"
-			:aria-label="option.iconOnly ? option.label : undefined"
-			:disabled="disabled"
-			class="flex h-10 min-w-0 cursor-pointer items-center justify-center gap-2 type-label-large transition-[border-radius,filter] duration-200 hover:brightness-110 disabled:cursor-default disabled:opacity-40 disabled:hover:brightness-100"
-			:class="[
-				option.iconOnly ? 'px-4' : 'flex-1 px-1',
-				optionColorClasses(option.color ?? color, option.value === modelValue),
-				connected
-					? option.value === modelValue
-						? 'rounded-full'
-						: [index === 0 ? 'rounded-s-full' : 'rounded-s-sm', index === options.length - 1 ? 'rounded-e-full' : 'rounded-e-sm']
-					: option.value === modelValue
-						? 'rounded-xl'
-						: 'rounded-full',
-			]"
-			@click="emit('update:modelValue', option.value)"
-		>
-			<AppIcon v-if="option.icon" :name="option.icon" :size="20" />
-			<span v-if="!option.iconOnly" class="truncate">{{ option.label }}</span>
-		</button>
-	</div>
+	<ButtonGroup v-model="model" :variant="connected ? 'connected' : 'standard'" selection="single" required class="w-full">
+		<template v-for="option in options" :key="String(option.value)">
+			<IconButton
+				v-if="option.iconOnly"
+				:value="option.value"
+				:label="option.label"
+				:disabled="disabled"
+				width="wide"
+				:class="colorClasses(option)"
+			>
+				<AppIcon :name="option.icon!" />
+			</IconButton>
+			<Button v-else :value="option.value" :disabled="disabled" class="min-w-0 flex-1 shrink!" :class="colorClasses(option)">
+				<template v-if="option.icon" #icon><AppIcon :name="option.icon" /></template>
+				<span class="truncate">{{ option.label }}</span>
+			</Button>
+		</template>
+	</ButtonGroup>
 </template>

@@ -10,6 +10,7 @@
         "@vueuse/core": "^15.0.0",
         "hono": "^4.6.14",
         "pinia": "^4.0.3",
+        "tailwind-material3": "github:gavenda/tailwind-material3#ed91194",
         "vue": "^3.5.42",
         "vue-router": "^5.3.1",
         "zod": "^4.6.5",
@@ -1093,6 +1094,8 @@
     "supports-color": ["supports-color@10.2.2", "", {}, "sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g=="],
 
     "supports-preserve-symlinks-flag": ["supports-preserve-symlinks-flag@1.0.0", "", {}, "sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w=="],
+
+    "tailwind-material3": ["tailwind-material3@github:gavenda/tailwind-material3#ed91194", { "peerDependencies": { "tailwindcss": "^4.0.0", "vue": "^3.5.0" } }, "gavenda-tailwind-material3-ed91194", "sha512-vnbnK6E/bJmZxmEAH3Q0MRISq59MZ8mBssN9zyXObSQ8seJ2LdnylBf/ZYxSlyZxQ+RgDccHKbonQB90w1NKOw=="],
 
     "tailwindcss": ["tailwindcss@4.3.5", "", {}, "sha512-FcQk9BuffmEHJP2G0XmB2SplU1aLTI7j07Kunk+U74Ny+XiWOtzXz9aujFZ/avntw1e2cOv/3PkgzflQ7gX2vQ=="],
 

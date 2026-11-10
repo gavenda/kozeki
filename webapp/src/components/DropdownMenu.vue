@@ -1,24 +1,25 @@
 <script setup lang="ts">
-import { onClickOutside, onKeyStroke } from '@vueuse/core';
 import { ref } from 'vue';
+import { Menu } from 'tailwind-material3';
 
 /**
- * A button that opens a menu under it, as the phone's DropdownMenu. The trigger is the `trigger`
- * slot, given `toggle` and `open`; the items are the default slot, given `close`.
+ * A button that opens a menu under it, as the phone's DropdownMenu, on Material's Menu. The trigger
+ * is the `trigger` slot, given `toggle`, `open` and `props` (spread them on it); the items are
+ * MenuItems in the default slot, given `close`.
  */
-withDefaults(defineProps<{ align?: 'start' | 'end' }>(), { align: 'end' });
+withDefaults(defineProps<{ align?: 'start' | 'end'; label?: string }>(), { align: 'end' });
 const open = ref(false);
-const root = ref<HTMLElement>();
-onClickOutside(root, () => (open.value = false));
-onKeyStroke('Escape', () => (open.value = false));
 const close = () => (open.value = false);
 </script>
 
 <template>
-	<div ref="root" class="relative">
-		<slot name="trigger" :toggle="() => (open = !open)" :open="open" />
-		<div v-if="open" class="menu top-full mt-1" :class="align === 'end' ? 'end-0' : 'start-0'" role="menu">
+	<span class="contents">
+		<!-- One root, so a listener given to this component (@click.stop) holds the menu's clicks too. -->
+		<Menu v-model:open="open" :placement="align === 'end' ? 'bottom-end' : 'bottom-start'" :label="label">
+			<template #anchor="{ toggle, props }">
+				<slot name="trigger" :toggle="toggle" :open="open" :props="props" />
+			</template>
 			<slot :close="close" />
-		</div>
-	</div>
+		</Menu>
+	</span>
 </template>

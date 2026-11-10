@@ -6,6 +6,7 @@ import ModalDialog from '@/components/ModalDialog.vue';
 import { searchBooks } from '@/lib/libraryView';
 import { s } from '@/strings';
 import type { Book, Shelf } from '@/types';
+import { Button, Checkbox, TextField } from 'tailwind-material3';
 
 /** Picks books of the library that are not on [shelf] to put on it, as the phone's `ShelfAddBooksSheet`. */
 const props = defineProps<{ shelf: Shelf; candidates: Book[] }>();
@@ -24,47 +25,31 @@ function toggle(id: string) {
 </script>
 
 <template>
-	<ModalDialog :title="shelf.name" wide @close="emit('close')">
+	<ModalDialog :title="shelf.name" @close="emit('close')">
 		<p v-if="candidates.length === 0">{{ s.shelves.addBooksNone }}</p>
 		<template v-else>
-			<label class="mb-2 flex h-12 items-center gap-3 rounded-full bg-surface-container-highest px-4">
-				<AppIcon name="search" />
-				<input
-					v-model="query"
-					type="search"
-					class="w-full bg-transparent text-on-surface outline-none"
-					:placeholder="s.shelves.addBooksSearch"
-					autofocus
-				/>
-			</label>
-			<ul class="-mx-2 flex max-h-[50vh] flex-col overflow-y-auto text-on-surface">
+			<TextField v-model="query" type="search" :placeholder="s.shelves.addBooksSearch" class="mb-2 w-full" autofocus>
+				<template #icon><AppIcon name="search" /></template>
+			</TextField>
+			<ul class="flex max-h-[50vh] flex-col overflow-y-auto text-on-surface">
 				<li v-for="book in shown" :key="book.id">
-					<button
-						class="flex w-full cursor-pointer items-center gap-4 rounded-lg px-2 py-2 text-start hover:bg-on-surface/8"
-						role="checkbox"
-						:aria-checked="picked.has(book.id)"
-						@click="toggle(book.id)"
-					>
-						<span
-							class="flex size-5 shrink-0 items-center justify-center rounded-sm border-2"
-							:class="picked.has(book.id) ? 'border-primary bg-primary text-on-primary' : 'border-on-surface-variant'"
-						>
-							<AppIcon v-if="picked.has(book.id)" name="check" :size="16" />
+					<Checkbox :model-value="picked.has(book.id)" class="w-full gap-2 py-1" @update:model-value="toggle(book.id)">
+						<span class="flex min-w-0 items-center gap-4">
+							<span class="w-10 shrink-0"><BookCover :book="book" :show-title="false" rounded="rounded-sm" /></span>
+							<span class="min-w-0">
+								<span class="block truncate type-body-large">{{ book.title }}</span>
+								<span class="block truncate type-body-medium text-on-surface-variant">{{ (book.authors ?? []).join(', ') }}</span>
+							</span>
 						</span>
-						<span class="w-10 shrink-0"><BookCover :book="book" :show-title="false" rounded="rounded-sm" /></span>
-						<span class="min-w-0">
-							<span class="block truncate type-body-large">{{ book.title }}</span>
-							<span class="block truncate type-body-medium text-on-surface-variant">{{ (book.authors ?? []).join(', ') }}</span>
-						</span>
-					</button>
+					</Checkbox>
 				</li>
 			</ul>
 		</template>
 		<template #actions="{ close }">
-			<button class="btn-text" @click="close">{{ s.action.cancel }}</button>
-			<button v-if="candidates.length" class="btn-filled" :disabled="picked.size === 0" @click="(emit('add', [...picked]), close())">
+			<Button variant="text" @click="close">{{ s.action.cancel }}</Button>
+			<Button v-if="candidates.length" :disabled="picked.size === 0" @click="(emit('add', [...picked]), close())">
 				{{ s.shelves.addCount(picked.size) }}
-			</button>
+			</Button>
 		</template>
 	</ModalDialog>
 </template>

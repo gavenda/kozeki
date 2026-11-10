@@ -4,6 +4,7 @@ import { formatDay, formatPrice } from '@/lib/format';
 import { inLibrary } from '@/lib/library';
 import { s } from '@/strings';
 import type { Book } from '@/types';
+import { Button } from 'tailwind-material3';
 
 /**
  * Whether the book is bought, as the phone's `OwnershipSection`: wished for (or just not bought,
@@ -36,7 +37,7 @@ const emit = defineEmits<{ purchased: [purchased: boolean]; edit: [] }>();
 				<p v-if="book.purchaseLocation" class="type-body-medium text-on-surface-variant">{{ book.purchaseLocation }}</p>
 				<p v-if="book.purchaseMemo" class="type-body-medium whitespace-pre-line text-on-surface-variant">{{ book.purchaseMemo }}</p>
 			</div>
-			<button class="btn-text" @click="emit('edit')">{{ s.action.edit }}</button>
+			<Button variant="text" @click="emit('edit')">{{ s.action.edit }}</Button>
 		</div>
 	</section>
 </template>

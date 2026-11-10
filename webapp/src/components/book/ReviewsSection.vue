@@ -6,6 +6,7 @@ import RatingBar from '@/components/RatingBar.vue';
 import { lookupMessage, providerFor, type BookReviews } from '@/lib/catalogue';
 import { formatDay } from '@/lib/format';
 import { s } from '@/strings';
+import { Button, Card } from 'tailwind-material3';
 
 /**
  * What other readers wrote of the book on Hardcover, as on the phone: its average and counts, then
@@ -49,14 +50,15 @@ const dayOf = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_
 		<div v-if="!reviews && !error" class="flex justify-center py-4"><HaloMark loading :size="32" /></div>
 		<div v-else-if="error" class="flex items-center gap-2">
 			<p class="flex-1 type-body-medium text-on-surface-variant">{{ error }}</p>
-			<button class="btn-text" @click="load">{{ s.action.retry }}</button>
+			<Button variant="text" @click="load">{{ s.action.retry }}</Button>
 		</div>
 		<p v-else-if="reviews!.reviews.length === 0" class="type-body-medium text-on-surface-variant">{{ s.reviews.empty }}</p>
 		<template v-else>
-			<article
+			<Card
 				v-for="review in showingAll ? reviews!.reviews : reviews!.reviews.slice(0, PREVIEW)"
 				:key="review.id"
-				class="card flex flex-col gap-2 p-4"
+				as="article"
+				class="flex! flex-col gap-2 bg-surface-container!"
 			>
 				<div class="flex items-center gap-2">
 					<p class="min-w-0 flex-1 truncate type-title-small">{{ review.reviewer ?? s.reviews.anonymous }}</p>
@@ -64,7 +66,7 @@ const dayOf = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_
 				</div>
 				<div v-if="review.hasSpoilers && !unfolded.has(review.id)" class="flex items-center gap-2">
 					<p class="flex-1 type-body-medium text-on-surface-variant">{{ s.reviews.spoilers }}</p>
-					<button class="btn-text" @click="unfolded = new Set([...unfolded, review.id])">{{ s.reviews.spoilersShow }}</button>
+					<Button variant="text" @click="unfolded = new Set([...unfolded, review.id])">{{ s.reviews.spoilersShow }}</Button>
 				</div>
 				<ExpandableText v-else :text="review.text" :lines="6" />
 				<p class="type-body-small text-on-surface-variant">
@@ -74,10 +76,10 @@ const dayOf = (date: string) => Math.floor(Date.parse(`${date}T00:00:00Z`) / 86_
 							.join(' · ')
 					}}
 				</p>
-			</article>
-			<button v-if="!showingAll && reviews!.reviews.length > PREVIEW" class="btn-text self-start" @click="showingAll = true">
+			</Card>
+			<Button variant="text" class="self-start" v-if="!showingAll && reviews!.reviews.length > PREVIEW" @click="showingAll = true">
 				{{ s.reviews.showAll(reviews!.reviews.length) }}
-			</button>
+			</Button>
 		</template>
 	</section>
 </template>

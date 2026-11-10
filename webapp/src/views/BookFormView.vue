@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useEventListener } from '@vueuse/core';
+import { useEventListener, useWindowScroll } from '@vueuse/core';
 import { computed, ref, useId } from 'vue';
 import { onBeforeRouteLeave, useRouter, type RouteLocationRaw } from 'vue-router';
 import AppIcon from '@/components/AppIcon.vue';
@@ -12,6 +12,7 @@ import { toIsbn13 } from '@/lib/isbn';
 import * as ops from '@/lib/library';
 import { useLibrary } from '@/stores/library';
 import { s } from '@/strings';
+import { AppBar, Button, IconButton, TextField } from 'tailwind-material3';
 
 /**
  * The details of a book typed in by hand, as the phone's `BookFormScreen`: a new one ([id] absent),
@@ -36,6 +37,7 @@ const initial = {
 	description: book.value?.description ?? '',
 };
 const form = ref({ ...initial });
+const { y } = useWindowScroll();
 const cover = ref<File | null>(null);
 const coverPreview = ref<string | null>(null);
 const removingCover = ref(false);
@@ -154,11 +156,15 @@ function close() {
 </script>
 
 <template>
-	<header class="sticky top-0 z-30 flex h-16 items-center gap-1 bg-surface px-1">
-		<button class="icon-btn size-12" :aria-label="s.action.close" @click="close"><AppIcon name="close" /></button>
-		<h1 class="flex-1 truncate ps-1 type-title-large">{{ id ? s.form.editTitle : s.form.manualTitle }}</h1>
-		<button class="btn-filled me-3" :disabled="!canSave" @click="save">{{ s.action.save }}</button>
-	</header>
+	<AppBar class="sticky top-0 z-30" :scrolled="y > 0">
+		<template #leading>
+			<IconButton variant="standard" :label="s.action.close" @click="close"><AppIcon name="close" /></IconButton>
+		</template>
+		{{ id ? s.form.editTitle : s.form.manualTitle }}
+		<template #trailing>
+			<Button class="me-3" :disabled="!canSave" @click="save">{{ s.action.save }}</Button>
+		</template>
+	</AppBar>
 
 	<form class="mx-auto flex max-w-[720px] flex-col gap-3 px-4 py-2 pb-10" @submit.prevent="save">
 		<div class="flex gap-4">
@@ -174,69 +180,74 @@ function close() {
 						<span class="rounded-full bg-surface-container-highest/80 p-2 text-on-surface"><AppIcon name="addPhotoAlternateFill" /></span>
 					</span>
 				</button>
-				<button v-if="hasOwnCover" type="button" class="btn-text h-8" @click="dropCover">{{ s.action.remove }}</button>
+				<Button variant="text" size="xs" v-if="hasOwnCover" type="button" @click="dropCover">{{ s.action.remove }}</Button>
 				<input ref="coverInput" type="file" accept="image/*" class="hidden" @change="pickCover" />
 			</div>
 			<div class="flex min-w-0 flex-1 flex-col gap-3">
-				<label>
-					<span class="label">{{ s.form.title }}</span>
-					<textarea v-model="form.title" rows="2" class="field resize-none" autocapitalize="words" :autofocus="!id" />
-				</label>
-				<label>
-					<span class="label">{{ s.form.authors }}</span>
-					<input v-model="form.authors" class="field" :list="ids.authors" autocapitalize="words" />
-					<span class="supporting">{{ s.form.authorsHint }}</span>
-				</label>
+				<TextField
+					v-model="form.title"
+					variant="outlined"
+					:label="s.form.title"
+					multiline
+					:rows="2"
+					autocapitalize="words"
+					:autofocus="!id"
+				/>
+				<TextField
+					v-model="form.authors"
+					variant="outlined"
+					:label="s.form.authors"
+					:supporting-text="s.form.authorsHint"
+					:list="ids.authors"
+					autocapitalize="words"
+				/>
 			</div>
 		</div>
-		<label>
-			<span class="label">{{ s.form.subtitle }}</span>
-			<input v-model="form.subtitle" class="field" />
-		</label>
-		<label>
-			<span class="label">{{ s.book.detail.publisher }}</span>
-			<input v-model="form.publisher" class="field" :list="ids.publishers" />
-		</label>
+		<TextField v-model="form.subtitle" variant="outlined" :label="s.form.subtitle" />
+		<TextField v-model="form.publisher" variant="outlined" :label="s.book.detail.publisher" :list="ids.publishers" />
 		<div class="flex gap-3">
-			<label class="flex-[2.4]">
-				<span class="label">{{ s.book.detail.series }}</span>
-				<input v-model="form.series" class="field" :list="ids.series" />
-			</label>
-			<label class="flex-1">
-				<span class="label">{{ s.book.detail.seriesNumber }}</span>
-				<input
-					:value="form.seriesNumber"
-					class="field"
-					inputmode="decimal"
-					:disabled="!form.series.trim()"
-					@input="form.seriesNumber = seriesNumberInput(($event.target as HTMLInputElement).value)"
-				/>
-			</label>
+			<TextField v-model="form.series" variant="outlined" :label="s.book.detail.series" class="min-w-0 flex-[2.4]" :list="ids.series" />
+			<TextField
+				:model-value="form.seriesNumber"
+				variant="outlined"
+				:label="s.book.detail.seriesNumber"
+				class="min-w-0 flex-1"
+				inputmode="decimal"
+				:disabled="!form.series.trim()"
+				@update:model-value="form.seriesNumber = seriesNumberInput(String($event ?? ''))"
+			/>
 		</div>
 		<div class="flex gap-3">
-			<label class="flex-[1.4]">
-				<span class="label">{{ s.book.detail.published }}</span>
-				<input v-model="form.publishedDate" class="field" placeholder="2026-11-08" />
-			</label>
-			<label class="flex-1">
-				<span class="label">{{ s.book.detail.pages }}</span>
-				<input
-					:value="form.pageCount"
-					class="field"
-					inputmode="numeric"
-					@input="form.pageCount = ($event.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 5)"
-				/>
-			</label>
+			<TextField
+				v-model="form.publishedDate"
+				variant="outlined"
+				:label="s.book.detail.published"
+				class="min-w-0 flex-[1.4]"
+				placeholder="2026-11-08"
+			/>
+			<TextField
+				:model-value="form.pageCount"
+				variant="outlined"
+				:label="s.book.detail.pages"
+				class="min-w-0 flex-1"
+				inputmode="numeric"
+				@update:model-value="
+					form.pageCount = String($event ?? '')
+						.replace(/\D/g, '')
+						.slice(0, 5)
+				"
+			/>
 		</div>
-		<label>
-			<span class="label">{{ s.book.detail.isbn }}</span>
-			<input v-model="form.isbn" class="field" :class="{ 'field-error': isbnInvalid }" maxlength="20" inputmode="numeric" />
-			<span v-if="isbnInvalid" class="supporting text-error">{{ s.form.isbnInvalid }}</span>
-		</label>
-		<label>
-			<span class="label">{{ s.form.description }}</span>
-			<textarea v-model="form.description" rows="5" class="field" />
-		</label>
+		<TextField
+			v-model="form.isbn"
+			variant="outlined"
+			:label="s.book.detail.isbn"
+			:error="isbnInvalid"
+			:error-text="s.form.isbnInvalid"
+			maxlength="20"
+			inputmode="numeric"
+		/>
+		<TextField v-model="form.description" variant="outlined" :label="s.form.description" multiline :rows="5" />
 		<div v-if="!id" class="flex items-center justify-center gap-2 pt-4">
 			<Portrait face="studious" :width="96" />
 			<SpeechBubble class="max-w-[360px]">{{ s.form.endBubble }}</SpeechBubble>
@@ -249,8 +260,8 @@ function close() {
 	<ModalDialog v-if="leaving" :title="s.form.discardTitle" icon="editOffFill" @close="leaving = null">
 		<p>{{ id ? s.form.discardMessage : s.form.discardBookMessage }}</p>
 		<template #actions="{ close: dismiss }">
-			<button class="btn-text" @click="dismiss">{{ s.form.keepEditing }}</button>
-			<button class="btn-text" @click="discard">{{ s.form.discard }}</button>
+			<Button variant="text" @click="dismiss">{{ s.form.keepEditing }}</Button>
+			<Button variant="text" @click="discard">{{ s.form.discard }}</Button>
 		</template>
 	</ModalDialog>
 </template>

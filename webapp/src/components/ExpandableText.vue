@@ -3,6 +3,7 @@ import { nextTick, onMounted, ref, watch } from 'vue';
 import { useResizeObserver } from '@vueuse/core';
 import { s } from '@/strings';
 import AppIcon from './AppIcon.vue';
+import { IconButton } from 'tailwind-material3';
 
 /**
  * Text cut to [lines] until clicked, with a chevron centred under it that turns over as it opens,
@@ -38,15 +39,16 @@ watch(
 		>
 			{{ text }}
 		</p>
-		<button
+		<IconButton
+			variant="standard"
+			:label="expanded ? s.action.showLess : s.action.showMore"
+			size="xs"
 			v-if="overflows || expanded"
 			type="button"
-			class="icon-btn size-8"
-			:aria-label="expanded ? s.action.showLess : s.action.showMore"
 			:aria-expanded="expanded"
 			@click="expanded = !expanded"
 		>
 			<AppIcon name="keyboardArrowUp" :size="20" class="transition-transform" :class="{ 'rotate-180': !expanded }" />
-		</button>
+		</IconButton>
 	</div>
 </template>

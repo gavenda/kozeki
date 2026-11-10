@@ -4,6 +4,7 @@ import AppIcon from '@/components/AppIcon.vue';
 import ModalDialog from '@/components/ModalDialog.vue';
 import { s } from '@/strings';
 import type { Shelf } from '@/types';
+import { Button, Checkbox, TextField } from 'tailwind-material3';
 
 /**
  * Which shelves [count] picked books go on, as the phone's `ShelfChecklistSheet`. A shelf holds all
@@ -38,38 +39,34 @@ function done(close: () => void) {
 
 <template>
 	<ModalDialog :title="s.shelves.addToTitle" @close="emit('close')">
-		<ul class="-mx-2 flex max-h-[50vh] flex-col overflow-y-auto text-on-surface">
+		<ul class="flex max-h-[50vh] flex-col overflow-y-auto text-on-surface">
 			<li v-for="shelf in shelves" :key="shelf.id">
-				<button
-					class="flex w-full cursor-pointer items-center gap-4 rounded-lg px-2 py-3 text-start hover:bg-on-surface/8"
-					role="checkbox"
-					:aria-checked="chosen.get(shelf.id) === 'on' ? 'true' : chosen.get(shelf.id) === 'some' ? 'mixed' : 'false'"
-					@click="tap(shelf.id)"
+				<Checkbox
+					:model-value="chosen.get(shelf.id) === 'on'"
+					:indeterminate="chosen.get(shelf.id) === 'some'"
+					class="w-full py-1 type-body-large"
+					@update:model-value="tap(shelf.id)"
 				>
-					<span
-						class="flex size-5 items-center justify-center rounded-sm border-2"
-						:class="chosen.get(shelf.id) === 'off' ? 'border-on-surface-variant' : 'border-primary bg-primary text-on-primary'"
-					>
-						<AppIcon v-if="chosen.get(shelf.id) === 'on'" name="check" :size="16" />
-						<AppIcon v-else-if="chosen.get(shelf.id) === 'some'" name="remove" :size="16" />
-					</span>
-					<span class="type-body-large">{{ shelf.name }}</span>
-				</button>
+					{{ shelf.name }}
+				</Checkbox>
 			</li>
-			<li v-for="name in created" :key="name" class="flex items-center gap-4 px-2 py-3">
-				<span class="flex size-5 items-center justify-center rounded-sm border-2 border-primary bg-primary text-on-primary"
-					><AppIcon name="check" :size="16"
-				/></span>
-				<span class="type-body-large">{{ name }}</span>
+			<li v-for="name in created" :key="name">
+				<Checkbox :model-value="true" disabled class="w-full py-1 type-body-large">{{ name }}</Checkbox>
 			</li>
 		</ul>
-		<form v-if="naming !== null" class="mt-2 flex gap-2" @submit.prevent="naming.trim() && (created.push(naming.trim()), (naming = null))">
-			<input v-model="naming" class="field text-on-surface" :placeholder="s.shelves.name" autofocus />
-			<button class="btn-text" :disabled="!naming.trim()">{{ s.shelves.create }}</button>
+		<form
+			v-if="naming !== null"
+			class="mt-2 flex items-center gap-2"
+			@submit.prevent="naming.trim() && (created.push(naming.trim()), (naming = null))"
+		>
+			<TextField v-model="naming" variant="outlined" :label="s.shelves.name" class="min-w-0 flex-1" autofocus />
+			<Button variant="text" type="submit" :disabled="!naming.trim()">{{ s.shelves.create }}</Button>
 		</form>
-		<button v-else class="btn-text mt-2 -ms-3" @click="naming = ''"><AppIcon name="add" :size="18" />{{ s.shelves.new }}</button>
+		<Button variant="text" class="mt-2 -ms-3" v-else @click="naming = ''"
+			><template #icon><AppIcon name="add" /></template>{{ s.shelves.new }}</Button
+		>
 		<template #actions="{ close }">
-			<button class="btn-filled" @click="done(close)">{{ s.shelves.done }}</button>
+			<Button @click="done(close)">{{ s.shelves.done }}</Button>
 		</template>
 	</ModalDialog>
 </template>

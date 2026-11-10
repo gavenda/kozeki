@@ -1,45 +1,37 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { Dialog } from 'tailwind-material3';
 import type { IconName } from '@/lib/icons';
 import AppIcon from './AppIcon.vue';
 
 /**
- * A modal on the native <dialog>, which takes care of focus and the Escape key, dressed as the
- * phone's AlertDialog: 28px round, the high surface container, the actions at the end. With an
- * [icon] the headline is centred under it. A [persistent] one, a form, does not close on a click
- * outside it, so what was typed is not lost.
+ * The phone's AlertDialog, as Material's Dialog: it opens when it is shown and says `close` once it
+ * has animated shut. With an [icon] the headline is centred under it. A [persistent] one, a form, does
+ * not close on a click outside it or on Escape, so what was typed is not lost. A `portrait` (one of
+ * Ui's faces) stands over the headline instead, larger than Material's icon allows. The content keeps
+ * a fixed width, as the phone's dialogs do, so a form does not shrink to its fields.
  */
-const props = defineProps<{ title: string; icon?: IconName; iconClass?: string; persistent?: boolean; wide?: boolean }>();
+defineProps<{ title: string; icon?: IconName; iconClass?: string; persistent?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
-const dialog = ref<HTMLDialogElement>();
+const open = ref(false);
 
-onMounted(() => dialog.value?.showModal());
-/** Closes on a click on the backdrop, which lands on the dialog itself but outside its box. */
-function outside(event: MouseEvent) {
-	if (props.persistent || event.target !== dialog.value) return;
-	const box = dialog.value.getBoundingClientRect();
-	const inside = event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
-	if (!inside) dialog.value.close();
-}
+onMounted(() => (open.value = true));
+const close = () => (open.value = false);
 </script>
 
 <template>
-	<dialog
-		ref="dialog"
-		class="m-auto max-h-[calc(100dvh-3rem)] rounded-[28px] bg-surface-container-high p-6 text-on-surface backdrop:bg-scrim/40"
-		:class="wide ? 'w-[min(40rem,calc(100vw-2rem))]' : 'w-[min(35rem,calc(100vw-2rem))]'"
-		@close="emit('close')"
-		@click="outside"
-	>
-		<div v-if="icon || $slots.icon" class="mb-4 flex justify-center" :class="iconClass ?? 'text-secondary'">
-			<slot name="icon"><AppIcon v-if="icon" :name="icon" /></slot>
+	<Dialog v-model:open="open" :persistent="persistent" :aria-label="$slots.portrait ? title : undefined" @closed="emit('close')">
+		<template v-if="icon && !$slots.portrait" #icon><AppIcon :name="icon" :class="iconClass" /></template>
+		<template v-if="!$slots.portrait" #headline>{{ title }}</template>
+		<div class="w-[32rem] max-w-full">
+			<div v-if="$slots.portrait" class="flex flex-col items-center">
+				<slot name="portrait" />
+				<h2 class="pt-4 pb-4 text-center type-headline-small text-on-surface">{{ title }}</h2>
+			</div>
+			<slot :close="close" />
 		</div>
-		<h2 class="mb-4 type-headline-small" :class="{ 'text-center': icon || $slots.icon }">{{ title }}</h2>
-		<div class="type-body-medium text-on-surface-variant">
-			<slot :close="() => dialog?.close()" />
-		</div>
-		<div class="mt-6 flex flex-wrap justify-end gap-2">
-			<slot name="actions" :close="() => dialog?.close()" />
-		</div>
-	</dialog>
+		<template v-if="$slots.actions" #actions>
+			<slot name="actions" :close="close" />
+		</template>
+	</Dialog>
 </template>

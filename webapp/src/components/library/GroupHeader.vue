@@ -2,6 +2,7 @@
 import AppIcon from '@/components/AppIcon.vue';
 import { s } from '@/strings';
 import SortDetailLine, { type SortDetail } from './SortDetailLine.vue';
+import { IconButton } from 'tailwind-material3';
 
 /**
  * The header a series or a shelf stays under while its books scroll by, as the phone's
@@ -22,13 +23,14 @@ const emit = defineEmits<{ toggle: [] }>();
 		<span v-else class="shrink-0 type-body-small text-on-surface-variant">{{ count }}</span>
 		<span class="flex-1" />
 		<slot name="actions" />
-		<button
-			class="icon-btn-tonal h-9 w-10 bg-tertiary-container text-on-tertiary-container"
-			:aria-label="collapsed ? s.library.groupExpand : s.library.groupCollapse"
+		<IconButton
+			variant="tonal"
+			:label="collapsed ? s.library.groupExpand : s.library.groupCollapse"
+			class="bg-tertiary-container! text-on-tertiary-container!"
 			:aria-expanded="!collapsed"
 			@click.stop="emit('toggle')"
 		>
 			<AppIcon name="keyboardArrowUp" class="transition-transform" :class="{ 'rotate-180': collapsed }" />
-		</button>
+		</IconButton>
 	</div>
 </template>

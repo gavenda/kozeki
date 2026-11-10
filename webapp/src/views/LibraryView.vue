@@ -43,6 +43,7 @@ import { shelfSummary, sortDetail } from '@/lib/sortDetail';
 import { useLibrary } from '@/stores/library';
 import { s } from '@/strings';
 import type { Book, ReadingState, Shelf } from '@/types';
+import { Button, IconButton, MenuItem } from 'tailwind-material3';
 
 const library = useLibrary();
 const router = useRouter();
@@ -228,10 +229,14 @@ const detail = (book: Book) => sortDetail(book, sort.value, now.value);
 
 		<EmptyState v-if="isLibraryEmpty" face="happy" icon="shelvesFill" :title="s.library.emptyTitle" :message="s.library.emptyMessage">
 			<div class="mt-2 flex flex-wrap justify-center gap-2">
-				<RouterLink :to="{ name: 'add' }" class="btn-filled"><AppIcon name="travelExplore" :size="18" />{{ s.library.addFind }}</RouterLink>
-				<RouterLink :to="{ name: 'addManual' }" class="btn-outlined"
-					><AppIcon name="editNoteFill" :size="18" />{{ s.library.addManual }}</RouterLink
-				>
+				<Button @click="router.push({ name: 'add' })">
+					<template #icon><AppIcon name="travelExplore" /></template>
+					{{ s.library.addFind }}
+				</Button>
+				<Button variant="outlined" @click="router.push({ name: 'addManual' })">
+					<template #icon><AppIcon name="editNoteFill" /></template>
+					{{ s.library.addManual }}
+				</Button>
 			</div>
 		</EmptyState>
 
@@ -252,9 +257,9 @@ const detail = (book: Book) => sortDetail(book, sort.value, now.value);
 			/>
 
 			<EmptyState v-if="isShelvesEmpty" face="neutral" icon="shelvesFill" :title="s.shelves.noneTitle" :message="s.shelves.noneMessage">
-				<button class="btn-filled mt-2" @click="shelfPrompt = { kind: 'create' }">
-					<AppIcon name="add" :size="18" />{{ s.shelves.new }}
-				</button>
+				<Button class="mt-2" @click="shelfPrompt = { kind: 'create' }"
+					><template #icon><AppIcon name="add" /></template>{{ s.shelves.new }}
+				</Button>
 			</EmptyState>
 			<EmptyState
 				v-else-if="isFilterEmpty"
@@ -277,29 +282,36 @@ const detail = (book: Book) => sortDetail(book, sort.value, now.value);
 						>
 							<template v-if="group.shelf" #actions>
 								<DropdownMenu @click.stop>
-									<template #trigger="{ toggle: menu }">
-										<button class="icon-btn" :aria-label="s.shelves.moreActions" :title="s.shelves.moreActions" @click.stop="menu">
+									<template #trigger="{ toggle: menu, props }">
+										<IconButton
+											v-bind="props"
+											variant="standard"
+											:label="s.shelves.moreActions"
+											:title="s.shelves.moreActions"
+											@click.stop="menu"
+										>
 											<AppIcon name="moreVert" />
-										</button>
+										</IconButton>
 									</template>
-									<template #default="{ close }">
-										<button class="menu-item" @click.stop="((addingTo = group.shelf!), close())">
-											<AppIcon name="add" />{{ s.shelves.addBooks }}
-										</button>
-										<button class="menu-item" @click.stop="((shelfPrompt = { kind: 'rename', shelf: group.shelf! }), close())">
-											<AppIcon name="editNoteFill" />{{ s.shelves.rename }}
-										</button>
-										<button class="menu-item" @click.stop="((shelfPrompt = { kind: 'delete', shelf: group.shelf! }), close())">
-											<AppIcon name="deleteFill" />{{ s.shelves.delete }}
-										</button>
-									</template>
+									<MenuItem @click="addingTo = group.shelf!">
+										<template #icon><AppIcon name="add" /></template>
+										{{ s.shelves.addBooks }}
+									</MenuItem>
+									<MenuItem @click="shelfPrompt = { kind: 'rename', shelf: group.shelf! }">
+										<template #icon><AppIcon name="editNoteFill" /></template>
+										{{ s.shelves.rename }}
+									</MenuItem>
+									<MenuItem @click="shelfPrompt = { kind: 'delete', shelf: group.shelf! }">
+										<template #icon><AppIcon name="deleteFill" /></template>
+										{{ s.shelves.delete }}
+									</MenuItem>
 								</DropdownMenu>
 							</template>
 						</GroupHeader>
 						<template v-if="!isCollapsed(group.key)">
 							<div v-if="group.shelf && group.books.length === 0" class="flex flex-wrap items-center gap-2 px-4 py-3">
 								<p class="type-body-medium text-on-surface-variant">{{ s.shelves.emptyTitle }}</p>
-								<button class="btn-text" @click="addingTo = group.shelf!">{{ s.shelves.addBooks }}</button>
+								<Button variant="text" @click="addingTo = group.shelf!">{{ s.shelves.addBooks }}</Button>
 							</div>
 							<template v-for="section in group.sections" :key="`${group.key}/${section.heading}`">
 								<h2 v-if="section.heading" class="px-4 pt-3 pb-2 type-title-medium-em text-on-surface-variant">
@@ -379,10 +391,10 @@ const detail = (book: Book) => sortDetail(book, sort.value, now.value);
 		<ModalDialog v-if="shelfPrompt?.kind === 'delete'" :title="s.shelves.deleteTitle(shelfPrompt.shelf.name)" @close="shelfPrompt = null">
 			<p>{{ s.shelves.deleteMessage }}</p>
 			<template #actions="{ close }">
-				<button class="btn-text" @click="close">{{ s.action.cancel }}</button>
-				<button class="btn-text text-error" @click="(deleteShelf(), close())">
+				<Button variant="text" @click="close">{{ s.action.cancel }}</Button>
+				<Button variant="text" class="text-error!" @click="(deleteShelf(), close())">
 					{{ s.shelves.delete }}
-				</button>
+				</Button>
 			</template>
 		</ModalDialog>
 		<ShelfAddBooksDialog v-if="addingTo" :shelf="addingTo" :candidates="shelfCandidates" @add="addToShelf" @close="addingTo = null" />

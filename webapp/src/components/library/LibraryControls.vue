@@ -11,6 +11,7 @@ import {
 	type LibrarySort,
 } from '@/lib/libraryView';
 import { s } from '@/strings';
+import { Button, Chip, IconButton, MenuItem } from 'tailwind-material3';
 
 /**
  * The row over the library, as the phone's: the filter on the left, its chips folded under it, and
@@ -43,89 +44,76 @@ const kindIcon = () => KINDS.find((entry) => entry.kind === props.kind)!.icon;
 <template>
 	<div class="flex flex-col gap-2">
 		<div class="flex items-center justify-between px-1">
-			<button
-				class="btn-text h-10 gap-2 px-3"
+			<Button
+				variant="text"
 				:class="filter === 'ALL' ? 'text-on-surface' : 'text-primary'"
 				:aria-expanded="filtersOpen"
 				:aria-label="s.library.filterBooks"
 				@click="filtersOpen = !filtersOpen"
-			>
-				<AppIcon name="filterAltFill" />
+				><template #icon><AppIcon name="filterAltFill" /></template>
 				<span class="type-title-small">{{ s.library.filter[filter] }}</span>
-			</button>
+			</Button>
 			<div class="flex items-center">
 				<DropdownMenu>
-					<template #trigger="{ toggle }">
-						<button
-							class="icon-btn text-primary"
-							:aria-label="s.library.kindChoose(s.library.kind[kind])"
+					<template #trigger="{ toggle, props }">
+						<IconButton
+							v-bind="props"
+							variant="standard"
+							:label="s.library.kindChoose(s.library.kind[kind])"
+							class="text-primary!"
 							:title="s.library.kind[kind]"
 							@click="toggle"
 						>
 							<AppIcon :name="kindIcon()" />
-						</button>
+						</IconButton>
 					</template>
-					<template #default="{ close }">
-						<button
-							v-for="entry in KINDS"
-							:key="entry.kind"
-							class="menu-item"
-							:class="{ 'text-primary': entry.kind === kind }"
-							role="menuitemradio"
-							:aria-checked="entry.kind === kind"
-							@click="(emit('update:kind', entry.kind), close())"
-						>
-							<AppIcon :name="entry.icon" /><span class="flex-1">{{ s.library.kind[entry.kind] }}</span>
-							<AppIcon v-if="entry.kind === kind" name="check" />
-						</button>
-					</template>
+					<MenuItem v-for="entry in KINDS" :key="entry.kind" :selected="entry.kind === kind" @click="emit('update:kind', entry.kind)">
+						<template #icon><AppIcon :name="entry.icon" /></template>
+						{{ s.library.kind[entry.kind] }}
+						<template v-if="entry.kind === kind" #trailing-icon><AppIcon name="check" /></template>
+					</MenuItem>
 				</DropdownMenu>
-				<button
-					class="icon-btn"
-					:aria-label="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
+				<IconButton
+					variant="standard"
+					:label="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
 					:title="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
 					@click="emit('update:display', display === 'COVERS' ? 'LIST' : 'COVERS')"
 				>
 					<AppIcon :name="display === 'COVERS' ? 'viewListFill' : 'gridViewFill'" />
-				</button>
+				</IconButton>
 				<DropdownMenu>
-					<template #trigger="{ toggle }">
-						<button class="icon-btn" :aria-label="s.library.sortBooks" :title="s.library.sortBooks" @click="toggle">
+					<template #trigger="{ toggle, props }">
+						<IconButton v-bind="props" variant="standard" :label="s.library.sortBooks" :title="s.library.sortBooks" @click="toggle">
 							<AppIcon name="sort" />
-						</button>
+						</IconButton>
 					</template>
-					<template #default="{ close }">
-						<button
-							v-for="option in LIBRARY_SORTS"
-							:key="option"
-							class="menu-item"
-							role="menuitemradio"
-							:aria-checked="option === sort"
-							:aria-description="option === sort ? (isDescending(sort, reversed) ? s.library.descending : s.library.ascending) : undefined"
-							@click="(emit('sort', option), close())"
-						>
-							<span class="size-6">
-								<AppIcon v-if="option === sort" :name="isDescending(sort, reversed) ? 'arrowDownward' : 'arrowUpward'" />
-							</span>
-							{{ s.library.sort[option] }}
-						</button>
-					</template>
+					<MenuItem
+						v-for="option in LIBRARY_SORTS"
+						:key="option"
+						:selected="option === sort"
+						:aria-description="option === sort ? (isDescending(sort, reversed) ? s.library.descending : s.library.ascending) : undefined"
+						@click="emit('sort', option)"
+					>
+						<template #icon>
+							<AppIcon v-if="option === sort" :name="isDescending(sort, reversed) ? 'arrowDownward' : 'arrowUpward'" />
+							<span v-else></span>
+						</template>
+						{{ s.library.sort[option] }}
+					</MenuItem>
 				</DropdownMenu>
 			</div>
 		</div>
 		<div v-show="filtersOpen" class="flex flex-wrap gap-2 px-4 pb-1">
-			<button
+			<Chip
 				v-for="option in LIBRARY_FILTERS"
 				:key="option"
-				class="chip"
-				:class="{ 'chip-on': option === filter }"
-				:aria-pressed="option === filter"
+				type="filter"
+				:selected="option === filter"
 				@click="emit('update:filter', option)"
 			>
-				<AppIcon v-if="option === filter" name="check" :size="18" />
 				{{ s.library.filter[option] }}
-				<span class="type-label-small">{{ counts[option] }}</span>
-			</button>
+				<span class="ms-1.5 type-label-small">{{ counts[option] }}</span>
+			</Chip>
 		</div>
 	</div>
 </template>

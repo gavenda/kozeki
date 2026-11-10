@@ -33,6 +33,7 @@ import { hardcoverAvailable } from '@/lib/hardcover';
 import { oneOf, persisted } from '@/lib/persisted';
 import { useFound } from '@/stores/found';
 import { s } from '@/strings';
+import { Button, Chip, IconButton, MenuItem } from 'tailwind-material3';
 
 /** Finding a book to add, as the phone's `AddBookScreen`: a search of a catalogue, or one of its lists. */
 const foundStore = useFound();
@@ -109,43 +110,30 @@ const showLists = computed(() => !kept.query.trim() && provider.value.browseOrde
 <template>
 	<TopAppBar :title="s.add.title" :back="{ name: 'library' }" always-title>
 		<DropdownMenu v-if="showLists">
-			<template #trigger="{ toggle }">
-				<button
-					class="icon-btn-tonal bg-secondary-container text-on-secondary-container"
-					:aria-label="s.add.lists"
-					:title="s.add.lists"
-					@click="toggle"
-				>
+			<template #trigger="{ toggle, props }">
+				<IconButton v-bind="props" variant="tonal" :label="s.add.lists" :title="s.add.lists" @click="toggle">
 					<AppIcon name="sort" />
-				</button>
+				</IconButton>
 			</template>
-			<template #default="{ close }">
-				<button
-					v-for="order in provider.browseOrders"
-					:key="order"
-					class="menu-item"
-					:class="{ 'text-primary': order === kept.order }"
-					@click="(browse(order), close())"
-				>
-					<span class="flex-1">{{ s.add.browse[order] }}</span>
-					<AppIcon v-if="order === kept.order" name="check" />
-				</button>
-			</template>
+			<MenuItem v-for="order in provider.browseOrders" :key="order" :selected="order === kept.order" @click="browse(order)">
+				{{ s.add.browse[order] }}
+				<template v-if="order === kept.order" #trailing-icon><AppIcon name="check" /></template>
+			</MenuItem>
 		</DropdownMenu>
-		<button
-			class="icon-btn"
-			:aria-label="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
+		<IconButton
+			variant="standard"
+			:label="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
 			:title="display === 'COVERS' ? s.library.displayAsList : s.library.displayAsCovers"
 			@click="display = display === 'COVERS' ? 'LIST' : 'COVERS'"
 		>
 			<AppIcon :name="display === 'COVERS' ? 'viewListFill' : 'gridViewFill'" />
-		</button>
+		</IconButton>
 	</TopAppBar>
 
 	<div class="mx-auto max-w-[720px] pb-28">
 		<form class="px-4 py-2" @submit.prevent="search">
 			<label class="flex h-14 items-center gap-2 rounded-full bg-surface-container-high ps-2 pe-2 text-on-surface-variant">
-				<button class="icon-btn" :aria-label="s.action.search" type="submit"><AppIcon name="search" /></button>
+				<IconButton variant="standard" :label="s.action.search" type="submit"><AppIcon name="search" /></IconButton>
 				<input
 					v-model="kept.query"
 					type="search"
@@ -153,25 +141,26 @@ const showLists = computed(() => !kept.query.trim() && provider.value.browseOrde
 					class="w-full bg-transparent type-body-large text-on-surface outline-none [&::-webkit-search-cancel-button]:hidden"
 					autofocus
 				/>
-				<button v-if="kept.query" type="button" class="icon-btn" :aria-label="s.search.clear" @click="clearQuery">
+				<IconButton variant="standard" :label="s.search.clear" v-if="kept.query" type="button" @click="clearQuery">
 					<AppIcon name="close" />
-				</button>
+				</IconButton>
 			</label>
 		</form>
 		<div class="flex gap-2 overflow-x-auto px-4 pb-2">
-			<button
+			<Chip
 				v-for="option in sources"
 				:key="option"
-				class="chip shrink-0"
-				:class="{ 'chip-on': option === source }"
+				type="filter"
+				:selected="option === source"
+				class="shrink-0"
 				@click="pickSource(option)"
 			>
-				<AppIcon v-if="option === source" name="check" :size="18" />{{ s.source[option] }}
-			</button>
+				{{ s.source[option] }}
+			</Chip>
 		</div>
 
 		<EmptyState v-if="error && kept.page === 0" face="dismayed" icon="errorFill" :title="s.add.errorTitle" :message="error">
-			<button class="btn-filled" @click="load(1)">{{ s.action.retry }}</button>
+			<Button @click="load(1)">{{ s.action.retry }}</Button>
 		</EmptyState>
 		<div v-else-if="(loading && kept.page === 0) || (loading && !kept.books.length)" class="flex justify-center py-16">
 			<HaloMark loading />
@@ -201,7 +190,7 @@ const showLists = computed(() => !kept.query.trim() && provider.value.browseOrde
 			</div>
 			<div ref="sentinel" class="flex justify-center py-6">
 				<HaloMark v-if="loading" loading :size="32" />
-				<button v-else-if="error" class="btn-text" @click="load(kept.page + 1)">{{ s.action.retry }}</button>
+				<Button variant="text" v-else-if="error" @click="load(kept.page + 1)">{{ s.action.retry }}</Button>
 			</div>
 		</template>
 	</div>

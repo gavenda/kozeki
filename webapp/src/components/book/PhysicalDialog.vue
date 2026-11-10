@@ -4,6 +4,7 @@ import ModalDialog from '@/components/ModalDialog.vue';
 import { physicalPageCount } from '@/lib/bookUi';
 import { s } from '@/strings';
 import type { Book, PhysicalReading } from '@/types';
+import { Button, TextField } from 'tailwind-material3';
 
 /**
  * The page reached in a paper copy and how many pages it has, as the phone's
@@ -50,34 +51,38 @@ export function pagesUnread(readings: PhysicalReading[], current: number | undef
 
 <template>
 	<ModalDialog v-if="!confirming" :title="s.physical.dialogTitle" persistent @close="emit('close')">
-		<form id="physical" class="flex gap-2 text-on-surface" @submit.prevent>
-			<label class="flex-1">
-				<span class="label">{{ s.physical.page }}</span>
-				<input
-					v-model="page"
-					class="field"
-					:class="{ 'field-error': page !== '' && !pageValid }"
-					inputmode="numeric"
-					maxlength="5"
-					autofocus
-					@focus="($event.target as HTMLInputElement).select()"
-				/>
-			</label>
-			<label class="flex-1">
-				<span class="label">{{ s.physical.pageCount }}</span>
-				<input v-model="pageCount" class="field" :class="{ 'field-error': !countValid }" inputmode="numeric" maxlength="5" />
-			</label>
+		<form id="physical" class="flex gap-2 pt-1" @submit.prevent>
+			<TextField
+				v-model="page"
+				variant="outlined"
+				:label="s.physical.page"
+				:error="page !== '' && !pageValid"
+				class="min-w-0 flex-1"
+				inputmode="numeric"
+				maxlength="5"
+				autofocus
+				@focus="($event.target as HTMLInputElement).select()"
+			/>
+			<TextField
+				v-model="pageCount"
+				variant="outlined"
+				:label="s.physical.pageCount"
+				:error="!countValid"
+				class="min-w-0 flex-1"
+				inputmode="numeric"
+				maxlength="5"
+			/>
 		</form>
 		<template #actions="{ close }">
-			<button class="btn-text" @click="close">{{ s.action.cancel }}</button>
-			<button class="btn-filled" :disabled="!pageValid || !countValid" @click="save(close)">{{ s.physical.save }}</button>
+			<Button variant="text" @click="close">{{ s.action.cancel }}</Button>
+			<Button :disabled="!pageValid || !countValid" @click="save(close)">{{ s.physical.save }}</Button>
 		</template>
 	</ModalDialog>
 	<ModalDialog v-else :title="s.physical.rewindTitle(target!)" icon="history" icon-class="text-error" @close="emit('close')">
 		<p>{{ s.physical.rewindMessage(unread, target!) }}</p>
 		<template #actions="{ close }">
-			<button class="btn-text" @click="confirming = false">{{ s.action.cancel }}</button>
-			<button class="btn-text text-error" @click="save(close)">{{ s.physical.rewindConfirm }}</button>
+			<Button variant="text" @click="confirming = false">{{ s.action.cancel }}</Button>
+			<Button variant="text" class="text-error!" @click="save(close)">{{ s.physical.rewindConfirm }}</Button>
 		</template>
 	</ModalDialog>
 </template>

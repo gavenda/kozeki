@@ -45,6 +45,10 @@ export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version),
 	},
+	// tailwind-material3 ships its .vue source; Vite compiles it with the app rather than pre-bundling it.
+	optimizeDeps: {
+		exclude: ['tailwind-material3'],
+	},
 	resolve: {
 		alias: {
 			'@': fileURLToPath(new URL('./src', import.meta.url)),

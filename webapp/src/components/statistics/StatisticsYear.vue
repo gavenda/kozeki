@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from 'tailwind-material3';
 import { computed } from 'vue';
 import ChartCard from '@/components/ChartCard.vue';
 import ColumnChart from '@/components/ColumnChart.vue';
@@ -49,7 +50,7 @@ const goalProgress = computed(() => (props.stats.goalBooks ? props.stats.complet
 					<p class="type-headline-medium-em">{{ s.stats.booksFinished(stats.completed.length) }}</p>
 					<p class="type-body-medium text-on-surface-variant">{{ s.stats.noGoal(stats.year) }}</p>
 				</div>
-				<button class="btn bg-secondary text-on-secondary hover:brightness-110" @click="emit('setGoal')">{{ s.stats.setGoal }}</button>
+				<Button class="bg-secondary! text-on-secondary!" @click="emit('setGoal')">{{ s.stats.setGoal }}</Button>
 			</div>
 		</section>
 		<div class="flex flex-col gap-2">

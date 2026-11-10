@@ -5,6 +5,7 @@ import AuthorLinks from '@/components/AuthorLinks.vue';
 import BookCover from '@/components/BookCover.vue';
 import RatingBar from '@/components/RatingBar.vue';
 import { s } from '@/strings';
+import { Button } from 'tailwind-material3';
 
 export interface HeaderBook {
 	title: string;
@@ -53,7 +54,7 @@ onKeyStroke('Escape', () => (viewing.value = false));
 			<template v-if="rateable">
 				<div class="mt-1 flex flex-wrap items-center gap-2">
 					<RatingBar :rating="book.rating" editable @change="emit('rate', $event)" />
-					<button v-if="book.rating != null" class="btn-text h-9" @click="emit('rate', null)">{{ s.rating.clear }}</button>
+					<Button variant="text" size="xs" v-if="book.rating != null" @click="emit('rate', null)">{{ s.rating.clear }}</Button>
 				</div>
 			</template>
 		</div>

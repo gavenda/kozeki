@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { Card } from 'tailwind-material3';
+import { RouterLink } from 'vue-router';
 import BookCover from '@/components/BookCover.vue';
 import RatingBar from '@/components/RatingBar.vue';
 import { formatDay } from '@/lib/format';
@@ -9,9 +11,12 @@ defineProps<{ entry: CompletedBook }>();
 </script>
 
 <template>
-	<RouterLink
+	<Card
+		:as="RouterLink"
 		:to="{ name: 'book', params: { id: entry.book.id } }"
-		class="card flex items-center gap-3 p-3 transition-colors hover:bg-surface-container-high"
+		interactive
+		:padded="false"
+		class="flex! items-center gap-3 bg-surface-container! p-3"
 	>
 		<span class="w-10 shrink-0"><BookCover :book="entry.book" :show-title="false" rounded="rounded-md" /></span>
 		<span class="min-w-0 flex-1">
@@ -19,5 +24,5 @@ defineProps<{ entry: CompletedBook }>();
 			<span class="block type-body-small text-on-surface-variant">{{ formatDay(entry.finishedOn) }}</span>
 		</span>
 		<RatingBar v-if="entry.book.rating != null" :rating="entry.book.rating" :size="14" />
-	</RouterLink>
+	</Card>
 </template>
