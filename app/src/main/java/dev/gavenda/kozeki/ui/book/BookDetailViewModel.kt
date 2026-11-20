@@ -521,6 +521,14 @@ class BookDetailViewModel(
     private val sitting = PhysicalSitting(System::currentTimeMillis)
     private val _sittingClock = MutableStateFlow(sitting.clock)
 
+    /** Whether the reading mode blurs the cover behind its card. */
+    val coverBlurred: StateFlow<Boolean> =
+        settings.blurReadingCover.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun setCoverBlurred(blurred: Boolean) {
+        appScope.launch { settings.setBlurReadingCover(blurred) }
+    }
+
     /** What the reading mode's timer shows. */
     val sittingClock: StateFlow<PhysicalSitting.Clock> = _sittingClock.asStateFlow()
 

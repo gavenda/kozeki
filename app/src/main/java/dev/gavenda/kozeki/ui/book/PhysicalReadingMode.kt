@@ -39,6 +39,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -73,6 +74,7 @@ class PhysicalReadingActions(
     val onHide: () -> Unit = {},
     val onShow: () -> Unit = {},
     val onClose: () -> Unit = {},
+    val onBlur: (Boolean) -> Unit = {},
 )
 
 /**
@@ -85,7 +87,7 @@ class PhysicalReadingActions(
  * the left. Either way the card and the buttons sit together in the middle.
  */
 @Composable
-fun PhysicalReadingMode(book: Book, clock: PhysicalSitting.Clock, actions: PhysicalReadingActions) {
+fun PhysicalReadingMode(book: Book, clock: PhysicalSitting.Clock, blurred: Boolean, actions: PhysicalReadingActions) {
     // The page is kept here while the screen is open, so quick taps never wait on the database.
     var page by rememberSaveable { mutableIntStateOf(book.physicalPage ?: 0) }
     val sittingSince = rememberSaveable { System.currentTimeMillis() }
@@ -125,6 +127,7 @@ fun PhysicalReadingMode(book: Book, clock: PhysicalSitting.Clock, actions: Physi
             page = page,
             total = total,
             clock = clock,
+            blurred = blurred,
             onNext = { turn(page + 1) },
             onPrevious = { turn(page - 1) },
             actions = actions,
@@ -138,6 +141,7 @@ private fun PhysicalReadingContent(
     page: Int,
     total: Int?,
     clock: PhysicalSitting.Clock,
+    blurred: Boolean,
     onNext: () -> Unit,
     onPrevious: () -> Unit,
     actions: PhysicalReadingActions,
@@ -152,7 +156,7 @@ private fun PhysicalReadingContent(
                     model = cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().then(if (blurred) Modifier.blur(24.dp) else Modifier),
                 )
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
             }
@@ -196,7 +200,7 @@ private fun PhysicalReadingContent(
                         PageButtons(page, total, onNext, onPrevious, Modifier.widthIn(max = 480.dp).fillMaxWidth())
                     }
                 }
-                TopRow(clock, onCover, actions, Modifier.align(Alignment.TopCenter))
+                TopRow(clock, onCover, blurred, actions, Modifier.align(Alignment.TopCenter))
             }
         }
     }
@@ -204,7 +208,13 @@ private fun PhysicalReadingContent(
 
 /** The way out on one side, and the sitting's timer on the other. */
 @Composable
-private fun TopRow(clock: PhysicalSitting.Clock, onCover: Boolean, actions: PhysicalReadingActions, modifier: Modifier) {
+private fun TopRow(
+    clock: PhysicalSitting.Clock,
+    onCover: Boolean,
+    blurred: Boolean,
+    actions: PhysicalReadingActions,
+    modifier: Modifier,
+) {
     // Over a cover, both sit on the surface colour so they stay readable.
     val chip = if (onCover) {
         MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.82f)
@@ -231,6 +241,24 @@ private fun TopRow(clock: PhysicalSitting.Clock, onCover: Boolean, actions: Phys
             )
         }
         Spacer(Modifier.weight(1f))
+        // Only a cover behind the card can be blurred, so only the phone's layout has the button.
+        if (onCover) {
+            val label = stringResource(if (blurred) R.string.physical_cover_unblur else R.string.physical_cover_blur)
+            LabelTooltip(label) {
+                FilledTonalIconButton(
+                    onClick = { actions.onBlur(!blurred) },
+                    shapes = IconButtonDefaults.shapes(),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = chip),
+                ) {
+                    Icon(
+                        painterResource(if (blurred) R.drawable.blur_off_48px else R.drawable.blur_on_48px),
+                        contentDescription = label,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+        }
         SittingTimer(clock, chip, actions)
     }
 }
@@ -390,6 +418,7 @@ private fun PhysicalReadingPreview() {
             page = 142,
             total = 320,
             clock = PhysicalSitting.Clock(24 * 60_000L + 13_000L, null),
+            blurred = false,
             onNext = {},
             onPrevious = {},
             actions = PhysicalReadingActions(),

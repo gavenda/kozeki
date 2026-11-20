@@ -315,6 +315,14 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         store.edit { it[Keys.TemporaryPagesMegabytes] = megabytes.coerceAtLeast(1) }
     }
 
+    /** Whether the reading mode blurs the cover behind its card. Kept per device. */
+    val blurReadingCover: Flow<Boolean> =
+        store.data.map { it[Keys.BlurReadingCover] ?: false }.distinctUntilChanged()
+
+    suspend fun setBlurReadingCover(on: Boolean) {
+        store.edit { it[Keys.BlurReadingCover] = on }
+    }
+
     suspend fun setDownloadWhileReading(on: Boolean) {
         store.edit { it[Keys.DownloadWhileReading] = on }
     }
@@ -412,6 +420,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
     }
 
     private object Keys {
+        val BlurReadingCover = booleanPreferencesKey("blur_reading_cover")
         val DailyGoalMinutes = intPreferencesKey("daily_goal_minutes")
         val ThemeMode = stringPreferencesKey("theme_mode")
         val ReaderPreferences = stringPreferencesKey("reader_preferences")

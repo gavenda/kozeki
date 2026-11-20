@@ -6,6 +6,7 @@ import BookCover from '@/components/BookCover.vue';
 import WavyProgress from '@/components/WavyProgress.vue';
 import { physicalPageCount } from '@/lib/bookUi';
 import { coverSrc } from '@/lib/covers';
+import { persisted } from '@/lib/persisted';
 import { PhysicalSitting, type SittingPart } from '@/lib/sitting';
 import { s } from '@/strings';
 import type { Book } from '@/types';
@@ -29,6 +30,8 @@ const page = ref(props.book.physicalPage ?? 0);
 const sittingSince = Date.now();
 const total = computed(() => physicalPageCount(props.book));
 const cover = computed(() => coverSrc(props.book));
+// Whether the cover behind the card is blurred, kept per browser as the phone keeps it per device.
+const blurred = persisted('readingCoverBlurred', false, (value): value is boolean => typeof value === 'boolean');
 const canNext = computed(() => total.value == null || page.value < total.value);
 
 function turn(to: number) {
@@ -112,10 +115,16 @@ onBeforeUnmount(() => void wakeLock.release());
 
 <template>
 	<Teleport to="body">
-		<div class="fixed inset-0 z-50 bg-surface text-on-surface" role="dialog" aria-modal="true" :aria-label="book.title">
+		<div class="fixed inset-0 z-50 overflow-hidden bg-surface text-on-surface" role="dialog" aria-modal="true" :aria-label="book.title">
 			<!-- In a tall window the cover is the background, darkened a little so the card stands out. -->
 			<template v-if="cover">
-				<img :src="cover" alt="" class="absolute inset-0 size-full object-cover landscape:hidden" referrerpolicy="no-referrer" />
+				<img
+					:src="cover"
+					alt=""
+					class="absolute inset-0 size-full object-cover transition-[filter,scale] landscape:hidden"
+					:class="blurred && 'scale-110 blur-2xl'"
+					referrerpolicy="no-referrer"
+				/>
 				<div class="absolute inset-0 bg-black/30 landscape:hidden" />
 			</template>
 
@@ -177,20 +186,34 @@ onBeforeUnmount(() => void wakeLock.release());
 					>
 						<AppIcon name="arrowBack" />
 					</IconButton>
-					<div
-						class="ml-auto flex items-center gap-1 rounded-full"
-						:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
-					>
-						<span class="flex size-10 items-center justify-center text-tertiary"><AppIcon name="timerFill" /></span>
-						<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
+					<div class="ml-auto flex items-center">
+						<!-- Only a cover behind the card can be blurred, so only the tall layout has the button. -->
 						<IconButton
-							variant="standard"
-							:label="running ? s.physical.timerPause : s.physical.timerResume"
-							:title="running ? s.physical.timerPause : s.physical.timerResume"
-							@click="toggleTimer"
+							v-if="cover"
+							variant="tonal"
+							:label="blurred ? s.physical.coverUnblur : s.physical.coverBlur"
+							:title="blurred ? s.physical.coverUnblur : s.physical.coverBlur"
+							class="mr-2 bg-surface-container-high/82! text-on-surface! landscape:hidden"
+							:aria-pressed="blurred"
+							@click="blurred = !blurred"
 						>
-							<AppIcon :name="running ? 'pauseFill' : 'playArrowFill'" />
+							<AppIcon :name="blurred ? 'blurOff' : 'blurOn'" />
 						</IconButton>
+						<div
+							class="flex items-center gap-1 rounded-full"
+							:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
+						>
+							<span class="flex size-10 items-center justify-center text-tertiary"><AppIcon name="timerFill" /></span>
+							<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
+							<IconButton
+								variant="standard"
+								:label="running ? s.physical.timerPause : s.physical.timerResume"
+								:title="running ? s.physical.timerPause : s.physical.timerResume"
+								@click="toggleTimer"
+							>
+								<AppIcon :name="running ? 'pauseFill' : 'playArrowFill'" />
+							</IconButton>
+						</div>
 					</div>
 				</div>
 			</div>

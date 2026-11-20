@@ -236,6 +236,7 @@ fun BookDetailScreen(
     val loaded by viewModel.uiState.collectAsStateWithLifecycle()
     val bookShelves by viewModel.shelves.collectAsStateWithLifecycle()
     val sittingClock by viewModel.sittingClock.collectAsStateWithLifecycle()
+    val coverBlurred by viewModel.coverBlurred.collectAsStateWithLifecycle()
     var choosingShelves by rememberSaveable { mutableStateOf(false) }
     val state = if (loaded.loading && placeholder != null) loaded.copy(loading = false, book = placeholder) else loaded
     val snackbarHostState = remember { SnackbarHostState() }
@@ -325,11 +326,12 @@ fun BookDetailScreen(
                 onHide = viewModel::hideSitting,
                 onShow = viewModel::showSitting,
                 onClose = viewModel::closeSitting,
+                onBlur = viewModel::setCoverBlurred,
             ),
         )
     }
 
-    BookDetailContent(state, snackbarHostState, actions, sittingClock = sittingClock)
+    BookDetailContent(state, snackbarHostState, actions, sittingClock = sittingClock, coverBlurred = coverBlurred)
     if (choosingShelves) {
         ShelfChecklistSheet(
             shelves = bookShelves.all,
@@ -399,6 +401,7 @@ fun BookDetailContent(
     modifier: Modifier = Modifier,
     onAdd: ((Acquisition) -> Unit)? = null,
     sittingClock: PhysicalSitting.Clock = PhysicalSitting.Clock(0L, null),
+    coverBlurred: Boolean = false,
 ) {
     val book = state.book
     // With a way to add it, the book is not the user's own yet: there is nothing of theirs to
@@ -838,6 +841,7 @@ fun BookDetailContent(
             PhysicalReadingMode(
                 book = book,
                 clock = sittingClock,
+                blurred = coverBlurred,
                 actions = PhysicalReadingActions(
                     onTurn = { page, sittingSince -> actions.onTurnPhysicalPage(page, book.physicalPageCount, sittingSince) },
                     onOpen = actions.sitting.onOpen,
@@ -845,6 +849,7 @@ fun BookDetailContent(
                     onResume = actions.sitting.onResume,
                     onHide = actions.sitting.onHide,
                     onShow = actions.sitting.onShow,
+                    onBlur = actions.sitting.onBlur,
                     onClose = {
                         actions.sitting.onClose()
                         readingPhysical = false
