@@ -120,6 +120,17 @@ describe('setPhysicalProgress', () => {
 	});
 });
 
+describe('recordPhysicalSession', () => {
+	it('keeps a timed sitting as a session in the read-through, with no pages of its own', () => {
+		const reading = run(tables({ books: [book({ pageCount: 200 })] }), (tx) => ops.setPhysicalProgress(tx, 'b1', 50, null)).after;
+		const start = 10 * 86_400_000 + 1000;
+		const { changes } = run(reading, (tx) => ops.recordPhysicalSession(tx, 'b1', start, start + 1_800_000, 1_800_000));
+		const [session] = changes.readingSessions!;
+		expect(session).toMatchObject({ bookId: 'b1', durationMs: 1_800_000, day: 10, pages: 0, startProgression: 0.25 });
+		expect(session.readThroughId).toBe([...reading.readThroughs.values()][0].id);
+	});
+});
+
 describe('deleteBook', () => {
 	it('tombstones the book and everything that hangs off it', () => {
 		const base = tables({

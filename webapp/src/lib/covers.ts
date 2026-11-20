@@ -37,6 +37,21 @@ export function coverUrl(name: string | undefined): string | null | undefined {
 	return urls.get(name);
 }
 
+type CoverBook = { coverFile?: string; coverUrl?: string; customCover?: boolean; fileHash?: string };
+
+/**
+ * The picture to show for [book]: the account's own copy first, then the catalogue's, as the phone
+ * does. A catalogue picture is never in the account, so it is not asked for there. Null while the
+ * account's copy loads, or when there is none.
+ */
+export function coverSrc(book: CoverBook): string | null {
+	if (!coverInAccount(book)) return book.coverUrl ?? null;
+	const own = coverUrl(book.coverFile);
+	if (own) return own;
+	if (own === undefined) return null;
+	return book.coverUrl ?? null;
+}
+
 const MAX_EDGE = 1200;
 
 /** Scales a picked picture to the phone's cover size, as a JPEG, and uploads it. Returns the file name to give the book. */

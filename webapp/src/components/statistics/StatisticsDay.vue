@@ -60,7 +60,13 @@ const headline = computed(() =>
 								{{
 									entry.kind === 'session'
 										? [formatDuration(entry.durationMs), entry.chapter].filter(Boolean).join(' · ')
-										: `${s.book.progressPhysical} · ${s.stats.pageSpan(entry.startPage, entry.endPage)}`
+										: [
+												s.book.progressPhysical,
+												entry.durationMs != null ? formatDuration(entry.durationMs) : null,
+												s.stats.pageSpan(entry.startPage, entry.endPage),
+											]
+												.filter(Boolean)
+												.join(' · ')
 								}}
 							</span>
 						</span>

@@ -282,7 +282,7 @@ export interface BookReading {
 	endPosition?: number;
 	/** Share of the book covered, 0 to 1, from the pages turned. */
 	progressGained: number;
-	/** Read in a physical copy, so untimed, its positions pages of that copy. */
+	/** Read in a physical copy, its positions pages of that copy; timed only by the reading mode. */
 	physical: boolean;
 }
 
@@ -293,7 +293,7 @@ export function pagesPerHour(reading: BookReading): number | null {
 
 export type TimelineEntry =
 	| { kind: 'session'; book: Book; at: number; durationMs: number; chapter?: string }
-	| { kind: 'pages'; book: Book; at: number; startPage: number; endPage: number };
+	| { kind: 'pages'; book: Book; at: number; startPage: number; endPage: number; durationMs?: number };
 
 function perDay(sessions: ReadingSession[], paper: PhysicalReading[], start: number, endExclusive: number): DayReading[] {
 	return Array.from({ length: endExclusive - start }, (_, index) => {
@@ -328,7 +328,7 @@ function perBook(sessions: ReadingSession[], paper: PhysicalReading[], byId: Map
 				startPosition: ordered.find((row) => row.startPosition != null)?.startPosition,
 				endPosition: ends.length ? Math.max(...ends) : undefined,
 				progressGained: book.positionCount && book.positionCount > 0 ? pages / book.positionCount : 0,
-				physical: false,
+				physical: !inLibrary(book),
 			},
 		];
 	});
@@ -347,7 +347,60 @@ function perBook(sessions: ReadingSession[], paper: PhysicalReading[], byId: Map
 			},
 		];
 	});
-	return [...read.sort((a, b) => b.durationMs - a.durationMs), ...onPaper.sort((a, b) => b.pages - a.pages)];
+	return withPaperTime(
+		read.sort((a, b) => b.durationMs - a.durationMs),
+		onPaper.sort((a, b) => b.pages - a.pages),
+	);
+}
+
+/**
+ * [reader] and [paper] together, with the time of a book read only on paper, which the reading mode
+ * timed as sessions, put on its paper line rather than on a line of its own.
+ */
+export function withPaperTime(reader: BookReading[], paper: BookReading[]): BookReading[] {
+	const paperIds = new Set(paper.map((row) => row.book.id));
+	const timed = new Map(reader.filter((row) => row.physical && paperIds.has(row.book.id)).map((row) => [row.book.id, row.durationMs]));
+	return [
+		...reader.filter((row) => !timed.has(row.book.id)),
+		...paper.map((row) => (timed.has(row.book.id) ? { ...row, durationMs: row.durationMs + timed.get(row.book.id)! } : row)),
+	];
+}
+
+/**
+ * A day's [sessions] and the pages [entered] on it, in the order they happened. A sitting timed in
+ * the reading mode is told by the pages it turned, which carry its time.
+ */
+export function timelineOf(sessions: ReadingSession[], entered: PhysicalReading[], byId: Map<string, Book>): TimelineEntry[] {
+	const folded = new Set<string>();
+	const pages = entered.flatMap((row) => {
+		const book = byId.get(row.bookId);
+		if (!book) return [];
+		const sitting = sessions.find(
+			(session) =>
+				session.bookId === row.bookId &&
+				!folded.has(session.id) &&
+				!inLibrary(book) &&
+				row.recordedAt >= session.startedAt &&
+				row.recordedAt <= session.endedAt,
+		);
+		if (sitting) folded.add(sitting.id);
+		return [
+			{
+				kind: 'pages' as const,
+				book,
+				at: row.recordedAt,
+				startPage: row.startPage,
+				endPage: row.endPage,
+				durationMs: sitting?.durationMs,
+			},
+		];
+	});
+	const read = sessions.flatMap((row) => {
+		const book = byId.get(row.bookId);
+		if (!book || folded.has(row.id)) return [];
+		return [{ kind: 'session' as const, book, at: row.startedAt, durationMs: row.durationMs, chapter: row.endChapter ?? row.startChapter }];
+	});
+	return [...read, ...pages].sort((a, b) => a.at - b.at);
 }
 
 export interface DayStats {
@@ -376,22 +429,7 @@ export function dayStats(input: StatsInput, day: number, firstDayOfWeek: number,
 	// The timeline shows every page entered, the totals only what counts for a book without an EPUB.
 	const entered = input.physical.filter((row) => alive(row) && row.day === day && byId.has(row.bookId));
 	const todayPaper = paper.filter((row) => row.day === day);
-	const timeline: TimelineEntry[] = [
-		...today.map((row) => ({
-			kind: 'session' as const,
-			book: byId.get(row.bookId)!,
-			at: row.startedAt,
-			durationMs: row.durationMs,
-			chapter: row.endChapter ?? row.startChapter,
-		})),
-		...entered.map((row) => ({
-			kind: 'pages' as const,
-			book: byId.get(row.bookId)!,
-			at: row.recordedAt,
-			startPage: row.startPage,
-			endPage: row.endPage,
-		})),
-	].sort((a, b) => a.at - b.at);
+	const timeline = timelineOf(today, entered, byId);
 	return {
 		day,
 		goalMinutes,

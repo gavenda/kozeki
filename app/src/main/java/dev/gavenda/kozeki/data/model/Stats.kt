@@ -19,8 +19,8 @@ data class BookReading(
     /** Share of the book covered, 0.0 to 1.0. */
     val progressGained: Double = 0.0,
     /**
-     * Read in a physical copy, which is how a book without an EPUB is told. Nobody timed it, so
-     * there is no duration, and the pages and positions are pages of that copy.
+     * Read in a physical copy, which is how a book without an EPUB is told. The duration is what
+     * the reading mode timed, if anything, and the pages and positions are pages of that copy.
      */
     val physical: Boolean = false,
     /** Chapters of a comic read to their end. A comic counts these in place of pages. */
@@ -56,6 +56,8 @@ sealed interface TimelineEntry {
         override val at: Long,
         val startPage: Int,
         val endPage: Int,
+        /** How long the sitting in the reading mode that turned these pages was timed, if it was. */
+        val durationMs: Long? = null,
     ) : TimelineEntry
 }
 

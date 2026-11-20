@@ -8,6 +8,7 @@ import dev.gavenda.kozeki.data.model.DayReading
 import dev.gavenda.kozeki.data.model.PeriodStats
 import dev.gavenda.kozeki.data.repository.paperBooks
 import dev.gavenda.kozeki.data.repository.paperOnly
+import dev.gavenda.kozeki.data.repository.withPaperTime
 import java.time.LocalDate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -62,6 +63,16 @@ class PaperStatsTest {
     @Test
     fun `nobody timed a physical copy, so it has no speed`() {
         assertNull(paperBooks(listOf(pages(0, 300)), books).single().pagesPerHour)
+    }
+
+    @Test
+    fun `the time the reading mode kept goes on the paper card, which then has a speed`() {
+        val timed = BookReading(paperback, 30 * 60_000L, 0, physical = true)
+        val read = BookReading(epub, 10 * 60_000L, 12)
+        val cards = withPaperTime(listOf(timed, read), paperBooks(listOf(pages(0, 20)), books))
+
+        assertEquals(listOf(read, BookReading(paperback, 30 * 60_000L, 20, 0, 20, physical = true)), cards)
+        assertEquals(40.0, cards.last().pagesPerHour!!, 0.001)
     }
 
     @Test

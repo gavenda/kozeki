@@ -238,7 +238,9 @@ class StatsRepository(
         list: List<ReadingSessionEntity>,
         paper: List<PhysicalReadingEntity>,
         books: Map<String, Book>,
-    ): List<BookReading> =
+    ): List<BookReading> = withPaperTime(readerBooks(list, books), paperBooks(paper, books))
+
+    private fun readerBooks(list: List<ReadingSessionEntity>, books: Map<String, Book>): List<BookReading> =
         list.groupBy { it.bookId }
             .mapNotNull { (bookId, bookSessions) ->
                 val book = books[bookId] ?: return@mapNotNull null
@@ -254,9 +256,10 @@ class StatsRepository(
                     // From the pages turned, so that jumping around the book does not count as progress.
                     progressGained = book.positionCount?.takeIf { it > 0 }?.let { pages.toDouble() / it } ?: 0.0,
                     chapters = ordered.sumOf { it.chapters },
+                    physical = !book.inLibrary,
                 )
             }
-            .sortedByDescending { it.durationMs } + paperBooks(paper, books)
+            .sortedByDescending { it.durationMs }
 
     private fun completed(list: List<ReadThroughEntity>, books: Map<String, Book>): List<CompletedBook> =
         list.mapNotNull { readThrough ->
@@ -278,15 +281,33 @@ internal fun timeline(
     physical: List<PhysicalReadingEntity>,
     books: Map<String, Book>,
 ): List<TimelineEntry> {
-    val read = sessions.mapNotNull { session ->
+    // A sitting timed in the reading mode is told by the pages it turned, which carry its time.
+    val folded = mutableSetOf<String>()
+    val entered = physical.mapNotNull { reading ->
+        val book = books[reading.bookId] ?: return@mapNotNull null
+        val sitting = sessions.firstOrNull {
+            it.bookId == reading.bookId && it.id !in folded && !book.inLibrary &&
+                reading.recordedAt in it.startedAt..it.endedAt
+        }
+        sitting?.let { folded += it.id }
+        TimelineEntry.Pages(book, reading.recordedAt, reading.startPage, reading.endPage, sitting?.durationMs)
+    }
+    val read = sessions.filter { it.id !in folded }.mapNotNull { session ->
         val book = books[session.bookId] ?: return@mapNotNull null
         TimelineEntry.Session(book, session.startedAt, session.durationMs, session.endChapter ?: session.startChapter)
     }
-    val entered = physical.mapNotNull { reading ->
-        val book = books[reading.bookId] ?: return@mapNotNull null
-        TimelineEntry.Pages(book, reading.recordedAt, reading.startPage, reading.endPage)
-    }
     return (read + entered).sortedBy { it.at }
+}
+
+/**
+ * [reader] and [paper] together, with the time of a book read only on paper, which the reading
+ * mode timed as sessions, put on its paper line rather than on a line of its own.
+ */
+internal fun withPaperTime(reader: List<BookReading>, paper: List<BookReading>): List<BookReading> {
+    val paperIds = paper.map { it.book.id }.toSet()
+    val timed = reader.filter { it.physical && it.book.id in paperIds }.associate { it.book.id to it.durationMs }
+    return reader.filterNot { it.book.id in timed } +
+        paper.map { row -> timed[row.book.id]?.let { row.copy(durationMs = row.durationMs + it) } ?: row }
 }
 
 /**
@@ -305,8 +326,8 @@ internal fun paperOnly(physical: List<PhysicalReadingEntity>, books: Map<String,
     physical.filter { books[it.bookId]?.inLibrary == false }
 
 /**
- * What was read on [paper] of each book, most pages first. Nobody timed it, so there is no duration
- * and the pages are those of the physical copy.
+ * What was read on [paper] of each book, most pages first. The pages are those of the physical
+ * copy; the time, which only the reading mode keeps, is added by [withPaperTime].
  */
 internal fun paperBooks(paper: List<PhysicalReadingEntity>, books: Map<String, Book>): List<BookReading> =
     paper.groupBy { it.bookId }

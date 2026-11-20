@@ -159,6 +159,8 @@ export const s = {
 		readingMode: 'Reading mode',
 		nextPage: 'Next page',
 		previousPage: 'Previous page',
+		timerPause: 'Pause timer',
+		timerResume: 'Resume timer',
 		rewindTitle: (page: number) => `Go back to page ${page}?`,
 		rewindMessage: (pages: number, page: number) =>
 			plural(pages, `The %d page read after page ${page}`, `The %d pages read after page ${page}`) +

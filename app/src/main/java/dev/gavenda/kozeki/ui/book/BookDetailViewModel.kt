@@ -39,11 +39,13 @@ import dev.gavenda.kozeki.ui.LookupError
 import java.time.LocalDate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -174,6 +176,7 @@ class BookDetailViewModel(
     private val aniListAuth: AniListAuth,
     private val shelfRepository: ShelfRepository,
     private val downloads: ComicDownloads,
+    private val appScope: CoroutineScope,
 ) : ViewModel() {
 
     private data class Activity(
@@ -512,6 +515,38 @@ class BookDetailViewModel(
         launch { pageTurns.withLock { library.setPhysicalProgress(bookId, page, pageCount, sittingSince) } }
 
     private val pageTurns = Mutex()
+
+    // ---- The reading mode's timer --------------------------------------------------------------
+
+    private val sitting = PhysicalSitting(System::currentTimeMillis)
+    private val _sittingClock = MutableStateFlow(sitting.clock)
+
+    /** What the reading mode's timer shows. */
+    val sittingClock: StateFlow<PhysicalSitting.Clock> = _sittingClock.asStateFlow()
+
+    /** Starts the timer when the reading mode opens; one already running carries on. */
+    fun openSitting() = sitting.start().also { _sittingClock.value = sitting.clock }
+
+    fun pauseSitting() = sitting.pause().also { _sittingClock.value = sitting.clock }
+
+    fun resumeSitting() = sitting.resume().also { _sittingClock.value = sitting.clock }
+
+    fun hideSitting() = keep(sitting.hide())
+
+    fun showSitting() = sitting.show().also { _sittingClock.value = sitting.clock }
+
+    fun closeSitting() = keep(sitting.close())
+
+    /** Keeps [part] as a session. Outside this ViewModel's scope, so closing the book does not lose it. */
+    private fun keep(part: PhysicalSitting.Part?) {
+        _sittingClock.value = sitting.clock
+        part ?: return
+        appScope.launch { library.recordPhysicalSession(bookId, part.startedAt, part.endedAt, part.durationMs) }
+    }
+
+    override fun onCleared() {
+        keep(sitting.close())
+    }
 
     fun saveNote(noteId: String?, text: String) {
         if (text.isBlank()) return

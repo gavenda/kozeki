@@ -66,7 +66,7 @@ fun foundBookViewModel(result: BookMetadata) =
 fun bookDetailViewModel(bookId: String) =
     BookDetailViewModel(
         bookId, koin.get(), koin.get(), koin.get(), koin.get(), koin.get(), scheduleMatching(), koin.get(), koin.get(), koin.get(),
-        koin.get(),
+        koin.get(), koin.get(),
     )
 
 fun readerViewModel(bookId: String) = ReaderViewModel(

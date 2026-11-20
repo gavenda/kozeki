@@ -209,9 +209,10 @@ private fun TimelineRow(entry: TimelineEntry) {
                 text = when (entry) {
                     is TimelineEntry.Session ->
                         listOfNotNull(formatDuration(entry.durationMs), entry.chapter).joinToString(" · ")
-                    // Nobody timed a physical copy, so it says how far it was read in place of how long.
-                    is TimelineEntry.Pages -> listOf(
+                    // How far a physical copy was read, and how long when the reading mode timed it.
+                    is TimelineEntry.Pages -> listOfNotNull(
                         stringResource(R.string.progress_physical),
+                        entry.durationMs?.let { formatDuration(it) },
                         stringResource(R.string.stats_page_span, entry.startPage, entry.endPage),
                     ).joinToString(" · ")
                 },

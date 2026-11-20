@@ -95,4 +95,15 @@ class TimelineTest {
 
         assertEquals(listOf(TimelineEntry.Pages(paper, 3_000, 0, 12)), entries)
     }
+
+    @Test
+    fun `a sitting timed in the reading mode is told by the pages it turned`() {
+        val entries = timeline(
+            sessions = listOf(session(1_000, minutes = 25, bookId = paper.id)),
+            physical = listOf(pages(4_000, from = 40, to = 61)),
+            books = books,
+        )
+
+        assertEquals(listOf(TimelineEntry.Pages(paper, 4_000, 40, 61, 25 * 60_000L)), entries)
+    }
 }

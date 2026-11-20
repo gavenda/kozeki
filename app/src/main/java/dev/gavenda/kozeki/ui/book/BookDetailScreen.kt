@@ -215,6 +215,8 @@ class BookDetailActions(
     val onOpenTrack: () -> Unit = {},
     val onOpenShelves: () -> Unit = {},
     val track: TrackSheetActions = TrackSheetActions(),
+    /** The reading mode's timer. Its page turns and its closing are added where it is shown. */
+    val sitting: PhysicalReadingActions = PhysicalReadingActions(),
 )
 
 @Composable
@@ -233,6 +235,7 @@ fun BookDetailScreen(
 ) {
     val loaded by viewModel.uiState.collectAsStateWithLifecycle()
     val bookShelves by viewModel.shelves.collectAsStateWithLifecycle()
+    val sittingClock by viewModel.sittingClock.collectAsStateWithLifecycle()
     var choosingShelves by rememberSaveable { mutableStateOf(false) }
     val state = if (loaded.loading && placeholder != null) loaded.copy(loading = false, book = placeholder) else loaded
     val snackbarHostState = remember { SnackbarHostState() }
@@ -315,10 +318,18 @@ fun BookDetailScreen(
                 onUntrack = viewModel::untrack,
                 onDismiss = viewModel::closeTrackSheet,
             ),
+            sitting = PhysicalReadingActions(
+                onOpen = viewModel::openSitting,
+                onPause = viewModel::pauseSitting,
+                onResume = viewModel::resumeSitting,
+                onHide = viewModel::hideSitting,
+                onShow = viewModel::showSitting,
+                onClose = viewModel::closeSitting,
+            ),
         )
     }
 
-    BookDetailContent(state, snackbarHostState, actions)
+    BookDetailContent(state, snackbarHostState, actions, sittingClock = sittingClock)
     if (choosingShelves) {
         ShelfChecklistSheet(
             shelves = bookShelves.all,
@@ -387,6 +398,7 @@ fun BookDetailContent(
     actions: BookDetailActions,
     modifier: Modifier = Modifier,
     onAdd: ((Acquisition) -> Unit)? = null,
+    sittingClock: PhysicalSitting.Clock = PhysicalSitting.Clock(0L, null),
 ) {
     val book = state.book
     // With a way to add it, the book is not the user's own yet: there is nothing of theirs to
@@ -825,8 +837,19 @@ fun BookDetailContent(
         if (readingPhysical) {
             PhysicalReadingMode(
                 book = book,
-                onTurn = { page, sittingSince -> actions.onTurnPhysicalPage(page, book.physicalPageCount, sittingSince) },
-                onDismiss = { readingPhysical = false },
+                clock = sittingClock,
+                actions = PhysicalReadingActions(
+                    onTurn = { page, sittingSince -> actions.onTurnPhysicalPage(page, book.physicalPageCount, sittingSince) },
+                    onOpen = actions.sitting.onOpen,
+                    onPause = actions.sitting.onPause,
+                    onResume = actions.sitting.onResume,
+                    onHide = actions.sitting.onHide,
+                    onShow = actions.sitting.onShow,
+                    onClose = {
+                        actions.sitting.onClose()
+                        readingPhysical = false
+                    },
+                ),
             )
         }
         if (confirmingRefresh) {

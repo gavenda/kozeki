@@ -261,6 +261,31 @@ export function setPhysicalProgress(
 	}
 }
 
+/**
+ * A sitting with a physical copy, timed in the reading mode. It is kept as a session, so it counts
+ * towards the time read and the daily goal as reading in the reader does; its pages are the
+ * physical readings' to count.
+ */
+export function recordPhysicalSession(tx: Tx, bookId: string, startedAt: number, endedAt: number, durationMs: number): void {
+	const book = tx.get('books', bookId);
+	if (!book || !alive(book)) return;
+	const count = book.physicalPageCount ?? book.pageCount;
+	const progression = book.physicalPage != null && count && count > 0 ? Math.min(Math.max(book.physicalPage / count, 0), 1) : 0;
+	tx.put('readingSessions', {
+		id: newId(),
+		bookId,
+		readThroughId: currentReadThrough(tx, bookId, book.state ?? 'PLANNED')?.id,
+		startedAt,
+		endedAt,
+		durationMs,
+		day: epochDayOf(startedAt),
+		startProgression: progression,
+		endProgression: progression,
+		pages: 0,
+		sync: tx.created(),
+	});
+}
+
 // ---- The book itself ------------------------------------------------------------------------
 
 export function setFavorite(tx: Tx, bookId: string, favorite: boolean): void {

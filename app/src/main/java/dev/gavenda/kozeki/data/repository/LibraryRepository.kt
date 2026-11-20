@@ -896,6 +896,34 @@ class LibraryRepository(
         )
     }
 
+    /**
+     * A sitting with a physical copy, timed in the reading mode. It is kept as a session, so it
+     * counts towards the time read and the daily goal as reading in the reader does; its pages are
+     * the physical readings' to count.
+     */
+    suspend fun recordPhysicalSession(bookId: String, startedAt: Long, endedAt: Long, durationMs: Long) {
+        val book = books.get(bookId) ?: return
+        val progression = book.physicalPage?.let { page ->
+            (book.physicalPageCount ?: book.pageCount)?.takeIf { it > 0 }?.let { (page.toDouble() / it).coerceIn(0.0, 1.0) }
+        } ?: 0.0
+        recordSession(
+            SessionDraft(
+                bookId = bookId,
+                readThroughId = currentReadThrough(bookId, book.state)?.id,
+                startedAt = startedAt,
+                endedAt = endedAt,
+                durationMs = durationMs,
+                startProgression = progression,
+                endProgression = progression,
+                startPosition = null,
+                endPosition = null,
+                pages = 0,
+                startChapter = null,
+                endChapter = null,
+            ),
+        )
+    }
+
     suspend fun recordSession(draft: SessionDraft) {
         val now = clock.millis()
         sessions.insert(

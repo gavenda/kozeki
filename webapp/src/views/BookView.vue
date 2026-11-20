@@ -204,6 +204,7 @@ function remove() {
 			v-if="readingPhysical"
 			:book="book"
 			@turn="(page, since) => edit((tx) => ops.setPhysicalProgress(tx, id, page, physicalPageCount(book!) ?? null, since))"
+			@session="(part) => edit((tx) => ops.recordPhysicalSession(tx, id, part.startedAt, part.endedAt, part.durationMs))"
 			@close="readingPhysical = false"
 		/>
 		<ModalDialog v-if="stoppingPhysical" :title="s.physical.stopTitle" icon="history" icon-class="text-error" @close="stoppingPhysical = 0">
