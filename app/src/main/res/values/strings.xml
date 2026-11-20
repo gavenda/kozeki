@@ -292,8 +292,8 @@
     <string name="physical_previous_page">Previous page</string>
     <string name="physical_timer_pause">Pause timer</string>
     <string name="physical_timer_resume">Resume timer</string>
-    <string name="physical_cover_blur">Blur cover</string>
-    <string name="physical_cover_unblur">Unblur cover</string>
+    <string name="physical_cover_blur">Blur panel</string>
+    <string name="physical_cover_unblur">Unblur panel</string>
     <string name="physical_rewind_title">Go back to page %1$d?</string>
     <plurals name="physical_rewind_message">
         <item quantity="one">The %1$d page read after page %2$d will be removed from your timeline. This cannot be undone.</item>

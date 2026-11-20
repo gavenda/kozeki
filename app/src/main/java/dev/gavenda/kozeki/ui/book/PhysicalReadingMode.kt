@@ -40,6 +40,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -151,12 +163,14 @@ private fun PhysicalReadingContent(
             val wide = maxWidth > maxHeight
             val cover = book.coverModel
             // On a phone the cover is the background, darkened a little so the card stands out.
+            // Where it sits is kept, so that the card can draw the part of it behind itself.
+            var coverOrigin by remember { mutableStateOf(Offset.Zero) }
             if (!wide && cover != null) {
                 AsyncImage(
                     model = cover,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().then(if (blurred) Modifier.blur(24.dp) else Modifier),
+                    modifier = Modifier.fillMaxSize().onGloballyPositioned { coverOrigin = it.positionInRoot() },
                 )
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
             }
@@ -186,23 +200,64 @@ private fun PhysicalReadingContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
                     ) {
+                        var cardOrigin by remember { mutableStateOf(Offset.Zero) }
                         Surface(
                             shape = MaterialTheme.shapes.extraLarge,
-                            color = if (onCover) {
-                                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.82f)
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerHigh
-                            },
-                            modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+                            color = Color.Transparent,
+                            modifier = Modifier
+                                .widthIn(max = 480.dp)
+                                .fillMaxWidth()
+                                .onGloballyPositioned { cardOrigin = it.positionInRoot() },
                         ) {
-                            Box(Modifier.padding(24.dp)) { BookAndPage(book, page, total) }
+                            Box {
+                                // Frosted glass: the cover behind the card, blurred, under the card's colour.
+                                if (onCover && blurred) {
+                                    FrostedCover(cover!!, this@BoxWithConstraints.maxWidth, this@BoxWithConstraints.maxHeight, cardOrigin - coverOrigin)
+                                }
+                                Box(
+                                    Modifier.matchParentSize().background(
+                                        MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+                                            alpha = when {
+                                                !onCover -> 1f
+                                                blurred -> 0.6f
+                                                else -> 0.82f
+                                            },
+                                        ),
+                                    ),
+                                )
+                                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                                    BookAndPage(book, page, total)
+                                    PageButtons(page, total, onNext, onPrevious, Modifier.fillMaxWidth())
+                                }
+                            }
                         }
-                        PageButtons(page, total, onNext, onPrevious, Modifier.widthIn(max = 480.dp).fillMaxWidth())
                     }
                 }
                 TopRow(clock, onCover, blurred, actions, Modifier.align(Alignment.TopCenter))
             }
         }
+    }
+}
+
+/**
+ * The part of the cover, filling a screen of [width] by [height], that lies behind a card [offset]
+ * from its corner, blurred, so that the card looks like frosted glass over it.
+ */
+@Composable
+private fun BoxScope.FrostedCover(cover: Any, width: Dp, height: Dp, offset: Offset) {
+    Box(Modifier.matchParentSize().clipToBounds()) {
+        AsyncImage(
+            model = cover,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .wrapContentSize(Alignment.TopStart, unbounded = true)
+                .requiredSize(width, height)
+                .offset { IntOffset(-offset.x.roundToInt(), -offset.y.roundToInt()) }
+                .blur(24.dp),
+        )
+        // The same darkening as the background, so the two meet without a seam.
+        Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.3f)))
     }
 }
 
@@ -241,7 +296,7 @@ private fun TopRow(
             )
         }
         Spacer(Modifier.weight(1f))
-        // Only a cover behind the card can be blurred, so only the phone's layout has the button.
+        // Only a card over the cover can be frosted, so only the phone's layout has the button.
         if (onCover) {
             val label = stringResource(if (blurred) R.string.physical_cover_unblur else R.string.physical_cover_blur)
             LabelTooltip(label) {

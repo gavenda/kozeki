@@ -161,8 +161,8 @@ export const s = {
 		previousPage: 'Previous page',
 		timerPause: 'Pause timer',
 		timerResume: 'Resume timer',
-		coverBlur: 'Blur cover',
-		coverUnblur: 'Unblur cover',
+		coverBlur: 'Blur panel',
+		coverUnblur: 'Unblur panel',
 		rewindTitle: (page: number) => `Go back to page ${page}?`,
 		rewindMessage: (pages: number, page: number) =>
 			plural(pages, `The %d page read after page ${page}`, `The %d pages read after page ${page}`) +

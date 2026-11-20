@@ -521,7 +521,7 @@ class BookDetailViewModel(
     private val sitting = PhysicalSitting(System::currentTimeMillis)
     private val _sittingClock = MutableStateFlow(sitting.clock)
 
-    /** Whether the reading mode blurs the cover behind its card. */
+    /** Whether the reading mode frosts its card over the cover. */
     val coverBlurred: StateFlow<Boolean> =
         settings.blurReadingCover.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 

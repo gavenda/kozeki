@@ -315,7 +315,7 @@ class SettingsRepository(context: Context) : DriveLinkStore, LocalBackupStore {
         store.edit { it[Keys.TemporaryPagesMegabytes] = megabytes.coerceAtLeast(1) }
     }
 
-    /** Whether the reading mode blurs the cover behind its card. Kept per device. */
+    /** Whether the reading mode frosts its card over the cover. Kept per device. */
     val blurReadingCover: Flow<Boolean> =
         store.data.map { it[Keys.BlurReadingCover] ?: false }.distinctUntilChanged()
 

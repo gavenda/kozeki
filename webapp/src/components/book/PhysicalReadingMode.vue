@@ -30,7 +30,7 @@ const page = ref(props.book.physicalPage ?? 0);
 const sittingSince = Date.now();
 const total = computed(() => physicalPageCount(props.book));
 const cover = computed(() => coverSrc(props.book));
-// Whether the cover behind the card is blurred, kept per browser as the phone keeps it per device.
+// Whether the card over the cover is frosted, kept per browser as the phone keeps it per device.
 const blurred = persisted('readingCoverBlurred', false, (value): value is boolean => typeof value === 'boolean');
 const canNext = computed(() => total.value == null || page.value < total.value);
 
@@ -118,13 +118,7 @@ onBeforeUnmount(() => void wakeLock.release());
 		<div class="fixed inset-0 z-50 overflow-hidden bg-surface text-on-surface" role="dialog" aria-modal="true" :aria-label="book.title">
 			<!-- In a tall window the cover is the background, darkened a little so the card stands out. -->
 			<template v-if="cover">
-				<img
-					:src="cover"
-					alt=""
-					class="absolute inset-0 size-full object-cover transition-[filter,scale] landscape:hidden"
-					:class="blurred && 'scale-110 blur-2xl'"
-					referrerpolicy="no-referrer"
-				/>
+				<img :src="cover" alt="" class="absolute inset-0 size-full object-cover landscape:hidden" referrerpolicy="no-referrer" />
 				<div class="absolute inset-0 bg-black/30 landscape:hidden" />
 			</template>
 
@@ -137,7 +131,13 @@ onBeforeUnmount(() => void wakeLock.release());
 					<div class="flex w-full max-w-[480px] flex-col items-center gap-6">
 						<section
 							class="flex w-full flex-col items-center gap-2 rounded-[28px] p-6 text-center landscape:bg-transparent! landscape:p-0"
-							:class="cover ? 'bg-surface-container-high/82' : 'bg-surface-container-high'"
+							:class="
+								!cover
+									? 'bg-surface-container-high'
+									: blurred
+										? 'bg-surface-container-high/60 backdrop-blur-2xl'
+										: 'bg-surface-container-high/82'
+							"
 						>
 							<h1 class="line-clamp-3 type-headline-small-em">{{ book.title }}</h1>
 							<p v-if="book.authors?.length" class="line-clamp-2 type-title-medium text-on-surface-variant">
@@ -146,25 +146,25 @@ onBeforeUnmount(() => void wakeLock.release());
 							<p class="mt-1 type-label-large text-primary">{{ s.book.page }}</p>
 							<p class="type-display-medium-em" aria-live="polite">{{ total ? s.xOfY(page, total) : String(page) }}</p>
 							<WavyProgress v-if="total" class="w-full" :progress="Math.min(page / total, 1)" />
+							<div class="mt-4 flex w-full items-center gap-3 landscape:max-w-[360px]">
+								<!-- Short and narrow, so that a thumb reaching for the next page does not land on it. -->
+								<IconButton
+									variant="tonal"
+									size="m"
+									width="narrow"
+									:label="s.physical.previousPage"
+									:title="s.physical.previousPage"
+									:disabled="page <= 0"
+									@click="previous"
+								>
+									<AppIcon name="undo" />
+								</IconButton>
+								<Button size="l" class="min-w-0 flex-1 px-6!" :disabled="!canNext" @click="next">
+									{{ s.physical.nextPage }}
+									<AppIcon name="keyboardArrowRight" :size="32" />
+								</Button>
+							</div>
 						</section>
-						<div class="flex w-full items-center gap-3 landscape:max-w-[360px]">
-							<!-- Short and narrow, so that a thumb reaching for the next page does not land on it. -->
-							<IconButton
-								variant="tonal"
-								size="m"
-								width="narrow"
-								:label="s.physical.previousPage"
-								:title="s.physical.previousPage"
-								:disabled="page <= 0"
-								@click="previous"
-							>
-								<AppIcon name="undo" />
-							</IconButton>
-							<Button size="l" class="min-w-0 flex-1 px-6!" :disabled="!canNext" @click="next">
-								{{ s.physical.nextPage }}
-								<AppIcon name="keyboardArrowRight" :size="32" />
-							</Button>
-						</div>
 					</div>
 				</div>
 
@@ -180,7 +180,7 @@ onBeforeUnmount(() => void wakeLock.release());
 						<AppIcon name="arrowBack" />
 					</IconButton>
 					<div class="ml-auto flex items-center">
-						<!-- Only a cover behind the card can be blurred, so only the tall layout has the button. -->
+						<!-- Only a card over the cover can be frosted, so only the tall layout has the button. -->
 						<IconButton
 							v-if="cover"
 							variant="tonal"
