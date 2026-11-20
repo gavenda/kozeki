@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** The sheet where the user picks which record in the metadata source a book corresponds to. */
 data class MatchUiState(
@@ -503,6 +505,13 @@ class BookDetailViewModel(
 
     fun setPhysicalProgress(page: Int?, pageCount: Int?) =
         launch { library.setPhysicalProgress(bookId, page, pageCount) }
+
+    /** One page on or back in the reading mode, in the sitting that began at [sittingSince]. */
+    fun turnPhysicalPage(page: Int, pageCount: Int?, sittingSince: Long) =
+        // Quick taps are written in the order they were made, so a page back never lands first.
+        launch { pageTurns.withLock { library.setPhysicalProgress(bookId, page, pageCount, sittingSince) } }
+
+    private val pageTurns = Mutex()
 
     fun saveNote(noteId: String?, text: String) {
         if (text.isBlank()) return

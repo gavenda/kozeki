@@ -100,6 +100,11 @@ body {
  * The Material 3 type scale the Android app uses, by role. The Emphasized roles are the Expressive
  * heavier weights. Name text by its role on the phone (type-title-medium), not by a size.
  */
+@utility type-display-medium-em {
+	font-size: 45px;
+	line-height: 52px;
+	font-weight: 500;
+}
 @utility type-display-small-em {
 	font-size: 36px;
 	line-height: 44px;

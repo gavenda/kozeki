@@ -186,6 +186,7 @@ class BookDetailActions(
     val onSetRating: (Float?) -> Unit = {},
     val onSetPurchase: (Acquisition, Long?, String?, LocalDate?, String?, String?) -> Unit = { _, _, _, _, _, _ -> },
     val onSetPhysicalProgress: (Int?, Int?) -> Unit = { _, _ -> },
+    val onTurnPhysicalPage: (page: Int, pageCount: Int?, sittingSince: Long) -> Unit = { _, _, _ -> },
     val onSaveNote: (String?, String) -> Unit = { _, _ -> },
     val onDeleteNote: (String) -> Unit = {},
     val onDelete: () -> Unit = {},
@@ -280,6 +281,7 @@ fun BookDetailScreen(
             onSetRating = viewModel::setRating,
             onSetPurchase = viewModel::setPurchase,
             onSetPhysicalProgress = viewModel::setPhysicalProgress,
+            onTurnPhysicalPage = viewModel::turnPhysicalPage,
             onSaveNote = viewModel::saveNote,
             onDeleteNote = viewModel::deleteNote,
             onDelete = viewModel::delete,
@@ -396,6 +398,7 @@ fun BookDetailContent(
     var editingPurchase by rememberSaveable { mutableStateOf(false) }
     var editingPhysicalProgress by rememberSaveable { mutableStateOf(false) }
     var confirmingStopPhysical by rememberSaveable { mutableStateOf(false) }
+    var readingPhysical by rememberSaveable { mutableStateOf(false) }
     var confirmingRefresh by rememberSaveable { mutableStateOf(false) }
     // "" means a new note is being written; null means no note dialog.
     var editingNoteId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -673,6 +676,7 @@ fun BookDetailContent(
                         PhysicalProgressCard(
                             book = book,
                             onEdit = { editingPhysicalProgress = true },
+                            onRead = { readingPhysical = true },
                             onStop = {
                                 // Asks first only when stopping unreads pages that are on record.
                                 if (pagesUnread(state.physicalReadings, book.physicalPage, null) > 0) {
@@ -816,6 +820,13 @@ fun BookDetailContent(
                     actions.onSetPhysicalProgress(page, pageCount)
                 },
                 onDismiss = { editingPhysicalProgress = false },
+            )
+        }
+        if (readingPhysical) {
+            PhysicalReadingMode(
+                book = book,
+                onTurn = { page, sittingSince -> actions.onTurnPhysicalPage(page, book.physicalPageCount, sittingSince) },
+                onDismiss = { readingPhysical = false },
             )
         }
         if (confirmingRefresh) {
@@ -1753,7 +1764,7 @@ private fun ProgressCard(book: Book, readingTimeMs: Long, readThroughs: List<Rea
  * invitation rather than an empty meter.
  */
 @Composable
-private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit, onStop: () -> Unit) {
+private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit, onRead: () -> Unit, onStop: () -> Unit) {
     // The paper copy is told from the EPUB by its colour as well: the theme's leather.
     val leather = MaterialTheme.colorScheme.tertiary
     val page = book.physicalPage
@@ -1816,6 +1827,28 @@ private fun PhysicalProgressCard(book: Book, onEdit: () -> Unit, onStop: () -> U
                 Spacer(Modifier.width(8.dp))
                 FilledTonalButton(onClick = onEdit, shapes = ButtonDefaults.shapes()) {
                     Text(stringResource(R.string.physical_update))
+                }
+                Spacer(Modifier.width(8.dp))
+                // Wide, as the way into the screen that turns pages.
+                val readLabel = stringResource(R.string.physical_reading_mode)
+                LabelTooltip(readLabel) {
+                    FilledIconButton(
+                        onClick = onRead,
+                        shapes = IconButtonDefaults.shapes(),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = leather,
+                            contentColor = MaterialTheme.colorScheme.onTertiary,
+                        ),
+                        modifier = Modifier.size(
+                            IconButtonDefaults.smallContainerSize(IconButtonDefaults.IconButtonWidthOption.Wide),
+                        ),
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.auto_stories_48px),
+                            contentDescription = readLabel,
+                            modifier = Modifier.size(IconButtonDefaults.smallIconSize),
+                        )
+                    }
                 }
             }
         }

@@ -103,6 +103,21 @@ describe('setPhysicalProgress', () => {
 			[100, 150],
 		]);
 	});
+
+	it('keeps the pages of one sitting in the reading mode as one reading', () => {
+		const since = 10 * 86_400_000;
+		const before = run(tables({ books: [book({ pageCount: 300 })] }), (tx) => ops.setPhysicalProgress(tx, 'b1', 40, null), since - 1).after;
+		let after = before;
+		for (const page of [41, 42, 43]) after = run(after, (tx) => ops.setPhysicalProgress(tx, 'b1', page, null, since), since + page).after;
+		// A tap taken back cuts the sitting's reading short, and the next tap carries it on again.
+		after = run(after, (tx) => ops.setPhysicalProgress(tx, 'b1', 42, null, since), since + 50).after;
+		after = run(after, (tx) => ops.setPhysicalProgress(tx, 'b1', 43, null, since), since + 51).after;
+		const readings = [...after.physicalReadings.values()].filter(ops.alive).map((row) => [row.startPage, row.endPage]);
+		expect(readings.sort()).toEqual([
+			[0, 40],
+			[40, 43],
+		]);
+	});
 });
 
 describe('deleteBook', () => {

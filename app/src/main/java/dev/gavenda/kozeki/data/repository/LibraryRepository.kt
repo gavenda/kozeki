@@ -685,8 +685,12 @@ class LibraryRepository(
      * timeline shows of a physical copy. Taking the page back, or no longer keeping one, removes
      * what the read-through had on record past it: see [pagesUnread], which callers ask the user
      * about before they get here.
+     *
+     * A sitting in the reading mode, which moves the page one at a time, passes when it began as
+     * [sittingSince]: the pages it moves on extend the reading it already put on record today
+     * rather than adding one for every page.
      */
-    suspend fun setPhysicalProgress(bookId: String, page: Int?, pageCount: Int?) {
+    suspend fun setPhysicalProgress(bookId: String, page: Int?, pageCount: Int?, sittingSince: Long? = null) {
         db.withTransaction {
             val book = books.get(bookId) ?: return@withTransaction
             if (book.acquisition == Acquisition.WISHLIST) return@withTransaction
@@ -716,19 +720,29 @@ class LibraryRepository(
             }
             setState(bookId, state)
             if (reached > before) {
-                physicalReadings.insert(
-                    PhysicalReadingEntity(
-                        id = UUID.randomUUID().toString(),
-                        bookId = bookId,
-                        // Looked up once the state is set, which is what starts a read-through.
-                        readThroughId = currentReadThrough(bookId, state)?.id,
-                        recordedAt = now,
-                        day = today().toEpochDay(),
-                        startPage = before,
-                        endPage = reached,
-                        sync = SyncStamp.created(now),
-                    ),
-                )
+                // Looked up once the state is set, which is what starts a read-through.
+                val readThroughId = currentReadThrough(bookId, state)?.id
+                val day = today().toEpochDay()
+                val sitting = sittingSince?.let { since ->
+                    physicalReadings.getLatest(bookId, readThroughId)
+                        ?.takeIf { it.recordedAt >= since && it.day == day && it.endPage == before }
+                }
+                if (sitting != null) {
+                    physicalReadings.update(sitting.copy(endPage = reached, sync = sitting.sync.touched(now)))
+                } else {
+                    physicalReadings.insert(
+                        PhysicalReadingEntity(
+                            id = UUID.randomUUID().toString(),
+                            bookId = bookId,
+                            readThroughId = readThroughId,
+                            recordedAt = now,
+                            day = day,
+                            startPage = before,
+                            endPage = reached,
+                            sync = SyncStamp.created(now),
+                        ),
+                    )
+                }
             }
         }
     }

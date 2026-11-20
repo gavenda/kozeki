@@ -287,6 +287,9 @@
     <string name="physical_page_count">Total pages</string>
     <string name="physical_stop">Stop tracking</string>
     <string name="physical_save">Save page</string>
+    <string name="physical_reading_mode">Reading mode</string>
+    <string name="physical_next_page">Next page</string>
+    <string name="physical_previous_page">Previous page</string>
     <string name="physical_rewind_title">Go back to page %1$d?</string>
     <plurals name="physical_rewind_message">
         <item quantity="one">The %1$d page read after page %2$d will be removed from your timeline. This cannot be undone.</item>

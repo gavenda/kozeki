@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import androidx.room.Upsert
 import dev.gavenda.kozeki.data.model.MetadataSource
 import kotlinx.coroutines.flow.Flow
@@ -337,6 +338,16 @@ interface PhysicalReadingDao {
 
     @Query("SELECT COUNT(*) FROM physical_readings WHERE bookId = :bookId AND deletedAt IS NULL")
     suspend fun countForBook(bookId: String): Int
+
+    /** The last reading one read-through has on record, which a sitting in the reading mode carries on. */
+    @Query(
+        "SELECT * FROM physical_readings WHERE bookId = :bookId AND readThroughId IS :readThroughId " +
+            "AND deletedAt IS NULL ORDER BY recordedAt DESC LIMIT 1",
+    )
+    suspend fun getLatest(bookId: String, readThroughId: String?): PhysicalReadingEntity?
+
+    @Update
+    suspend fun update(reading: PhysicalReadingEntity)
 
     /**
      * Removes what one read-through has on record as read from [page] onwards. A reading that only

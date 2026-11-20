@@ -197,8 +197,18 @@ function currentReadThrough(tx: Tx, bookId: string, state: ReadingState): ReadTh
  * The page reached in a physical copy. Moving it on records the pages in between as read today;
  * taking it back removes what this read-through recorded past it. A first page starts the book,
  * the last one completes it.
+ *
+ * A sitting in the reading mode, which moves the page one at a time, passes when it began as
+ * [sittingSince]: the pages it moves on extend the reading it already put on record today rather
+ * than adding one for every page.
  */
-export function setPhysicalProgress(tx: Tx, bookId: string, page: number | null, pageCount: number | null): void {
+export function setPhysicalProgress(
+	tx: Tx,
+	bookId: string,
+	page: number | null,
+	pageCount: number | null,
+	sittingSince: number | null = null,
+): void {
 	const book = tx.get('books', bookId);
 	if (!book || book.acquisition === 'WISHLIST') return;
 	const count = pageCount != null && pageCount > 0 ? pageCount : undefined;
@@ -227,10 +237,21 @@ export function setPhysicalProgress(tx: Tx, bookId: string, page: number | null,
 		total != null && reached >= total ? 'COMPLETED' : state === 'PLANNED' || state === 'PAUSED' ? 'READING' : state;
 	setState(tx, bookId, next);
 	if (reached > before) {
+		const readThroughId = currentReadThrough(tx, bookId, next)?.id;
+		const sitting =
+			sittingSince == null
+				? undefined
+				: tx
+						.all('physicalReadings', (row) => row.bookId === bookId && (row.readThroughId ?? undefined) === readThroughId)
+						.sort((a, b) => b.recordedAt - a.recordedAt)[0];
+		if (sitting && sitting.recordedAt >= sittingSince! && sitting.day === tx.today && sitting.endPage === before) {
+			tx.touch('physicalReadings', sitting, { endPage: reached });
+			return;
+		}
 		tx.put('physicalReadings', {
 			id: newId(),
 			bookId,
-			readThroughId: currentReadThrough(tx, bookId, next)?.id,
+			readThroughId,
 			recordedAt: tx.now,
 			day: tx.today,
 			startPage: before,

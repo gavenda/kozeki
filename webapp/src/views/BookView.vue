@@ -14,6 +14,7 @@ import NotesSection from '@/components/book/NotesSection.vue';
 import OwnershipSection from '@/components/book/OwnershipSection.vue';
 import PhysicalCard from '@/components/book/PhysicalCard.vue';
 import PhysicalDialog, { pagesUnread } from '@/components/book/PhysicalDialog.vue';
+import PhysicalReadingMode from '@/components/book/PhysicalReadingMode.vue';
 import ProgressCard from '@/components/book/ProgressCard.vue';
 import PurchaseDialog from '@/components/book/PurchaseDialog.vue';
 import ReviewsSection from '@/components/book/ReviewsSection.vue';
@@ -61,6 +62,7 @@ const edit = library.edit;
 // ---- Paper copy -----------------------------------------------------------------------------
 
 const editingPhysical = ref(false);
+const readingPhysical = ref(false);
 const stoppingPhysical = ref(0);
 function stopPhysical() {
 	// Asks first only when stopping unreads pages that are on record.
@@ -177,7 +179,13 @@ function remove() {
 
 			<StatusGroup v-if="canChangeState(book)" :state="stateOf(book)" @change="(state) => edit((tx) => ops.setState(tx, id, state))" />
 			<ProgressCard v-if="ops.inLibrary(book)" :book="book" :reading-time-ms="readingTimeMs" :reading-number="readingNumber" />
-			<PhysicalCard v-if="canTrackPhysical(book)" :book="book" @edit="editingPhysical = true" @stop="stopPhysical" />
+			<PhysicalCard
+				v-if="canTrackPhysical(book)"
+				:book="book"
+				@edit="editingPhysical = true"
+				@read="readingPhysical = true"
+				@stop="stopPhysical"
+			/>
 			<SynopsisSection :book="book" />
 			<OwnershipSection :book="book" @purchased="setPurchased" @edit="editingPurchase = true" />
 			<NotesSection :notes="notes" @add="editingNote = 'new'" @open="editingNote = $event" />
@@ -191,6 +199,12 @@ function remove() {
 			:readings="currentReadings"
 			@save="(page, count) => edit((tx) => ops.setPhysicalProgress(tx, id, page, count))"
 			@close="editingPhysical = false"
+		/>
+		<PhysicalReadingMode
+			v-if="readingPhysical"
+			:book="book"
+			@turn="(page, since) => edit((tx) => ops.setPhysicalProgress(tx, id, page, physicalPageCount(book!) ?? null, since))"
+			@close="readingPhysical = false"
 		/>
 		<ModalDialog v-if="stoppingPhysical" :title="s.physical.stopTitle" icon="history" icon-class="text-error" @close="stoppingPhysical = 0">
 			<p>{{ s.physical.stopMessage(stoppingPhysical) }}</p>

@@ -14,7 +14,7 @@ import { Button, IconButton } from 'tailwind-material3';
  * paper copy is told from the EPUB by its colour: the theme's leather.
  */
 defineProps<{ book: Book }>();
-const emit = defineEmits<{ edit: []; stop: [] }>();
+const emit = defineEmits<{ edit: []; read: []; stop: [] }>();
 </script>
 
 <template>
@@ -50,6 +50,16 @@ const emit = defineEmits<{ edit: []; stop: [] }>();
 				<AppIcon name="doNotDisturbOn" :size="20" />
 			</IconButton>
 			<Button variant="tonal" @click="emit('edit')">{{ s.physical.update }}</Button>
+			<!-- Wide, as the way into the screen that turns pages. -->
+			<IconButton
+				:label="s.physical.readingMode"
+				width="wide"
+				class="bg-tertiary! text-on-tertiary!"
+				:title="s.physical.readingMode"
+				@click="emit('read')"
+			>
+				<AppIcon name="autoStories" />
+			</IconButton>
 		</div>
 	</section>
 </template>
