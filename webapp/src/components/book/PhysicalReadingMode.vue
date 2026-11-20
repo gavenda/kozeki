@@ -157,7 +157,7 @@ onBeforeUnmount(() => void wakeLock.release());
 					:class="cover && 'bg-surface-container-high/82! text-on-surface! landscape:bg-transparent!'"
 					@click="emit('close')"
 				>
-					<AppIcon name="keyboardArrowLeft" />
+					<AppIcon name="arrowBack" />
 				</IconButton>
 				<div
 					class="ml-auto flex items-center gap-2 rounded-full pl-4"

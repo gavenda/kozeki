@@ -220,12 +220,12 @@ private fun TopRow(clock: PhysicalSitting.Clock, onCover: Boolean, actions: Phys
                     shapes = IconButtonDefaults.shapes(),
                     colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = chip),
                 ) {
-                    Icon(painterResource(R.drawable.keyboard_arrow_left_48px), back, Modifier.size(24.dp))
+                    Icon(painterResource(R.drawable.arrow_back_48px), back, Modifier.size(24.dp))
                 }
             }
         } else {
             TooltipIconButton(
-                icon = R.drawable.keyboard_arrow_left_48px,
+                icon = R.drawable.arrow_back_48px,
                 label = stringResource(R.string.action_back),
                 onClick = actions.onClose,
             )
