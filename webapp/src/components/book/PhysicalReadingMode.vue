@@ -143,9 +143,9 @@ onBeforeUnmount(() => void wakeLock.release());
 							<p v-if="book.authors?.length" class="line-clamp-2 type-title-medium text-on-surface-variant">
 								{{ book.authors.join(', ') }}
 							</p>
-							<p class="mt-1 type-label-large text-tertiary">{{ s.book.page }}</p>
+							<p class="mt-1 type-label-large text-primary">{{ s.book.page }}</p>
 							<p class="type-display-medium-em" aria-live="polite">{{ total ? s.xOfY(page, total) : String(page) }}</p>
-							<WavyProgress v-if="total" class="w-full" :progress="Math.min(page / total, 1)" tone="tertiary" />
+							<WavyProgress v-if="total" class="w-full" :progress="Math.min(page / total, 1)" />
 						</section>
 						<div class="flex w-full items-center gap-3 landscape:max-w-[360px]">
 							<!-- Short and narrow, so that a thumb reaching for the next page does not land on it. -->
@@ -156,18 +156,11 @@ onBeforeUnmount(() => void wakeLock.release());
 								:label="s.physical.previousPage"
 								:title="s.physical.previousPage"
 								:disabled="page <= 0"
-								:class="page > 0 && 'bg-tertiary-container! text-on-tertiary-container!'"
 								@click="previous"
 							>
 								<AppIcon name="undo" />
 							</IconButton>
-							<Button
-								size="l"
-								class="min-w-0 flex-1 px-6!"
-								:class="canNext && 'bg-tertiary! text-on-tertiary!'"
-								:disabled="!canNext"
-								@click="next"
-							>
+							<Button size="l" class="min-w-0 flex-1 px-6!" :disabled="!canNext" @click="next">
 								{{ s.physical.nextPage }}
 								<AppIcon name="keyboardArrowRight" :size="32" />
 							</Button>
@@ -203,7 +196,7 @@ onBeforeUnmount(() => void wakeLock.release());
 							class="flex items-center gap-1 rounded-full"
 							:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
 						>
-							<span class="flex size-10 items-center justify-center text-tertiary"><AppIcon name="timerFill" /></span>
+							<span class="flex size-10 items-center justify-center text-primary"><AppIcon name="timerFill" /></span>
 							<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
 							<IconButton
 								variant="standard"

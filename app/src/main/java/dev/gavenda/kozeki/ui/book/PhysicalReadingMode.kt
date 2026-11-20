@@ -281,7 +281,7 @@ private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, actions: Ph
                 Icon(
                     painterResource(R.drawable.timer_fill_48px),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.tertiary,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -316,7 +316,7 @@ private fun clockText(ms: Long): String {
 
 @Composable
 private fun BookAndPage(book: Book, page: Int, total: Int?) {
-    val leather = MaterialTheme.colorScheme.tertiary
+    val accent = MaterialTheme.colorScheme.primary
     Column(
         Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -340,7 +340,7 @@ private fun BookAndPage(book: Book, page: Int, total: Int?) {
             )
         }
         Spacer(Modifier.size(4.dp))
-        Text(stringResource(R.string.book_page), style = MaterialTheme.typography.labelLarge, color = leather)
+        Text(stringResource(R.string.book_page), style = MaterialTheme.typography.labelLarge, color = accent)
         Text(
             if (total != null) stringResource(R.string.x_of_y, page, total) else page.toString(),
             style = MaterialTheme.typography.displayMediumEmphasized,
@@ -349,8 +349,8 @@ private fun BookAndPage(book: Book, page: Int, total: Int?) {
             LinearWavyProgressIndicator(
                 progress = { (page.toFloat() / total).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth(),
-                color = leather,
-                trackColor = MaterialTheme.colorScheme.tertiaryContainer,
+                color = accent,
+                trackColor = MaterialTheme.colorScheme.primaryContainer,
             )
         }
     }
@@ -367,10 +367,6 @@ private fun PageButtons(page: Int, total: Int?, onNext: () -> Unit, onPrevious: 
                 onClick = onPrevious,
                 enabled = page > 0,
                 shapes = IconButtonDefaults.shapes(),
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                ),
                 modifier = Modifier.size(
                     IconButtonDefaults.mediumContainerSize(IconButtonDefaults.IconButtonWidthOption.Narrow),
                 ),
@@ -386,10 +382,6 @@ private fun PageButtons(page: Int, total: Int?, onNext: () -> Unit, onPrevious: 
             onClick = onNext,
             enabled = total == null || page < total,
             shapes = ButtonDefaults.shapesFor(height),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.tertiary,
-                contentColor = MaterialTheme.colorScheme.onTertiary,
-            ),
             contentPadding = ButtonDefaults.contentPaddingFor(height),
             modifier = Modifier.weight(1f).heightIn(min = height),
         ) {
