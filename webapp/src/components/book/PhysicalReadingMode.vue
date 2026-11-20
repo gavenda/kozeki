@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onKeyStroke, useDocumentVisibility, useIntervalFn, useWakeLock } from '@vueuse/core';
+import { onKeyStroke, useDocumentVisibility, useIntervalFn, useWakeLock, useWindowSize } from '@vueuse/core';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppIcon from '@/components/AppIcon.vue';
 import BookCover from '@/components/BookCover.vue';
@@ -88,6 +88,22 @@ onMounted(() => {
 });
 onBeforeUnmount(() => keep(sitting.close()));
 
+// ---- Size ------------------------------------------------------------------------------------
+
+// The layout is made for a window about the size of a laptop's (a tall one about a phone's or
+// tablet's) and zoomed up to fill a bigger one, up to twice over, so its controls grow with it.
+const { width, height } = useWindowSize();
+const scale = computed(() => {
+	const [w, h] = [width.value, height.value];
+	const fit = w > h ? Math.min(w / 1280, h / 800) : Math.min(w / 600, h / 960);
+	return Math.min(Math.max(fit, 1), 2);
+});
+const scaled = computed(() => ({
+	width: `${width.value / scale.value}px`,
+	height: `${height.value / scale.value}px`,
+	zoom: scale.value,
+}));
+
 // The screen stays on while the window is given to the book, as the phone keeps it on.
 const wakeLock = useWakeLock();
 onMounted(() => wakeLock.isSupported.value && void wakeLock.request('screen'));
@@ -103,76 +119,79 @@ onBeforeUnmount(() => void wakeLock.release());
 				<div class="absolute inset-0 bg-black/30 landscape:hidden" />
 			</template>
 
-			<div class="relative flex size-full items-center justify-center gap-12 px-6 py-18 landscape:px-12 landscape:py-16">
-				<div v-if="cover" class="hidden h-full max-h-[600px] landscape:block">
-					<div class="aspect-[2/3] h-full"><BookCover :book="book" rounded="rounded-2xl" /></div>
-				</div>
-				<div class="flex w-full max-w-[480px] flex-col items-center gap-6">
-					<section
-						class="flex w-full flex-col items-center gap-2 rounded-[28px] p-6 text-center landscape:bg-transparent! landscape:p-0"
-						:class="cover ? 'bg-surface-container-high/82' : 'bg-surface-container-high'"
-					>
-						<h1 class="line-clamp-3 type-headline-small-em">{{ book.title }}</h1>
-						<p v-if="book.authors?.length" class="line-clamp-2 type-title-medium text-on-surface-variant">
-							{{ book.authors.join(', ') }}
-						</p>
-						<p class="mt-1 type-label-large text-tertiary">{{ s.book.page }}</p>
-						<p class="type-display-medium-em" aria-live="polite">{{ total ? s.xOfY(page, total) : String(page) }}</p>
-						<WavyProgress v-if="total" class="w-full" :progress="Math.min(page / total, 1)" tone="tertiary" />
-					</section>
-					<div class="flex w-full items-center gap-3 landscape:max-w-[360px]">
-						<!-- Short and narrow, so that a thumb reaching for the next page does not land on it. -->
-						<IconButton
-							variant="tonal"
-							size="m"
-							width="narrow"
-							:label="s.physical.previousPage"
-							:title="s.physical.previousPage"
-							:disabled="page <= 0"
-							:class="page > 0 && 'bg-tertiary-container! text-on-tertiary-container!'"
-							@click="previous"
+			<!-- Laid out for a laptop's window and zoomed to fill a bigger one, so a large monitor gets large controls. -->
+			<div class="absolute top-0 left-0" :style="scaled">
+				<div class="relative flex size-full items-center justify-center gap-12 px-6 py-18 landscape:px-12 landscape:py-16">
+					<div v-if="cover" class="hidden h-full max-h-[600px] landscape:block">
+						<div class="aspect-[2/3] h-full"><BookCover :book="book" rounded="rounded-2xl" /></div>
+					</div>
+					<div class="flex w-full max-w-[480px] flex-col items-center gap-6">
+						<section
+							class="flex w-full flex-col items-center gap-2 rounded-[28px] p-6 text-center landscape:bg-transparent! landscape:p-0"
+							:class="cover ? 'bg-surface-container-high/82' : 'bg-surface-container-high'"
 						>
-							<AppIcon name="undo" />
-						</IconButton>
-						<Button
-							size="l"
-							class="min-w-0 flex-1 px-6!"
-							:class="canNext && 'bg-tertiary! text-on-tertiary!'"
-							:disabled="!canNext"
-							@click="next"
-						>
-							{{ s.physical.nextPage }}
-							<AppIcon name="keyboardArrowRight" :size="32" />
-						</Button>
+							<h1 class="line-clamp-3 type-headline-small-em">{{ book.title }}</h1>
+							<p v-if="book.authors?.length" class="line-clamp-2 type-title-medium text-on-surface-variant">
+								{{ book.authors.join(', ') }}
+							</p>
+							<p class="mt-1 type-label-large text-tertiary">{{ s.book.page }}</p>
+							<p class="type-display-medium-em" aria-live="polite">{{ total ? s.xOfY(page, total) : String(page) }}</p>
+							<WavyProgress v-if="total" class="w-full" :progress="Math.min(page / total, 1)" tone="tertiary" />
+						</section>
+						<div class="flex w-full items-center gap-3 landscape:max-w-[360px]">
+							<!-- Short and narrow, so that a thumb reaching for the next page does not land on it. -->
+							<IconButton
+								variant="tonal"
+								size="m"
+								width="narrow"
+								:label="s.physical.previousPage"
+								:title="s.physical.previousPage"
+								:disabled="page <= 0"
+								:class="page > 0 && 'bg-tertiary-container! text-on-tertiary-container!'"
+								@click="previous"
+							>
+								<AppIcon name="undo" />
+							</IconButton>
+							<Button
+								size="l"
+								class="min-w-0 flex-1 px-6!"
+								:class="canNext && 'bg-tertiary! text-on-tertiary!'"
+								:disabled="!canNext"
+								@click="next"
+							>
+								{{ s.physical.nextPage }}
+								<AppIcon name="keyboardArrowRight" :size="32" />
+							</Button>
+						</div>
 					</div>
 				</div>
-			</div>
 
-			<!-- The way out on one side, the sitting's timer on the other. Over a cover both sit on the surface colour. -->
-			<div class="absolute inset-x-0 top-0 flex items-center p-2">
-				<IconButton
-					:variant="cover ? 'tonal' : 'standard'"
-					:label="s.action.back"
-					:title="s.action.back"
-					:class="cover && 'bg-surface-container-high/82! text-on-surface! landscape:bg-transparent!'"
-					@click="emit('close')"
-				>
-					<AppIcon name="arrowBack" />
-				</IconButton>
-				<div
-					class="ml-auto flex items-center gap-1 rounded-full"
-					:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
-				>
-					<span class="flex size-10 items-center justify-center text-tertiary"><AppIcon name="timerFill" /></span>
-					<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
+				<!-- The way out on one side, the sitting's timer on the other. Over a cover both sit on the surface colour. -->
+				<div class="absolute inset-x-0 top-0 flex items-center p-2">
 					<IconButton
-						variant="standard"
-						:label="running ? s.physical.timerPause : s.physical.timerResume"
-						:title="running ? s.physical.timerPause : s.physical.timerResume"
-						@click="toggleTimer"
+						:variant="cover ? 'tonal' : 'standard'"
+						:label="s.action.back"
+						:title="s.action.back"
+						:class="cover && 'bg-surface-container-high/82! text-on-surface! landscape:bg-transparent!'"
+						@click="emit('close')"
 					>
-						<AppIcon :name="running ? 'pauseFill' : 'playArrowFill'" />
+						<AppIcon name="arrowBack" />
 					</IconButton>
+					<div
+						class="ml-auto flex items-center gap-1 rounded-full"
+						:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
+					>
+						<span class="flex size-10 items-center justify-center text-tertiary"><AppIcon name="timerFill" /></span>
+						<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
+						<IconButton
+							variant="standard"
+							:label="running ? s.physical.timerPause : s.physical.timerResume"
+							:title="running ? s.physical.timerPause : s.physical.timerResume"
+							@click="toggleTimer"
+						>
+							<AppIcon :name="running ? 'pauseFill' : 'playArrowFill'" />
+						</IconButton>
+					</div>
 				</div>
 			</div>
 		</div>
