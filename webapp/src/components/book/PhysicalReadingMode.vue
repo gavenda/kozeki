@@ -160,10 +160,10 @@ onBeforeUnmount(() => void wakeLock.release());
 					<AppIcon name="arrowBack" />
 				</IconButton>
 				<div
-					class="ml-auto flex items-center gap-2 rounded-full pl-4"
+					class="ml-auto flex items-center gap-1 rounded-full"
 					:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
 				>
-					<AppIcon name="timerFill" :size="20" class="text-tertiary" />
+					<span class="flex size-10 items-center justify-center text-tertiary"><AppIcon name="timerFill" /></span>
 					<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
 					<IconButton
 						variant="standard"

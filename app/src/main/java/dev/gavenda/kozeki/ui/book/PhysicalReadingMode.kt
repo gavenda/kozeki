@@ -247,15 +247,19 @@ private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, actions: Ph
     val elapsed = clock.baseMs + (clock.runningSince?.let { (now - it).coerceAtLeast(0L) } ?: 0L)
     val running = clock.runningSince != null
     Surface(shape = CircleShape, color = color) {
-        Row(Modifier.padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                painterResource(R.drawable.timer_fill_48px),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(20.dp),
-            )
-            Spacer(Modifier.width(8.dp))
+        // The timer's icon takes the same room as the pause button's, so the two ends match.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(IconButtonDefaults.smallContainerSize()), contentAlignment = Alignment.Center) {
+                Icon(
+                    painterResource(R.drawable.timer_fill_48px),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.tertiary,
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+            Spacer(Modifier.width(4.dp))
             Text(clockText(elapsed), style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.width(4.dp))
             val label = stringResource(if (running) R.string.physical_timer_pause else R.string.physical_timer_resume)
             LabelTooltip(label) {
                 IconButton(onClick = if (running) actions.onPause else actions.onResume, shapes = IconButtonDefaults.shapes()) {
