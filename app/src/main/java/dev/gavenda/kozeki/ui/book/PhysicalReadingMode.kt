@@ -10,15 +10,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -414,10 +413,9 @@ private fun BookAndPage(book: Book, page: Int, total: Int?) {
     }
 }
 
-/** A wide button for the next page, and beside it a short, narrow one that takes a tap back. */
+/** A wide icon button for the next page, and beside it a short, narrow one that takes a tap back. */
 @Composable
 private fun PageButtons(page: Int, total: Int?, onNext: () -> Unit, onPrevious: () -> Unit, modifier: Modifier) {
-    val height = ButtonDefaults.LargeContainerHeight
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         val previousLabel = stringResource(R.string.physical_previous_page)
         LabelTooltip(previousLabel) {
@@ -436,25 +434,23 @@ private fun PageButtons(page: Int, total: Int?, onNext: () -> Unit, onPrevious: 
                 )
             }
         }
-        Button(
-            onClick = onNext,
-            enabled = total == null || page < total,
-            shapes = ButtonDefaults.shapesFor(height),
-            contentPadding = ButtonDefaults.contentPaddingFor(height),
-            modifier = Modifier.weight(1f).heightIn(min = height),
-        ) {
-            Text(
-                stringResource(R.string.physical_next_page),
-                style = ButtonDefaults.textStyleFor(height),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.size(ButtonDefaults.iconSpacingFor(height)))
-            Icon(
-                painterResource(R.drawable.keyboard_arrow_right_48px),
-                contentDescription = null,
-                modifier = Modifier.size(ButtonDefaults.iconSizeFor(height)),
-            )
+        val nextLabel = stringResource(R.string.physical_next_page)
+        // As wide as the row allows, so that it is hard to miss.
+        Box(Modifier.weight(1f)) {
+            LabelTooltip(nextLabel) {
+                FilledIconButton(
+                    onClick = onNext,
+                    enabled = total == null || page < total,
+                    shapes = IconButtonDefaults.shapes(),
+                    modifier = Modifier.fillMaxWidth().height(IconButtonDefaults.largeContainerSize().height),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.keyboard_arrow_right_48px),
+                        contentDescription = nextLabel,
+                        modifier = Modifier.size(48.dp),
+                    )
+                }
+            }
         }
     }
 }

@@ -10,7 +10,7 @@ import { persisted } from '@/lib/persisted';
 import { PhysicalSitting, type SittingPart } from '@/lib/sitting';
 import { s } from '@/strings';
 import type { Book } from '@/types';
-import { Button, IconButton } from 'tailwind-material3';
+import { IconButton } from 'tailwind-material3';
 
 /**
  * The whole window given to a paper copy being read, as the phone's `PhysicalReadingMode`: one wide
@@ -155,10 +155,18 @@ onBeforeUnmount(() => void wakeLock.release());
 								>
 									<AppIcon name="undo" />
 								</IconButton>
-								<Button size="l" class="min-w-0 flex-1 px-6!" :disabled="!canNext" @click="next">
-									{{ s.physical.nextPage }}
-									<AppIcon name="keyboardArrowRight" :size="32" />
-								</Button>
+								<!-- As wide as the row allows, so that it is hard to miss. -->
+								<IconButton
+									size="l"
+									width="wide"
+									:label="s.physical.nextPage"
+									:title="s.physical.nextPage"
+									class="w-auto! min-w-0 flex-1 [&>span]:size-12!"
+									:disabled="!canNext"
+									@click="next"
+								>
+									<AppIcon name="keyboardArrowRight" />
+								</IconButton>
 							</div>
 						</section>
 					</div>
