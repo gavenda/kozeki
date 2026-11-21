@@ -32,6 +32,8 @@ const total = computed(() => physicalPageCount(props.book));
 const cover = computed(() => coverSrc(props.book));
 // Whether the card over the cover is frosted, kept per browser as the phone keeps it per device.
 const blurred = persisted('readingCoverBlurred', false, (value): value is boolean => typeof value === 'boolean');
+// What sits over the cover: see-through, and frosted when blurred.
+const glass = computed(() => (blurred.value ? 'bg-surface-container-high/60! backdrop-blur-2xl' : 'bg-surface-container-high/82!'));
 const canNext = computed(() => total.value == null || page.value < total.value);
 
 function turn(to: number) {
@@ -131,13 +133,7 @@ onBeforeUnmount(() => void wakeLock.release());
 					<div class="flex w-full max-w-[480px] flex-col items-center gap-6">
 						<section
 							class="flex w-full flex-col items-center gap-2 rounded-[28px] p-6 text-center landscape:bg-transparent! landscape:p-0"
-							:class="
-								!cover
-									? 'bg-surface-container-high'
-									: blurred
-										? 'bg-surface-container-high/60 backdrop-blur-2xl'
-										: 'bg-surface-container-high/82'
-							"
+							:class="cover ? glass : 'bg-surface-container-high'"
 						>
 							<h1 class="line-clamp-3 type-headline-small-em">{{ book.title }}</h1>
 							<p v-if="book.authors?.length" class="line-clamp-2 type-title-medium text-on-surface-variant">
@@ -174,7 +170,7 @@ onBeforeUnmount(() => void wakeLock.release());
 						:variant="cover ? 'tonal' : 'standard'"
 						:label="s.action.back"
 						:title="s.action.back"
-						:class="cover && 'bg-surface-container-high/82! text-on-surface! landscape:bg-transparent!'"
+						:class="cover && [glass, 'text-on-surface! landscape:bg-transparent! landscape:backdrop-blur-none']"
 						@click="emit('close')"
 					>
 						<AppIcon name="arrowBack" />
@@ -186,7 +182,8 @@ onBeforeUnmount(() => void wakeLock.release());
 							variant="tonal"
 							:label="blurred ? s.physical.coverUnblur : s.physical.coverBlur"
 							:title="blurred ? s.physical.coverUnblur : s.physical.coverBlur"
-							class="mr-2 bg-surface-container-high/82! text-on-surface! landscape:hidden"
+							class="mr-2 text-on-surface! landscape:hidden"
+							:class="glass"
 							:aria-pressed="blurred"
 							@click="blurred = !blurred"
 						>
@@ -194,7 +191,7 @@ onBeforeUnmount(() => void wakeLock.release());
 						</IconButton>
 						<div
 							class="flex items-center gap-1 rounded-full"
-							:class="cover ? 'bg-surface-container-high/82 landscape:bg-surface-container-high' : 'bg-surface-container-high'"
+							:class="cover ? [glass, 'landscape:bg-surface-container-high! landscape:backdrop-blur-none'] : 'bg-surface-container-high'"
 						>
 							<span class="flex size-10 items-center justify-center text-primary"><AppIcon name="timerFill" /></span>
 							<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>

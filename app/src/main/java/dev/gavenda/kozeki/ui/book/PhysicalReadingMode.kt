@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
@@ -175,6 +177,8 @@ private fun PhysicalReadingContent(
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
             }
             val onCover = !wide && cover != null
+            // What the frosted parts blur: the cover as it fills the screen.
+            val backdrop = if (onCover && blurred) Backdrop(cover!!, maxWidth, maxHeight, coverOrigin) else null
             Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                 if (wide) {
                     Row(
@@ -200,48 +204,62 @@ private fun PhysicalReadingContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterVertically),
                     ) {
-                        var cardOrigin by remember { mutableStateOf(Offset.Zero) }
-                        Surface(
+                        Frosted(
+                            backdrop = backdrop,
                             shape = MaterialTheme.shapes.extraLarge,
-                            color = Color.Transparent,
-                            modifier = Modifier
-                                .widthIn(max = 480.dp)
-                                .fillMaxWidth()
-                                .onGloballyPositioned { cardOrigin = it.positionInRoot() },
+                            color = panelColor(onCover, blurred),
+                            modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
                         ) {
-                            Box {
-                                // Frosted glass: the cover behind the card, blurred, under the card's colour.
-                                if (onCover && blurred) {
-                                    FrostedCover(cover!!, this@BoxWithConstraints.maxWidth, this@BoxWithConstraints.maxHeight, cardOrigin - coverOrigin)
-                                }
-                                Box(
-                                    Modifier.matchParentSize().background(
-                                        MaterialTheme.colorScheme.surfaceContainerHigh.copy(
-                                            alpha = when {
-                                                !onCover -> 1f
-                                                blurred -> 0.6f
-                                                else -> 0.82f
-                                            },
-                                        ),
-                                    ),
-                                )
-                                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                                    BookAndPage(book, page, total)
-                                    PageButtons(page, total, onNext, onPrevious, Modifier.fillMaxWidth())
-                                }
+                            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+                                BookAndPage(book, page, total)
+                                PageButtons(page, total, onNext, onPrevious, Modifier.fillMaxWidth())
                             }
                         }
                     }
                 }
-                TopRow(clock, onCover, blurred, actions, Modifier.align(Alignment.TopCenter))
+                TopRow(clock, onCover, blurred, backdrop, actions, Modifier.align(Alignment.TopCenter))
             }
         }
     }
 }
 
+/** The cover as it fills a screen of [width] by [height], its corner at [origin] in the window. */
+private class Backdrop(val cover: Any, val width: Dp, val height: Dp, val origin: Offset)
+
+/** The colour of what sits over the cover: see-through over it, more so when frosted. */
+@Composable
+private fun panelColor(onCover: Boolean, blurred: Boolean): Color =
+    MaterialTheme.colorScheme.surfaceContainerHigh.copy(
+        alpha = when {
+            !onCover -> 1f
+            blurred -> 0.6f
+            else -> 0.82f
+        },
+    )
+
+/**
+ * [content] on [color] in [shape]; with a [backdrop], over the part of it behind, blurred, so that
+ * it looks like frosted glass.
+ */
+@Composable
+private fun Frosted(
+    backdrop: Backdrop?,
+    shape: Shape,
+    color: Color,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    Box(modifier.clip(shape).onGloballyPositioned { origin = it.positionInRoot() }) {
+        if (backdrop != null) FrostedCover(backdrop.cover, backdrop.width, backdrop.height, origin - backdrop.origin)
+        Box(Modifier.matchParentSize().background(color))
+        content()
+    }
+}
+
 /**
  * The part of the cover, filling a screen of [width] by [height], that lies behind a card [offset]
- * from its corner, blurred, so that the card looks like frosted glass over it.
+ * from its corner, blurred.
  */
 @Composable
 private fun BoxScope.FrostedCover(cover: Any, width: Dp, height: Dp, offset: Offset) {
@@ -267,26 +285,17 @@ private fun TopRow(
     clock: PhysicalSitting.Clock,
     onCover: Boolean,
     blurred: Boolean,
+    backdrop: Backdrop?,
     actions: PhysicalReadingActions,
     modifier: Modifier,
 ) {
-    // Over a cover, both sit on the surface colour so they stay readable.
-    val chip = if (onCover) {
-        MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.82f)
-    } else {
-        MaterialTheme.colorScheme.surfaceContainerHigh
-    }
+    // Over a cover, they sit on the card's see-through colour, and are frosted when it is.
+    val chip = panelColor(onCover, blurred)
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         if (onCover) {
             val back = stringResource(R.string.action_back)
-            LabelTooltip(back) {
-                FilledTonalIconButton(
-                    onClick = actions.onClose,
-                    shapes = IconButtonDefaults.shapes(),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = chip),
-                ) {
-                    Icon(painterResource(R.drawable.arrow_back_48px), back, Modifier.size(24.dp))
-                }
+            Frosted(backdrop, CircleShape, chip) {
+                TooltipIconButton(icon = R.drawable.arrow_back_48px, label = back, onClick = actions.onClose)
             }
         } else {
             TooltipIconButton(
@@ -299,27 +308,21 @@ private fun TopRow(
         // Only a card over the cover can be frosted, so only the phone's layout has the button.
         if (onCover) {
             val label = stringResource(if (blurred) R.string.physical_cover_unblur else R.string.physical_cover_blur)
-            LabelTooltip(label) {
-                FilledTonalIconButton(
+            Frosted(backdrop, CircleShape, chip) {
+                TooltipIconButton(
+                    icon = if (blurred) R.drawable.blur_off_48px else R.drawable.blur_on_48px,
+                    label = label,
                     onClick = { actions.onBlur(!blurred) },
-                    shapes = IconButtonDefaults.shapes(),
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = chip),
-                ) {
-                    Icon(
-                        painterResource(if (blurred) R.drawable.blur_off_48px else R.drawable.blur_on_48px),
-                        contentDescription = label,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+                )
             }
             Spacer(Modifier.width(8.dp))
         }
-        SittingTimer(clock, chip, actions)
+        SittingTimer(clock, chip, backdrop, actions)
     }
 }
 
 @Composable
-private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, actions: PhysicalReadingActions) {
+private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, backdrop: Backdrop?, actions: PhysicalReadingActions) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(clock.runningSince) {
         while (clock.runningSince != null) {
@@ -329,7 +332,7 @@ private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, actions: Ph
     }
     val elapsed = clock.baseMs + (clock.runningSince?.let { (now - it).coerceAtLeast(0L) } ?: 0L)
     val running = clock.runningSince != null
-    Surface(shape = CircleShape, color = color) {
+    Frosted(backdrop, CircleShape, color) {
         // The timer's icon takes the same room as the pause button's, so the two ends match.
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(IconButtonDefaults.smallContainerSize()), contentAlignment = Alignment.Center) {
