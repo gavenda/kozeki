@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -194,7 +193,7 @@ private fun PhysicalReadingContent(
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
                             BookAndPage(book, page, total)
-                            PageButtons(page, total, onNext, onPrevious, Modifier.width(360.dp))
+                            PageButtons(page, total, clock, onNext, onPrevious, actions, Modifier.width(360.dp))
                         }
                     }
                 } else {
@@ -211,7 +210,7 @@ private fun PhysicalReadingContent(
                         ) {
                             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
                                 BookAndPage(book, page, total)
-                                PageButtons(page, total, onNext, onPrevious, Modifier.fillMaxWidth())
+                                PageButtons(page, total, clock, onNext, onPrevious, actions, Modifier.fillMaxWidth())
                             }
                         }
                     }
@@ -316,12 +315,12 @@ private fun TopRow(
             }
             Spacer(Modifier.width(8.dp))
         }
-        SittingTimer(clock, chip, backdrop, actions)
+        SittingTimer(clock, chip, backdrop)
     }
 }
 
 @Composable
-private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, backdrop: Backdrop?, actions: PhysicalReadingActions) {
+private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, backdrop: Backdrop?) {
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(clock.runningSince) {
         while (clock.runningSince != null) {
@@ -330,10 +329,8 @@ private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, backdrop: B
         }
     }
     val elapsed = clock.baseMs + (clock.runningSince?.let { (now - it).coerceAtLeast(0L) } ?: 0L)
-    val running = clock.runningSince != null
     Frosted(backdrop, CircleShape, color) {
-        // The timer's icon takes the same room as the pause button's, so the two ends match.
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(IconButtonDefaults.smallContainerSize()), contentAlignment = Alignment.Center) {
                 Icon(
                     painterResource(R.drawable.timer_fill_48px),
@@ -344,17 +341,6 @@ private fun SittingTimer(clock: PhysicalSitting.Clock, color: Color, backdrop: B
             }
             Spacer(Modifier.width(4.dp))
             Text(clockText(elapsed), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.width(4.dp))
-            val label = stringResource(if (running) R.string.physical_timer_pause else R.string.physical_timer_resume)
-            LabelTooltip(label) {
-                IconButton(onClick = if (running) actions.onPause else actions.onResume, shapes = IconButtonDefaults.shapes()) {
-                    Icon(
-                        painterResource(if (running) R.drawable.pause_fill_48px else R.drawable.play_arrow_fill_48px),
-                        contentDescription = label,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
-            }
         }
     }
 }
@@ -413,9 +399,20 @@ private fun BookAndPage(book: Book, page: Int, total: Int?) {
     }
 }
 
-/** A wide icon button for the next page, and beside it a short, narrow one that takes a tap back. */
+/**
+ * A wide icon button for the next page, and before it a short, narrow one that takes a tap back
+ * and the timer's pause.
+ */
 @Composable
-private fun PageButtons(page: Int, total: Int?, onNext: () -> Unit, onPrevious: () -> Unit, modifier: Modifier) {
+private fun PageButtons(
+    page: Int,
+    total: Int?,
+    clock: PhysicalSitting.Clock,
+    onNext: () -> Unit,
+    onPrevious: () -> Unit,
+    actions: PhysicalReadingActions,
+    modifier: Modifier,
+) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         val previousLabel = stringResource(R.string.physical_previous_page)
         LabelTooltip(previousLabel) {
@@ -430,6 +427,22 @@ private fun PageButtons(page: Int, total: Int?, onNext: () -> Unit, onPrevious: 
                 Icon(
                     painterResource(R.drawable.undo_48px),
                     contentDescription = previousLabel,
+                    modifier = Modifier.size(IconButtonDefaults.mediumIconSize),
+                )
+            }
+        }
+        // The timer's pause, between the two, where a hand already is.
+        val running = clock.runningSince != null
+        val timerLabel = stringResource(if (running) R.string.physical_timer_pause else R.string.physical_timer_resume)
+        LabelTooltip(timerLabel) {
+            FilledTonalIconButton(
+                onClick = if (running) actions.onPause else actions.onResume,
+                shapes = IconButtonDefaults.shapes(),
+                modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),
+            ) {
+                Icon(
+                    painterResource(if (running) R.drawable.pause_fill_48px else R.drawable.play_arrow_fill_48px),
+                    contentDescription = timerLabel,
                     modifier = Modifier.size(IconButtonDefaults.mediumIconSize),
                 )
             }

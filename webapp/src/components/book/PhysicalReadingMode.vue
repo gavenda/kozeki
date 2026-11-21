@@ -155,6 +155,16 @@ onBeforeUnmount(() => void wakeLock.release());
 								>
 									<AppIcon name="undo" />
 								</IconButton>
+								<!-- The timer's pause, between the two, where a hand already is. -->
+								<IconButton
+									variant="tonal"
+									size="m"
+									:label="running ? s.physical.timerPause : s.physical.timerResume"
+									:title="running ? s.physical.timerPause : s.physical.timerResume"
+									@click="toggleTimer"
+								>
+									<AppIcon :name="running ? 'pauseFill' : 'playArrowFill'" />
+								</IconButton>
 								<!-- As wide as the row allows, so that it is hard to miss. -->
 								<IconButton
 									size="l"
@@ -198,19 +208,11 @@ onBeforeUnmount(() => void wakeLock.release());
 							<AppIcon :name="blurred ? 'blurOff' : 'blurOn'" />
 						</IconButton>
 						<div
-							class="flex items-center gap-1 rounded-full"
+							class="flex items-center gap-1 rounded-full pr-4"
 							:class="cover ? [glass, 'landscape:bg-surface-container-high! landscape:backdrop-blur-none'] : 'bg-surface-container-high'"
 						>
 							<span class="flex size-10 items-center justify-center text-primary"><AppIcon name="timerFill" /></span>
 							<span class="type-title-medium tabular-nums" role="timer">{{ clockText }}</span>
-							<IconButton
-								variant="standard"
-								:label="running ? s.physical.timerPause : s.physical.timerResume"
-								:title="running ? s.physical.timerPause : s.physical.timerResume"
-								@click="toggleTimer"
-							>
-								<AppIcon :name="running ? 'pauseFill' : 'playArrowFill'" />
-							</IconButton>
 						</div>
 					</div>
 				</div>
