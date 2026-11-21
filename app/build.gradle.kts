@@ -59,8 +59,8 @@ android {
         applicationId = "dev.gavenda.kozeki"
         minSdk = 36
         targetSdk = 37
-        versionCode = 33
-        versionName = "3.4.2"
+        versionCode = 34
+        versionName = "3.4.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
