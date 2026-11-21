@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -435,7 +436,7 @@ private fun PageButtons(
         val running = clock.runningSince != null
         val timerLabel = stringResource(if (running) R.string.physical_timer_pause else R.string.physical_timer_resume)
         LabelTooltip(timerLabel) {
-            FilledTonalIconButton(
+            OutlinedIconButton(
                 onClick = if (running) actions.onPause else actions.onResume,
                 shapes = IconButtonDefaults.shapes(),
                 modifier = Modifier.size(IconButtonDefaults.mediumContainerSize()),

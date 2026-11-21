@@ -157,7 +157,7 @@ onBeforeUnmount(() => void wakeLock.release());
 								</IconButton>
 								<!-- The timer's pause, between the two, where a hand already is. -->
 								<IconButton
-									variant="tonal"
+									variant="outlined"
 									size="m"
 									:label="running ? s.physical.timerPause : s.physical.timerResume"
 									:title="running ? s.physical.timerPause : s.physical.timerResume"
