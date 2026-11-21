@@ -40,7 +40,12 @@ function turn(to: number) {
 	page.value = to;
 	emit('turn', to, sittingSince);
 }
-const next = () => canNext.value && turn(page.value + 1);
+function next() {
+	if (!canNext.value) return;
+	// Turning a page is reading, so a paused timer starts again.
+	if (!running.value) toggleTimer();
+	turn(page.value + 1);
+}
 const previous = () => page.value > 0 && turn(page.value - 1);
 
 onKeyStroke(['ArrowRight', ' ', 'PageDown'], (event) => (event.preventDefault(), next()));

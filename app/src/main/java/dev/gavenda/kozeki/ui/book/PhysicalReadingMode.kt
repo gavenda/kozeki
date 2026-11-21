@@ -141,7 +141,11 @@ fun PhysicalReadingMode(book: Book, clock: PhysicalSitting.Clock, blurred: Boole
             total = total,
             clock = clock,
             blurred = blurred,
-            onNext = { turn(page + 1) },
+            onNext = {
+                // Turning a page is reading, so a paused timer starts again.
+                if (clock.runningSince == null) actions.onResume()
+                turn(page + 1)
+            },
             onPrevious = { turn(page - 1) },
             actions = actions,
         )
